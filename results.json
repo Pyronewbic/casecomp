@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-04-28T08:00:34.323Z",
+  "config": {
+    "language": "any",
+    "deliveryCountries": [
+      "US",
+      "IN"
+    ],
+    "resultsPerCard": 5,
+    "soldListingsLimit": 3,
+    "listingFormat": "slab",
+    "rawSearchSuffix": "raw",
+    "slab": {
+      "provider": "CGC",
+      "grade": "9.5"
+    },
+    "aiGrading": {
+      "enabled": false,
+      "mode": "llm",
+      "llm": {
+        "provider": "claude",
+        "model": "claude-opus-4-7",
+        "maxTokens": 500
+      },
+      "site": {
+        "provider": "local"
+      },
+      "minGradeToReport": 0,
+      "cacheGrades": true
+    }
+  },
+  "argv": {
+    "_": [],
+    "ebay": false,
+    "limit": 1,
+    "format": "slab",
+    "slab-provider": "CGC",
+    "slab-grade": 9.5
+  },
+  "results": [
+    {
+      "query": "Pikachu 10th movie",
+      "ebaySearchQuery": "Pikachu 10th movie CGC 9.5",
+      "listingFormat": "slab",
+      "listingDescription": "slab (CGC 9.5)",
+      "slab": {
+        "provider": "CGC",
+        "grade": "9.5"
+      },
+      "lang": "any",
+      "activeByCountry": {
+        "US": [],
+        "IN": []
+      },
+      "sold": [],
+      "soldSource": "no-ebay",
+      "gradingLabel": "off",
+      "counts": {
+        "activeTotal": 0,
+        "sold": 0
+      },
+      "pipelines": {
+        "active": {
+          "US": {
+            "fetched": 0,
+            "afterLanguage": 0,
+            "afterRelevance": 0,
+            "afterListingFormat": 0
+          },
+          "IN": {
+            "fetched": 0,
+            "afterLanguage": 0,
+            "afterRelevance": 0,
+            "afterListingFormat": 0
+          }
+        },
+        "sold": {
+          "fetched": 0,
+          "afterLanguage": 0,
+          "afterRelevance": 0,
+          "afterListingFormat": 0
+        }
+      }
+    }
+  ]
+}
