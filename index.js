@@ -21,9 +21,7 @@ import { writeMarkdown, writeJson } from "./output.js";
 import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
 
 export const CARDS = [
-  "Pikachu 10th movie",
-  "Mew 10th movie",
-  "Charizard Base Set shadowless",
+  "Giratina V Alt Art Japanese"
 ];
 
 export const CONFIG = {
@@ -31,10 +29,16 @@ export const CONFIG = {
   deliveryCountries: ["US", "IN"],
   resultsPerCard: 5,
   soldListingsLimit: 3,
+  /** When true, try Playwright (Chromium) before axios for sold HTML (Insights still first). */
+  soldBrowser: false,
+  /** Narrow Browse + sold scrape to TCG singles category and drop obvious non-card titles. */
+  tcgListingFocus: true,
+  /** eBay category_ids for Browse (comma-separated). Default: CCG Individual Cards. */
+  tcgBrowseCategoryIds: "183454",
   /** "raw" = ungraded bias; "slab" = graded in case (uses slab.provider + slab.grade). */
   listingFormat: "raw",
-  /** Appended to eBay q when listingFormat is raw (e.g. "raw", "ungraded raw", or ""). */
-  rawSearchSuffix: "raw",
+  /** Appended to eBay q when listingFormat is raw (e.g. "ungraded", or "" for card name only). */
+  rawSearchSuffix: "",
   slab: {
     provider: "PSA",
     grade: "10",
@@ -60,6 +64,25 @@ const argv = minimist(process.argv.slice(2));
 function log(msg) {
   const t = new Date().toTimeString().slice(0, 8);
   console.log(`[${t}] ${msg}`);
+}
+
+/** Readable axios / fetch-style errors (avoids "[object Object]"). */
+function formatRequestError(err) {
+  if (err == null) return String(err);
+  const res = err.response;
+  if (res) {
+    const bits = [res.status, res.statusText].filter(Boolean).join(" ");
+    let body = res.data;
+    if (body != null && typeof body === "object") {
+      try {
+        body = JSON.stringify(body);
+      } catch {
+        body = String(body);
+      }
+    }
+    return [bits, body].filter(Boolean).join(" — ").trim() || err.message || String(err);
+  }
+  return err.message || String(err);
 }
 
 function applyArgvToConfig(cfg) {
@@ -93,7 +116,19 @@ function applyArgvToConfig(cfg) {
   }
   if (argv["raw-suffix"] !== undefined) {
     const v = argv["raw-suffix"];
-    c.rawSearchSuffix = v === true ? "raw" : v === false ? "" : String(v);
+    c.rawSearchSuffix = v === true || v === false ? "" : String(v);
+  }
+  if (argv["sold-browser"]) {
+    c.soldBrowser = true;
+  } else {
+    const eb = (process.env.EBAY_SOLD_BROWSER || "").toLowerCase();
+    c.soldBrowser =
+      eb === "1" || eb === "true" || eb === "playwright" || eb === "chromium";
+  }
+  if (argv["wide-products"]) {
+    c.tcgListingFocus = false;
+  } else if (process.env.EBAY_TCG_FOCUS === "0") {
+    c.tcgListingFocus = false;
   }
   return c;
 }
@@ -239,7 +274,7 @@ export async function main() {
       await testEbayAuth(clientId, clientSecret);
       log("eBay OAuth: OK");
     } catch (e) {
-      log(`eBay OAuth failed: ${e.response?.data || e.message}`);
+      log(`eBay OAuth failed: ${formatRequestError(e)}`);
       process.exit(1);
     }
   } else {
@@ -294,10 +329,13 @@ export async function main() {
       const p = res.pipeline;
       const items = res.items || [];
       pipelines[country] = p;
-      activeTotal += p?.afterListingFormat ?? p?.afterRelevance ?? items.length;
 
+      const tcgStep =
+        config.tcgListingFocus !== false && p?.afterTcgFocus != null
+          ? ` → ${p.afterTcgFocus} (tcg)`
+          : "";
       log(
-        `  Active ${country}: ${p?.fetched ?? items.length} → ${p?.afterLanguage ?? "?"} (lang) → ${p?.afterRelevance ?? items.length} (relevance) → ${p?.afterListingFormat ?? "?"} (format) → top ${items.length}`,
+        `  Active ${country}: ${p?.fetched ?? items.length} → ${p?.afterLanguage ?? "?"} (lang) → ${p?.afterRelevance ?? items.length} (relevance) → ${p?.afterListingFormat ?? "?"} (format)${tcgStep} → top ${items.length}${p?.cardOnlyBrowseFallback ? " [card-only Browse]" : ""}${p?.unrestrictedBrowse ? " [wide Browse+BIN: verify listing]" : p?.deliveryFilterRelaxed ? " [relaxed Browse filters]" : ""}`,
       );
       if (verbose) {
         log(
@@ -325,6 +363,7 @@ export async function main() {
       let rows = gradedPack.rows;
       rows = applyMinGrade(rows, config.aiGrading.minGradeToReport);
       activeByCountry[country] = rows;
+      activeTotal += rows.length;
       }
 
       const soldRes = await searchSold({
@@ -336,10 +375,15 @@ export async function main() {
       noEbay,
       getToken,
       on401,
+      soldBrowser: config.soldBrowser,
     });
       const sp = soldRes.pipeline;
+      const soldTcg =
+        config.tcgListingFocus !== false && sp?.afterTcgFocus != null
+          ? ` → ${sp.afterTcgFocus} (tcg)`
+          : "";
       log(
-        `  Sold (${soldRes.source}): ${sp?.fetched ?? 0} → ${sp?.afterLanguage ?? "?"} (lang) → ${sp?.afterRelevance ?? 0} (relevance) → ${sp?.afterListingFormat ?? "?"} (format) → last ${soldRes.items?.length ?? 0}`,
+        `  Sold (${soldRes.source}): ${sp?.fetched ?? 0} → ${sp?.afterLanguage ?? "?"} (lang) → ${sp?.afterRelevance ?? 0} (relevance) → ${sp?.afterListingFormat ?? "?"} (format)${soldTcg} → last ${soldRes.items?.length ?? 0}`,
       );
 
       const ebayUsed = await getEbayUsageToday();
@@ -361,12 +405,12 @@ export async function main() {
         gradingLabel: gradingLabel(config),
         counts: {
           activeTotal,
-          sold: sp?.afterListingFormat ?? sp?.afterRelevance ?? soldRes.items?.length ?? 0,
+          sold: soldRes.items?.length ?? 0,
         },
         pipelines: { active: pipelines, sold: sp },
       });
     } catch (e) {
-      log(`  ERROR: ${e.message || e}`);
+      log(`  ERROR: ${formatRequestError(e)}`);
       results.push({
         query: card,
         ebaySearchQuery: ebayQuery,
@@ -377,7 +421,7 @@ export async function main() {
             ? { ...config.slab }
             : null,
         lang: config.language,
-        error: String(e.message || e),
+        error: formatRequestError(e),
         activeByCountry: {},
         sold: [],
         gradingLabel: gradingLabel(config),

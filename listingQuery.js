@@ -10,7 +10,7 @@ export function buildEbaySearchQuery(cardName, config) {
     const g = String(config.slab?.grade ?? "10").trim();
     return `${base} ${p} ${g}`.replace(/\s+/g, " ").trim();
   }
-  const suffix = String(config.rawSearchSuffix ?? "raw").trim();
+  const suffix = String(config.rawSearchSuffix ?? "").trim();
   if (suffix) return `${base} ${suffix}`.replace(/\s+/g, " ").trim();
   return base;
 }
@@ -23,6 +23,8 @@ export function describeListingSearch(config) {
     const g = String(config.slab?.grade ?? "10").trim();
     return `slab (${p} ${g})`;
   }
-  const suffix = String(config.rawSearchSuffix ?? "raw").trim();
-  return suffix ? `raw (q+ "${suffix}")` : "raw";
+  const suffix = String(config.rawSearchSuffix ?? "").trim();
+  return suffix
+    ? `non-slab (q+ "${suffix}")`
+    : "non-slab (q = card only; slab-like titles filtered)";
 }
