@@ -1,4 +1,6 @@
 import axios from "axios";
+import { wrapper } from "axios-cookiejar-support";
+import { CookieJar } from "tough-cookie";
 import * as cheerio from "cheerio";
 import fs from "fs/promises";
 import path from "path";
@@ -12,6 +14,7 @@ import {
   filterByLanguage,
   filterRelevantResults,
   filterByListingFormat,
+  filterToLikelyTcgCards,
 } from "./filters.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,16 +25,28 @@ const ACTIVE_TTL_MS = 6 * 60 * 60 * 1000;
 const SOLD_TTL_MS = 24 * 60 * 60 * 1000;
 const DAILY_CAP = 5000;
 
-const TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token";
-const BROWSE_SEARCH =
-  "https://api.ebay.com/buy/browse/v1/item_summary/search";
-const INSIGHTS_SEARCH =
-  "https://api.ebay.com/buy/marketplace-insights/v1_beta/item_sales/search";
+const API_BASE = (process.env.EBAY_API_BASE || "https://api.ebay.com").replace(
+  /\/$/,
+  "",
+);
+const TOKEN_URL = `${API_BASE}/identity/v1/oauth2/token`;
+const BROWSE_SEARCH = `${API_BASE}/buy/browse/v1/item_summary/search`;
+/** Use underscores; hyphenated `marketplace-insights` returns 404. */
+const INSIGHTS_SEARCH = `${API_BASE}/buy/marketplace_insights/v1_beta/item_sales/search`;
 
-const SCOPES = [
-  "https://api.ebay.com/oauth/api_scope",
-  "https://api.ebay.com/oauth/api_scope/buy.marketplace.insights",
-].join(" ");
+/** Default: Browse / Buy APIs only. Insights scope is restricted; most keysets reject it → invalid_scope. */
+const SCOPE_BROWSE_ONLY = "https://api.ebay.com/oauth/api_scope";
+const SCOPE_INSIGHTS =
+  "https://api.ebay.com/oauth/api_scope/buy.marketplace.insights";
+
+function oauthScopeString() {
+  const custom = process.env.EBAY_OAUTH_SCOPE?.trim();
+  if (custom) return custom;
+  if (process.env.EBAY_TRY_INSIGHTS_SCOPE === "1") {
+    return `${SCOPE_BROWSE_ONLY} ${SCOPE_INSIGHTS}`;
+  }
+  return SCOPE_BROWSE_ONLY;
+}
 
 let tokenCache = { access_token: null, expires_at: 0 };
 let lastEbayRequestAt = 0;
@@ -118,12 +133,16 @@ export async function getAccessToken(clientId, clientSecret) {
     });
   }
   let res;
+  const primary = oauthScopeString();
   try {
-    res = await postToken(SCOPES);
+    res = await postToken(primary);
   } catch (e) {
+    const err = e.response?.data?.error;
     const msg = e.response?.data?.error_description || e.message || "";
-    if (/invalid_scope|invalid scope/i.test(String(msg))) {
-      res = await postToken("https://api.ebay.com/oauth/api_scope");
+    const scopeRejected =
+      err === "invalid_scope" || /invalid.?scope/i.test(String(msg));
+    if (scopeRejected && primary !== SCOPE_BROWSE_ONLY) {
+      res = await postToken(SCOPE_BROWSE_ONLY);
     } else {
       throw e;
     }
@@ -140,6 +159,19 @@ export async function getAccessToken(clientId, clientSecret) {
 
 export function invalidateToken() {
   tokenCache = { access_token: null, expires_at: 0 };
+}
+
+/** When Browse is called with no filter, keep only listings that offer Buy It Now. */
+function itemHasFixedPriceOption(item) {
+  const bo = item?.buyingOptions;
+  if (bo == null) return true;
+  if (Array.isArray(bo)) {
+    return bo.some((x) => {
+      const u = String(x).toUpperCase();
+      return u === "FIXED_PRICE" || u.includes("FIXED");
+    });
+  }
+  return true;
 }
 
 function normalizeBrowseItem(item) {
@@ -168,10 +200,12 @@ function normalizeBrowseItem(item) {
     (Number.isNaN(priceVal) ? 0 : priceVal) +
     (Number.isNaN(shippingCost) ? 0 : shippingCost);
   const add = (item.additionalImages || []).map((x) => x.imageUrl).filter(Boolean);
+  const lids = item.leafCategoryIds;
   return {
     itemId: item.itemId,
     title: item.title,
     itemWebUrl: item.itemWebUrl,
+    leafCategoryIds: Array.isArray(lids) ? lids : [],
     price: priceVal,
     priceCurrency: currency,
     shippingCost,
@@ -213,50 +247,360 @@ function insightsToSold(entry) {
   };
 }
 
-function scrapeSoldUrl(query) {
-  const q = encodeURIComponent(query);
-  // Newly listed first ≈ most recently sold for completed listings
-  return `https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1&_sop=10`;
+const SCRAPE_BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+function scrapeHtmlHeaders(extra = {}) {
+  return {
+    "User-Agent": SCRAPE_BROWSER_UA,
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    ...extra,
+  };
 }
 
-export async function searchSoldScrape(query, { delayMs = 1000 } = {}) {
-  await sleep(delayMs);
-  const url = scrapeSoldUrl(query);
-  const res = await axios.get(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; CardSearchBot/1.0; +https://example.local)",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-    timeout: 30_000,
+function tcgBrowseCategoryIdsString(config) {
+  if (config?.tcgListingFocus === false) return "";
+  return (
+    config.tcgBrowseCategoryIds ||
+    process.env.EBAY_BROWSE_CATEGORY_IDS ||
+    "183454"
+  )
+    .trim()
+    .replace(/\s+/g, "");
+}
+
+/** First numeric category for sold search `_sacat` (usually CCG singles). */
+function tcgSoldSacat(config) {
+  const raw = tcgBrowseCategoryIdsString(config);
+  const first = raw.split(",")[0]?.trim() || "";
+  return /^\d+$/.test(first) ? first : "";
+}
+
+/** Several URL shapes; eBay is picky about query params and bot detection. */
+function soldSearchUrlVariants(query, sacat) {
+  const enc = encodeURIComponent(query);
+  const cat = sacat ? `&_sacat=${encodeURIComponent(sacat)}` : "";
+  return [
+    `https://www.ebay.com/sch/i.html?_nkw=${enc}&LH_Sold=1&LH_Complete=1&_sop=10&_dmd=2${cat}`,
+    `https://www.ebay.com/sch/i.html?_nkw=${enc}&_sacat=0&LH_Sold=1&LH_Complete=1&rt=nc&_sop=10`,
+    `https://www.ebay.com/sch/i.html?_nkw=${enc}&LH_Sold=1&LH_Complete=1&_sop=10${cat}`,
+  ];
+}
+
+/**
+ * Plain axios does not merge Set-Cookie across redirects into follow-up requests.
+ * A jar keeps the session eBay expects before /sch/i.html.
+ */
+async function createSoldScrapeClient() {
+  const jar = new CookieJar();
+  const client = wrapper(
+    axios.create({
+      jar,
+      withCredentials: true,
+      timeout: 35_000,
+      maxRedirects: 5,
+    }),
+  );
+  await client.get("https://www.ebay.com/", {
+    headers: scrapeHtmlHeaders({
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+    }),
+    validateStatus: (s) => s >= 200 && s < 500,
   });
-  const $ = cheerio.load(res.data);
+  return client;
+}
+
+function sanitizeScrapedListingTitle(title) {
+  if (!title || typeof title !== "string") return title;
+  return title
+    .replace(/\s*Opens in a new window or tab\.?/gi, "")
+    .replace(/\s*Opens in a new window or\.?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseSoldTilesFromHtml(html) {
+  const $ = cheerio.load(html);
   const items = [];
+
+  function pushRow({ title, link, priceText, ended, img }) {
+    if (!title || /shop on ebay/i.test(title)) return;
+    const cleanTitle = sanitizeScrapedListingTitle(title);
+    if (!cleanTitle) return;
+    const m = (priceText || "").replace(/,/g, "").match(/[\d.]+/);
+    const price = m ? parseFloat(m[0]) : null;
+    items.push({
+      title: cleanTitle,
+      itemWebUrl: (link || "").split("?")[0] || link || "",
+      price,
+      currency: "USD",
+      endedDate: (ended || "").trim(),
+      imageUrl: img || null,
+      raw: { priceText },
+    });
+  }
+
   $(".s-item").each((i, el) => {
     if (i === 0) return;
     const $el = $(el);
     const title = $el.find(".s-item__title").text().trim();
-    if (!title || /shop on ebay/i.test(title)) return;
     const link = $el.find("a.s-item__link").attr("href") || "";
     const priceText = $el.find(".s-item__price").first().text().trim();
     const ended = $el.find(".s-item__ended-date, .POSITIVE").text().trim();
-    const m = priceText.replace(/,/g, "").match(/[\d.]+/);
-    const price = m ? parseFloat(m[0]) : null;
     const img =
       $el.find(".s-item__image-img").attr("src") ||
       $el.find("img").attr("src") ||
       null;
-    items.push({
-      title,
-      itemWebUrl: link.split("?")[0] || link,
-      price,
-      currency: "USD",
-      endedDate: ended,
-      imageUrl: img,
-      raw: { priceText },
-    });
+    pushRow({ title, link, priceText, ended, img });
   });
+
+  if (!items.length) {
+    $(".s-card").each((_, el) => {
+      const $el = $(el);
+      const link =
+        $el.find("a[href*='itm']").first().attr("href") ||
+        $el.find("a[href*='ebay.com']").first().attr("href") ||
+        "";
+      const title =
+        $el.find(".s-card__title, .s-item__title, [role='heading']").first()
+          .text() ||
+        "";
+      const priceText = $el
+        .find(".s-card__price, .s-item__price, [class*='price']")
+        .first()
+        .text();
+      const ended = $el.find(".s-item__ended-date, .POSITIVE").text().trim();
+      const img = $el.find("img").first().attr("src") || null;
+      pushRow({ title, link, priceText, ended, img });
+    });
+  }
+
   return items;
+}
+
+/** eBay SRP keeps hydrating after load; retry if content() races with navigation. */
+async function playwrightPageHtml(page) {
+  const attempts = 6;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await page.content();
+    } catch (e) {
+      const msg = e.message || String(e);
+      const retry =
+        /navigating|changing the content|Target page.*closed/i.test(msg);
+      if (retry && i < attempts - 1) {
+        await sleep(400 + i * 200);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+/**
+ * Real Chromium session for /sch/i.html when axios gets 4xx/5xx or bot HTML.
+ * Requires: npm install playwright && npx playwright install chromium
+ */
+async function searchSoldPlaywright(
+  query,
+  { delayMs = 1000, soldSacat } = {},
+) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    console.warn(
+      "[scrape] Playwright is not installed (npm install playwright).",
+    );
+    return [];
+  }
+
+  await sleep(delayMs);
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: ["--disable-blink-features=AutomationControlled"],
+    });
+  } catch (e) {
+    console.warn(
+      `[scrape] Playwright could not launch Chromium (${e.message || e}). Run: npx playwright install chromium`,
+    );
+    return [];
+  }
+
+  try {
+    const context = await browser.newContext({
+      userAgent: SCRAPE_BROWSER_UA,
+      locale: "en-US",
+      viewport: { width: 1365, height: 900 },
+    });
+    const page = await context.newPage();
+    await page.goto("https://www.ebay.com/", {
+      waitUntil: "load",
+      timeout: 35_000,
+    });
+    await sleep(600);
+
+    const urls = soldSearchUrlVariants(query, soldSacat);
+    let html = "";
+    let lastStatus = 0;
+    for (const url of urls) {
+      try {
+        const resp = await page.goto(url, {
+          waitUntil: "load",
+          timeout: 45_000,
+        });
+        lastStatus = resp?.status() ?? 0;
+        await page
+          .waitForSelector(".srp-river, .srp-results .s-item, .s-item", {
+            timeout: 22_000,
+          })
+          .catch(() => {});
+        await sleep(600);
+        const body = await playwrightPageHtml(page);
+        if (
+          lastStatus < 400 &&
+          body.length > 8000 &&
+          /s-item|s-card|srp-river|srp-results/i.test(body)
+        ) {
+          html = body;
+          break;
+        }
+      } catch {
+        /* try next URL variant */
+      }
+    }
+
+    if (!html) {
+      console.warn(
+        `[scrape] Playwright sold search HTTP ${lastStatus} or empty HTML for "${query.slice(0, 60)}…"`,
+      );
+      return [];
+    }
+
+    if (!/s-item|s-card|srp-river|srp-results/i.test(html)) {
+      console.warn(
+        `[scrape] Playwright sold page had no listing markers — possible bot/captcha.`,
+      );
+    }
+
+    return parseSoldTilesFromHtml(html);
+  } catch (e) {
+    console.warn(`[scrape] Playwright sold error: ${e.message || e}`);
+    return [];
+  } finally {
+    await browser?.close();
+  }
+}
+
+async function fetchSoldHtmlFallback(
+  query,
+  relQ,
+  { delayMs, soldBrowser, soldSacat },
+) {
+  const strategies = soldBrowser
+    ? [searchSoldPlaywright, searchSoldScrape]
+    : [searchSoldScrape];
+  const scrapeOpts = { delayMs, soldSacat };
+
+  for (let i = 0; i < strategies.length; i++) {
+    const fn = strategies[i];
+    if (i === 1 && strategies[0] === searchSoldPlaywright) {
+      console.warn(
+        "[scrape] Playwright returned no sold rows (or parse empty); trying cookie-jar HTTP scrape (often 503 from eBay).",
+      );
+    }
+    let items = await fn(query, scrapeOpts);
+    if (
+      items.length === 0 &&
+      relQ.trim() !== query.trim()
+    ) {
+      items = await fn(relQ.trim(), scrapeOpts);
+    }
+    const tag = fn === searchSoldPlaywright ? "playwright" : "scrape";
+    if (items.length) {
+      if (tag === "playwright") {
+        console.log(`[scrape] sold listings via Playwright (${items.length} raw rows)`);
+      }
+      return { items, tag };
+    }
+  }
+
+  console.warn(
+    "[scrape] No sold rows from Playwright or HTTP scrape — if eBay.com also shows none, widen keywords (try card name without \"raw\") or check Sold filters on the site.",
+  );
+  return { items: [], tag: "scrape" };
+}
+
+export async function searchSoldScrape(
+  query,
+  { delayMs = 1000, soldSacat } = {},
+) {
+  await sleep(delayMs);
+  let client = null;
+  try {
+    client = await createSoldScrapeClient();
+  } catch {
+    /* fallback below */
+  }
+  await sleep(400);
+
+  const searchHeaders = scrapeHtmlHeaders({
+    "Cache-Control": "max-age=0",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-User": "?1",
+    Referer: "https://www.ebay.com/",
+  });
+
+  let html = "";
+  let lastStatus = 0;
+  const urls = soldSearchUrlVariants(query, soldSacat);
+  for (const url of urls) {
+    try {
+      const res = client
+        ? await client.get(url, {
+            headers: searchHeaders,
+            validateStatus: () => true,
+          })
+        : await axios.get(url, {
+            headers: searchHeaders,
+            timeout: 35_000,
+            maxRedirects: 5,
+            validateStatus: () => true,
+          });
+      lastStatus = res.status;
+      const raw = typeof res.data === "string" ? res.data : "";
+      if (res.status < 400 && raw.length > 8000) {
+        html = raw;
+        break;
+      }
+    } catch (e) {
+      lastStatus = e.response?.status ?? 0;
+    }
+  }
+
+  if (!html) {
+    console.warn(
+      `[scrape] sold search HTTP ${lastStatus} for "${query.slice(0, 60)}…" — eBay may require a real browser session. Try: open ${urls[0]} manually, or request Marketplace Insights API access for sold data.`,
+    );
+    return [];
+  }
+
+  if (!/s-item|s-card|srp-river|srp-results/i.test(html)) {
+    console.warn(
+      `[scrape] sold HTML had no listing markers — possible bot/captcha page.`,
+    );
+  }
+
+  return parseSoldTilesFromHtml(html);
 }
 
 async function ebayRequest(config, getToken, on401) {
@@ -322,65 +666,172 @@ export async function searchActive(
             afterLanguage: 0,
             afterRelevance: 0,
             afterListingFormat: 0,
+            deliveryFilterRelaxed: false,
+            unrestrictedBrowse: false,
           },
         };
   }
 
   const limit = Math.max(20, config.resultsPerCard * 4);
-  const filter = `buyingOptions:{FIXED_PRICE},deliveryCountry:${country}`;
-  const token = await getToken();
-  const res = await ebayRequest(
-    {
-      method: "GET",
-      url: BROWSE_SEARCH,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
-        "X-EBAY-C-ENDUSERCTX": `contextualLocation=country=${country}`,
+  const filterStrict = `buyingOptions:{FIXED_PRICE},deliveryCountry:${country}`;
+  const filterBinOnly = "buyingOptions:{FIXED_PRICE}";
+
+  async function browseSearch(searchQ, filterStr) {
+    const token = await getToken();
+    const params = {
+      q: searchQ,
+      sort: "price",
+      limit,
+      fieldgroups: "EXTENDED",
+    };
+    const catIds = tcgBrowseCategoryIdsString(config);
+    if (catIds) params.category_ids = catIds;
+    if (filterStr != null && filterStr !== "") {
+      params.filter = filterStr;
+    }
+    return ebayRequest(
+      {
+        method: "GET",
+        url: BROWSE_SEARCH,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+          "X-EBAY-C-ENDUSERCTX": `contextualLocation=country=${country}`,
+        },
+        params,
+        timeout: 30_000,
       },
-      params: {
-        q: query,
-        filter,
-        sort: "price",
-        limit,
-        fieldgroups: "EXTENDED",
+      getToken,
+      on401,
+    );
+  }
+
+  async function browseChain(searchQ) {
+    let deliveryFilterRelaxed = false;
+    let unrestrictedBrowse = false;
+
+    let res = await browseSearch(searchQ, filterStrict);
+    let summaries = res.data?.itemSummaries || [];
+    if (summaries.length === 0) {
+      res = await browseSearch(searchQ, filterBinOnly);
+      summaries = res.data?.itemSummaries || [];
+      deliveryFilterRelaxed = true;
+    }
+    if (summaries.length === 0) {
+      res = await browseSearch(searchQ, undefined);
+      summaries = res.data?.itemSummaries || [];
+      deliveryFilterRelaxed = true;
+      unrestrictedBrowse = true;
+      summaries = summaries.filter(itemHasFixedPriceOption);
+    }
+    return { summaries, deliveryFilterRelaxed, unrestrictedBrowse };
+  }
+
+  function finalizeFromSummaries(summariesIn, browseMeta) {
+    const normalizedIn = summariesIn.map(normalizeBrowseItem);
+    const afterLangIn = filterByLanguage(
+      normalizedIn.map((n) => ({ title: n.title, ...n })),
+      lang,
+    );
+    const langCountIn = afterLangIn.length;
+    const { filtered: relFiltered, stats: relStats } = filterRelevantResults(
+      afterLangIn,
+      relQ,
+    );
+    const relCountIn = relFiltered.length;
+    const afterFmt = filterByListingFormat(relFiltered, config);
+    const fmtCountIn = afterFmt.length;
+    const afterTcg =
+      config.tcgListingFocus !== false
+        ? filterToLikelyTcgCards(afterFmt)
+        : afterFmt;
+    const tcgCountIn = afterTcg.length;
+    const sortedIn = [...afterTcg].sort(
+      (a, b) => (a.totalCost ?? 0) - (b.totalCost ?? 0),
+    );
+    const topIn = sortedIn.slice(0, config.resultsPerCard);
+    return {
+      items: topIn,
+      pipeline: {
+        fetched: normalizedIn.length,
+        afterLanguage: langCountIn,
+        afterRelevance: relCountIn,
+        afterListingFormat: fmtCountIn,
+        afterTcgFocus: tcgCountIn,
+        deliveryFilterRelaxed: browseMeta.deliveryFilterRelaxed,
+        unrestrictedBrowse: browseMeta.unrestrictedBrowse,
+        cardOnlyBrowseFallback: browseMeta.cardOnlyBrowseFallback ?? false,
+        relevanceStats: relStats,
       },
-      timeout: 30_000,
-    },
-    getToken,
-    on401,
-  );
+      _normalizedLen: normalizedIn.length,
+    };
+  }
 
-  const summaries = res.data?.itemSummaries || [];
-  const normalized = summaries.map(normalizeBrowseItem);
+  let { summaries, deliveryFilterRelaxed, unrestrictedBrowse } =
+    await browseChain(query);
 
-  let afterLang = filterByLanguage(
-    normalized.map((n) => ({ title: n.title, ...n })),
-    lang,
-  );
-  const langCount = afterLang.length;
+  if (
+    summaries.length === 0 &&
+    relevanceQuery &&
+    relevanceQuery.trim() !== query.trim()
+  ) {
+    console.warn(
+      `[browse] No itemSummaries for "${query.slice(0, 80)}…"; retrying Browse with card-only "${relevanceQuery}".`,
+    );
+    const again = await browseChain(relevanceQuery.trim());
+    if (again.summaries.length > 0) {
+      summaries = again.summaries;
+      deliveryFilterRelaxed =
+        deliveryFilterRelaxed || again.deliveryFilterRelaxed;
+      unrestrictedBrowse = unrestrictedBrowse || again.unrestrictedBrowse;
+    }
+  }
 
-  const { filtered, stats } = filterRelevantResults(afterLang, relQ);
-  const relCount = filtered.length;
+  if (summaries.length === 0) {
+    console.warn(
+      `[browse] No itemSummaries for q="${query.slice(0, 72)}" country=${country} — try a shorter card name, confirm the keyset has Production Buy Browse API access, or search on ebay.com with the same keywords.`,
+    );
+  }
 
-  const afterFormat = filterByListingFormat(filtered, config);
-  const fmtCount = afterFormat.length;
+  let payload = finalizeFromSummaries(summaries, {
+    deliveryFilterRelaxed,
+    unrestrictedBrowse,
+    cardOnlyBrowseFallback: false,
+  });
 
-  const sorted = [...afterFormat].sort(
-    (a, b) => (a.totalCost ?? 0) - (b.totalCost ?? 0),
-  );
-  const top = sorted.slice(0, config.resultsPerCard);
+  if (
+    payload.items.length === 0 &&
+    relevanceQuery &&
+    relevanceQuery.trim() !== query.trim() &&
+    summaries.length > 0
+  ) {
+    console.warn(
+      `[browse] No rows after filters for full-query results; retrying Browse with card-only "${relevanceQuery}".`,
+    );
+    const wider = await browseChain(relevanceQuery.trim());
+    if (wider.summaries.length > 0) {
+      const payload2 = finalizeFromSummaries(wider.summaries, {
+        deliveryFilterRelaxed: wider.deliveryFilterRelaxed,
+        unrestrictedBrowse: wider.unrestrictedBrowse,
+        cardOnlyBrowseFallback: true,
+      });
+      if (payload2.items.length > 0) {
+        payload = payload2;
+      }
+    }
+  }
 
-  const payload = {
-    items: top,
-    pipeline: {
-      fetched: normalized.length,
-      afterLanguage: langCount,
-      afterRelevance: relCount,
-      afterListingFormat: fmtCount,
-      relevanceStats: stats,
-    },
-  };
+  const { unrestrictedBrowse: ub, deliveryFilterRelaxed: dfr } =
+    payload.pipeline;
+  if (ub && payload.pipeline.fetched > 0) {
+    console.warn(
+      `[browse] Used unfiltered Browse + client-side BIN filter — confirm price type and shipping to ${country}.`,
+    );
+  } else if (dfr && payload.pipeline.fetched > 0) {
+    console.warn(
+      `[browse] Relaxed Browse filters (no deliveryCountry and/or no server BIN filter) — verify shipping and BIN on eBay.`,
+    );
+  }
 
   const disk = (await readJsonCache(ACTIVE_CACHE, refresh ? 0 : ACTIVE_TTL_MS)) || {
     entries: {},
@@ -393,11 +844,32 @@ export async function searchActive(
   return payload;
 }
 
+function formatInsightsError(e) {
+  const d = e.response?.data;
+  if (d && Array.isArray(d.errors)) {
+    return d.errors
+      .map((x) => x.longMessage || x.message || `errorId=${x.errorId}`)
+      .join("; ");
+  }
+  if (d && typeof d === "object") {
+    try {
+      return JSON.stringify(d).slice(0, 280);
+    } catch {
+      /* */
+    }
+  }
+  return e.message || String(e);
+}
+
 export async function searchSoldInsights(
   query,
   { getToken, on401, limit = 50 },
 ) {
   const token = await getToken();
+  const sort = process.env.EBAY_INSIGHTS_SORT?.trim();
+  const params = { q: query, limit };
+  if (sort) params.sort = sort;
+
   const res = await ebayRequest(
     {
       method: "GET",
@@ -406,17 +878,15 @@ export async function searchSoldInsights(
         Authorization: `Bearer ${token}`,
         "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
       },
-      params: {
-        q: query,
-        limit,
-        sort: "-itemEndDate",
-      },
+      params,
       timeout: 30_000,
     },
     getToken,
     on401,
   );
-  const list = res.data?.itemSales || res.data?.itemSummaries || [];
+  const raw = res.data;
+  const list =
+    raw?.itemSales || raw?.item_sales || raw?.itemSummaries || [];
   return list.map(insightsToSold);
 }
 
@@ -424,10 +894,20 @@ export async function searchSoldInsights(
  * @returns {Promise<{ items: object[], source: string, pipeline: object }>}
  */
 export async function searchSold(
-  { query, relevanceQuery, lang, config, refresh, noEbay, getToken, on401 },
+  {
+    query,
+    relevanceQuery,
+    lang,
+    config,
+    refresh,
+    noEbay,
+    getToken,
+    on401,
+    soldBrowser = false,
+  },
 ) {
   const relQ = relevanceQuery ?? query;
-  const key = `${query}::${lang}`;
+  const key = `${query}::${lang}::${soldBrowser ? "pw" : "http"}`;
   if (!refresh && !noEbay) {
     const disk = await readJsonCache(SOLD_CACHE, SOLD_TTL_MS);
     if (disk?.entries?.[key]) {
@@ -455,19 +935,60 @@ export async function searchSold(
 
   let items = [];
   let source = "insights";
+  const insightsLimit = Math.max(30, config.soldListingsLimit * 5);
+
   try {
     items = await searchSoldInsights(query, {
       getToken,
       on401,
-      limit: Math.max(30, config.soldListingsLimit * 5),
+      limit: insightsLimit,
     });
-  } catch (e) {
-    if (e.response?.status === 403 || e.response?.status === 401) {
-      source = "scrape";
-      items = await searchSoldScrape(query, { delayMs: 1000 });
-    } else {
-      throw e;
+    if (
+      items.length === 0 &&
+      relQ.trim() !== query.trim()
+    ) {
+      items = await searchSoldInsights(relQ.trim(), {
+        getToken,
+        on401,
+        limit: insightsLimit,
+      });
     }
+    if (items.length > 0) {
+      console.log(`[insights] ${items.length} raw sold rows from API`);
+    }
+  } catch (e) {
+    const st = e.response?.status;
+    const insightsUnavailable =
+      st === 403 ||
+      st === 401 ||
+      st === 404 ||
+      st === 400 ||
+      st === 429 ||
+      (typeof st === "number" && st >= 500 && st < 600);
+    if (!insightsUnavailable) throw e;
+    console.warn(
+      `[insights] ${formatInsightsError(e)} (HTTP ${st ?? "?"}) — using HTML fallback`,
+    );
+    const fb = await fetchSoldHtmlFallback(query, relQ, {
+      delayMs: 1000,
+      soldBrowser,
+      soldSacat: tcgSoldSacat(config),
+    });
+    items = fb.items;
+    source = fb.tag;
+  }
+
+  if (items.length === 0 && source === "insights") {
+    console.warn(
+      `[insights] 0 sold rows from API for this query — using HTML fallback`,
+    );
+    const fb = await fetchSoldHtmlFallback(query, relQ, {
+      delayMs: 1000,
+      soldBrowser,
+      soldSacat: tcgSoldSacat(config),
+    });
+    items = fb.items;
+    source = fb.tag;
   }
 
   const mapped = items.map((i) => ({
@@ -487,8 +1008,13 @@ export async function searchSold(
 
   const afterFormat = filterByListingFormat(filtered, config);
   const fmtCount = afterFormat.length;
+  const afterTcg =
+    config.tcgListingFocus !== false
+      ? filterToLikelyTcgCards(afterFormat)
+      : afterFormat;
+  const tcgCount = afterTcg.length;
 
-  const sorted = [...afterFormat].sort((a, b) => {
+  const sorted = [...afterTcg].sort((a, b) => {
     const da = Date.parse(a.endedDate) || 0;
     const db = Date.parse(b.endedDate) || 0;
     return db - da;
@@ -507,6 +1033,7 @@ export async function searchSold(
     afterLanguage: langCount,
     afterRelevance: relCount,
     afterListingFormat: fmtCount,
+    afterTcgFocus: tcgCount,
     relevanceStats: stats,
   };
   disk._expiresAt = Date.now() + SOLD_TTL_MS;
@@ -520,6 +1047,7 @@ export async function searchSold(
       afterLanguage: langCount,
       afterRelevance: relCount,
       afterListingFormat: fmtCount,
+      afterTcgFocus: tcgCount,
       relevanceStats: stats,
     },
   };

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-28T08:00:34.323Z",
+  "generatedAt": "2026-04-28T10:41:43.992Z",
   "config": {
     "language": "any",
     "deliveryCountries": [
@@ -8,11 +8,14 @@
     ],
     "resultsPerCard": 5,
     "soldListingsLimit": 3,
-    "listingFormat": "slab",
-    "rawSearchSuffix": "raw",
+    "soldBrowser": true,
+    "tcgListingFocus": true,
+    "tcgBrowseCategoryIds": "183454",
+    "listingFormat": "raw",
+    "rawSearchSuffix": "",
     "slab": {
-      "provider": "CGC",
-      "grade": "9.5"
+      "provider": "PSA",
+      "grade": "10"
     },
     "aiGrading": {
       "enabled": false,
@@ -31,54 +34,196 @@
   },
   "argv": {
     "_": [],
-    "ebay": false,
-    "limit": 1,
-    "format": "slab",
-    "slab-provider": "CGC",
-    "slab-grade": 9.5
+    "refresh": true,
+    "format": "raw"
   },
   "results": [
     {
-      "query": "Pikachu 10th movie",
-      "ebaySearchQuery": "Pikachu 10th movie CGC 9.5",
-      "listingFormat": "slab",
-      "listingDescription": "slab (CGC 9.5)",
-      "slab": {
-        "provider": "CGC",
-        "grade": "9.5"
-      },
+      "query": "Giratina V Alt Art Japanese",
+      "ebaySearchQuery": "Giratina V Alt Art Japanese",
+      "listingFormat": "raw",
+      "listingDescription": "non-slab (q = card only; slab-like titles filtered)",
+      "slab": null,
       "lang": "any",
       "activeByCountry": {
-        "US": [],
+        "US": [
+          {
+            "title": "Pokemon PTCG S-Chinese CS6bC 150/131 SR Giratina V Holo Alt Art Sword&Shield",
+            "itemId": "v1|287238398179|0",
+            "itemWebUrl": "https://www.ebay.com/itm/287238398179?_skw=Giratina+V+Alt+Art+Japanese&hash=item42e0be20e3:g:LvUAAeSwFSxpIVi1",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 220.34,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "free",
+            "totalCost": 220.34,
+            "location": "CN",
+            "condition": "Ungraded",
+            "imageUrl": "https://i.ebayimg.com/images/g/LvUAAeSwFSxpIVi1/s-l225.jpg",
+            "additionalImages": [
+              "https://i.ebayimg.com/images/g/~JwAAeSwi7ppIVi4/s-l225.jpg"
+            ],
+            "raw": {
+              "itemId": "v1|287238398179|0",
+              "title": "Pokemon PTCG S-Chinese CS6bC 150/131 SR Giratina V Holo Alt Art Sword&Shield",
+              "leafCategoryIds": [
+                "183454"
+              ],
+              "categories": [
+                {
+                  "categoryId": "183454",
+                  "categoryName": "CCG Individual Cards"
+                },
+                {
+                  "categoryId": "220",
+                  "categoryName": "Toys & Hobbies"
+                },
+                {
+                  "categoryId": "2536",
+                  "categoryName": "Collectible Card Games"
+                }
+              ],
+              "shortDescription": "Rarity / Variant Manga Alt Art / Secret Rare / Textured Foil. Card Type: Leader / Character (SEC) — Alternate Art Manga. Pokémon TCG One Piece CG Yu-Gi-Oh! Disney Lorcana Dragon Ball Super. TOP TCGs & FRANCHISES.",
+              "image": {
+                "imageUrl": "https://i.ebayimg.com/images/g/LvUAAeSwFSxpIVi1/s-l225.jpg"
+              },
+              "price": {
+                "value": "220.34",
+                "currency": "USD"
+              },
+              "itemHref": "https://api.ebay.com/buy/browse/v1/item/v1%7C287238398179%7C0",
+              "seller": {
+                "username": "jxya9917",
+                "feedbackPercentage": "100.0",
+                "feedbackScore": 4
+              },
+              "condition": "Ungraded",
+              "conditionId": "4000",
+              "thumbnailImages": [
+                {
+                  "imageUrl": "https://i.ebayimg.com/images/g/LvUAAeSwFSxpIVi1/s-l1600.jpg"
+                }
+              ],
+              "shippingOptions": [
+                {
+                  "shippingCostType": "FIXED",
+                  "shippingCost": {
+                    "value": "0.00",
+                    "currency": "USD"
+                  },
+                  "minEstimatedDeliveryDate": "2026-05-19T07:00:00.000Z",
+                  "maxEstimatedDeliveryDate": "2026-06-03T07:00:00.000Z"
+                }
+              ],
+              "buyingOptions": [
+                "FIXED_PRICE",
+                "BEST_OFFER"
+              ],
+              "itemWebUrl": "https://www.ebay.com/itm/287238398179?_skw=Giratina+V+Alt+Art+Japanese&hash=item42e0be20e3:g:LvUAAeSwFSxpIVi1",
+              "itemLocation": {
+                "country": "CN"
+              },
+              "additionalImages": [
+                {
+                  "imageUrl": "https://i.ebayimg.com/images/g/~JwAAeSwi7ppIVi4/s-l225.jpg"
+                }
+              ],
+              "adultOnly": false,
+              "legacyItemId": "287238398179",
+              "availableCoupons": false,
+              "itemOriginDate": "2026-03-28T09:19:52.000Z",
+              "itemCreationDate": "2026-03-28T09:19:52.000Z",
+              "topRatedBuyingExperience": false,
+              "priorityListing": false,
+              "listingMarketplaceId": "EBAY_US"
+            },
+            "grade": null
+          }
+        ],
         "IN": []
       },
-      "sold": [],
-      "soldSource": "no-ebay",
+      "sold": [
+        {
+          "title": "2022 Pokemon Japanese Lost Abyss Giratina V Full Alternate Alt Art 111/100 NM-",
+          "itemWebUrl": "https://www.ebay.com/itm/188224446817",
+          "price": 949.99,
+          "currency": "USD",
+          "endedDate": "",
+          "imageUrl": "https://i.ebayimg.com/images/g/d0IAAeSw40Zpygkd/s-l140.webp",
+          "raw": {
+            "priceText": "$949.99"
+          }
+        },
+        {
+          "title": "Pokemon S-Chinese Giratina V 150/131 SR CS6bC Dark Shadow Blue Sea Alt Art NM",
+          "itemWebUrl": "https://www.ebay.com/itm/227269216623",
+          "price": 200,
+          "currency": "USD",
+          "endedDate": "",
+          "imageUrl": "https://i.ebayimg.com/images/g/EewAAeSw591pwKxk/s-l140.webp",
+          "raw": {
+            "priceText": "$200.00"
+          }
+        }
+      ],
+      "soldSource": "playwright",
       "gradingLabel": "off",
       "counts": {
-        "activeTotal": 0,
-        "sold": 0
+        "activeTotal": 1,
+        "sold": 2
       },
       "pipelines": {
         "active": {
           "US": {
-            "fetched": 0,
-            "afterLanguage": 0,
-            "afterRelevance": 0,
-            "afterListingFormat": 0
+            "fetched": 18,
+            "afterLanguage": 18,
+            "afterRelevance": 17,
+            "afterListingFormat": 1,
+            "afterTcgFocus": 1,
+            "deliveryFilterRelaxed": false,
+            "unrestrictedBrowse": false,
+            "cardOnlyBrowseFallback": false,
+            "relevanceStats": {
+              "input": 18,
+              "afterKeywordRatio": 18,
+              "afterBlocklist": 18,
+              "afterPokemonName": 17,
+              "keywordFallback": false
+            }
           },
           "IN": {
-            "fetched": 0,
-            "afterLanguage": 0,
-            "afterRelevance": 0,
-            "afterListingFormat": 0
+            "fetched": 2,
+            "afterLanguage": 2,
+            "afterRelevance": 2,
+            "afterListingFormat": 0,
+            "afterTcgFocus": 0,
+            "deliveryFilterRelaxed": false,
+            "unrestrictedBrowse": false,
+            "cardOnlyBrowseFallback": false,
+            "relevanceStats": {
+              "input": 2,
+              "afterKeywordRatio": 2,
+              "afterBlocklist": 2,
+              "afterPokemonName": 2,
+              "keywordFallback": false
+            }
           }
         },
         "sold": {
-          "fetched": 0,
-          "afterLanguage": 0,
-          "afterRelevance": 0,
-          "afterListingFormat": 0
+          "fetched": 5,
+          "afterLanguage": 5,
+          "afterRelevance": 5,
+          "afterListingFormat": 2,
+          "afterTcgFocus": 2,
+          "relevanceStats": {
+            "input": 5,
+            "afterKeywordRatio": 5,
+            "afterBlocklist": 5,
+            "afterPokemonName": 5,
+            "keywordFallback": false
+          }
         }
       }
     }

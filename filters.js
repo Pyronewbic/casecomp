@@ -22,6 +22,7 @@ const STOPWORDS = new Set([
   "lp",
   "mp",
   "hp",
+  "set",
 ]);
 
 const JP_REGEX =
@@ -38,6 +39,95 @@ const BLOCKLIST = [
   "metal card",
   "oversized",
 ];
+
+/** eBay US leaf categories that are usually actual TCG singles (not figures/DVDs). */
+export const TCG_LEAF_CATEGORY_IDS = new Set(["183454"]);
+
+/**
+ * Titles that strongly suggest non-card merchandise (DVDs, figures, stickers, etc.).
+ * Does not include the word "movie" alone — many legit promos say "10th movie".
+ */
+const NON_CARD_TITLE_HINTS = [
+  " dvd",
+  " blu-ray",
+  "bluray",
+  " blu ray",
+  "bottle cap",
+  "keychain",
+  "key chain",
+  "sticker not",
+  "not the real card",
+  "not actual card",
+  "not official",
+  "gag gift",
+  "novelty keychain",
+  "fan made",
+  "custom art card",
+  "plush",
+  " ornament",
+  " light fx",
+  "scale figure",
+  " mini figure",
+  "funko",
+  " tomica ",
+  "deco chara",
+  "premium seat",
+  "commemoration premium",
+  "figure f/s",
+  "figure collection",
+  "miniature figure",
+  "bottle cap mini",
+  "hasbro pokemon",
+  "anniversary figure",
+  "stickers to choose",
+  "sticker card", // often sticker sheets, not TCG
+  "display case",
+  "acrylic case",
+  "magnetic case",
+  "one touch",
+];
+
+function titleLooksLikeNonCardMerch(title) {
+  const t = (title || "").toLowerCase();
+  if (/\bdvd\b|blu-?ray/.test(t)) return true;
+  if (/^\s*sticker\b/i.test(t)) return true;
+  if (/\bsticker\b/i.test(title) && /\bnot\b.*\bcard\b/i.test(t)) return true;
+  if (/\*sticker\*/i.test(title)) return true;
+  for (const h of NON_CARD_TITLE_HINTS) {
+    if (t.includes(h)) return true;
+  }
+  return false;
+}
+
+function titleHasTcgCardSignal(title) {
+  const t = (title || "").toLowerCase();
+  if (/\b(card|tcg|ccg|jcc)\b/.test(t)) return true;
+  if (/\bholo\b|reverse holo|1st edition|first edition|shadowless|\bpromo\b/.test(t))
+    return true;
+  if (/\bungraded\b|\braw\b/.test(t)) return true;
+  if (/\b(psa|bgs|cgc|sgc)\s*[#:]?\s*\d/.test(t)) return true;
+  if (/\b\d{1,3}\s*\/\s*\d{2,3}\b/.test(t)) return true;
+  if (/pokémon card|pokemon card/.test(t)) return true;
+  return false;
+}
+
+/**
+ * Keep listings that look like trading cards. Uses eBay leaf category when present
+ * (Browse `leafCategoryIds`), otherwise title heuristics.
+ */
+export function filterToLikelyTcgCards(items) {
+  return items.filter((r) => {
+    const lids = r.leafCategoryIds ?? r.raw?.leafCategoryIds;
+    const idList = Array.isArray(lids) ? lids.map(String) : [];
+    const inTcgLeaf = idList.some((id) => TCG_LEAF_CATEGORY_IDS.has(id));
+
+    if (inTcgLeaf) {
+      return !titleLooksLikeNonCardMerch(r.title);
+    }
+    if (titleLooksLikeNonCardMerch(r.title)) return false;
+    return titleHasTcgCardSignal(r.title);
+  });
+}
 
 const ASCII_LATIN_REGEX = /^[\x00-\x7F\u00C0-\u024F\s\d\-&',.+()]+$/u;
 
@@ -79,6 +169,32 @@ function titleHasBlocklist(title, queryLower) {
   return null;
 }
 
+/** Card / relevance line mentions Japanese market (not the same as --lang jp). */
+export function querySeeksJapaneseMarket(query) {
+  const q = (query || "").toLowerCase();
+  return (
+    /\bjapanese\b/.test(q) || /\bjapan\b/.test(q) || /\bjpn\b/.test(q)
+  );
+}
+
+/** eBay sellers often tag Simplified / Traditional Chinese product lines. */
+function titleLooksChineseRegionalListing(title) {
+  const t = (title || "").toLowerCase();
+  if (t.includes("s-chinese") || t.includes("s chinese")) return true;
+  if (t.includes("simplified chinese")) return true;
+  if (
+    t.includes("traditional chinese") ||
+    t.includes("trad. chinese") ||
+    t.includes("trad chinese")
+  ) {
+    return true;
+  }
+  if (/\bt-chinese\b/.test(t) || /\bt chinese\b/.test(t)) return true;
+  if (t.includes("chinese version")) return true;
+  if (/简体中文|繁体中文|繁體中文/.test(title || "")) return true;
+  return false;
+}
+
 /**
  * Post-filter listings. Assumes language filter already applied when needed.
  * @param {Array<{ title: string }>} results
@@ -91,16 +207,22 @@ export function filterRelevantResults(results, query) {
     afterKeywordRatio: 0,
     afterBlocklist: 0,
     afterPokemonName: 0,
+    keywordFallback: false,
   };
   const keywords = tokenizeQuery(query);
   const queryLower = query.toLowerCase();
   const pokemon = extractPokemonName(query);
+  const qCompact = queryLower.replace(/\s+/g, "");
   const minMatch =
-    keywords.length === 0 ? 0 : Math.ceil(keywords.length * 0.6);
+    keywords.length === 0
+      ? 0
+      : Math.max(1, Math.ceil(keywords.length * 0.5));
 
-  const filtered = results.filter((r) => {
+  let filtered = results.filter((r) => {
     const title = (r.title || "").toLowerCase();
+    const titleCompact = title.replace(/\s+/g, "");
     if (keywords.length > 0) {
+      if (qCompact.length >= 8 && titleCompact.includes(qCompact)) return true;
       let matched = 0;
       for (const kw of keywords) {
         if (title.includes(kw)) matched++;
@@ -109,6 +231,19 @@ export function filterRelevantResults(results, query) {
     }
     return true;
   });
+
+  if (filtered.length === 0 && results.length > 0 && pokemon) {
+    const rescue = results.filter((r) => {
+      const title = (r.title || "").toLowerCase();
+      if (!title.includes(pokemon.toLowerCase())) return false;
+      return !titleHasBlocklist(r.title || "", queryLower);
+    });
+    if (rescue.length > 0) {
+      filtered = rescue;
+      stats.keywordFallback = true;
+    }
+  }
+
   stats.afterKeywordRatio = filtered.length;
 
   const afterBlock = filtered.filter((r) => {
@@ -117,24 +252,35 @@ export function filterRelevantResults(results, query) {
   });
   stats.afterBlocklist = afterBlock.length;
 
-  const finalList = afterBlock.filter((r) => {
+  let out = afterBlock.filter((r) => {
     if (!pokemon) return true;
     return (r.title || "").toLowerCase().includes(pokemon.toLowerCase());
   });
-  stats.afterPokemonName = finalList.length;
+  stats.afterPokemonName = out.length;
+
+  if (querySeeksJapaneseMarket(query)) {
+    const before = out.length;
+    out = out.filter((r) => !titleLooksChineseRegionalListing(r.title));
+    stats.afterJapaneseRegional = out.length;
+    if (before > out.length) {
+      stats.droppedChineseRegional = before - out.length;
+    }
+  }
 
   console.log(
-    `[filterRelevantResults] query="${query}" in=${stats.input} ≥60%kw=${stats.afterKeywordRatio} blocklist=${stats.afterBlocklist} pokemon=${stats.afterPokemonName}`,
+    `[filterRelevantResults] query="${query}" in=${stats.input} ≥50%kw=${stats.afterKeywordRatio}${stats.keywordFallback ? " (name+blocklist fallback)" : ""} blocklist=${stats.afterBlocklist} pokemon=${stats.afterPokemonName}${stats.droppedChineseRegional ? ` −CN=${stats.droppedChineseRegional} → ${stats.afterJapaneseRegional}` : ""}`,
   );
 
-  return { filtered: finalList, stats };
+  return { filtered: out, stats };
 }
 
 export function filterByLanguage(results, lang) {
   if (lang === "any") return results;
   return results.filter((r) => {
     const d = detectLanguage(r.title || "");
-    if (lang === "eng") return d === "eng";
+    // eBay titles often use en-dashes, bullets, ™, etc. — those are "unknown"
+    // but are still English listings; keep them unless we detected Japanese.
+    if (lang === "eng") return d === "eng" || d === "unknown";
     if (lang === "jp") return d === "jp";
     return true;
   });
