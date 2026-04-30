@@ -776,7 +776,10 @@ function parseSoldTilesFromHtml(html) {
     const title = $el.find(".s-item__title").text().trim();
     const link = $el.find("a.s-item__link").attr("href") || "";
     const priceText = $el.find(".s-item__price").first().text().trim();
-    const ended = $el.find(".s-item__ended-date, .POSITIVE").text().trim();
+    const ended = (
+      $el.find(".s-item__ended-date, .POSITIVE").text().trim() ||
+      $el.find(".s-card__caption").text().trim()
+    ).replace(/^Sold\s+/i, "");
     const img =
       $el.find(".s-item__image-img").attr("src") ||
       $el.find("img").attr("src") ||
@@ -799,7 +802,10 @@ function parseSoldTilesFromHtml(html) {
         .find(".s-card__price, .s-item__price, [class*='price']")
         .first()
         .text();
-      const ended = $el.find(".s-item__ended-date, .POSITIVE").text().trim();
+      const ended = (
+        $el.find(".s-item__ended-date, .POSITIVE").text().trim() ||
+        $el.find(".s-card__caption").text().trim()
+      ).replace(/^Sold\s+/i, "");
       const img = $el.find("img").first().attr("src") || null;
       pushRow({ title, link, priceText, ended, img });
     });

@@ -66,7 +66,9 @@ export const CONFIG = {
   },
 };
 
-const argv = minimist(process.argv.slice(2));
+const argv = minimist(process.argv.slice(2), {
+  boolean: ["refresh", "parallel", "grade", "sold-browser"],
+});
 
 /**
  * Card search lines: positional args and/or `--cards` (comma-separated).
@@ -457,7 +459,7 @@ export async function main() {
       const ebayUsed = await getEbayUsageToday();
       log(`  eBay: ${ebayUsed}/${DAILY_CAP} today | LLM calls: ${counters.llmCalls}`);
 
-      results.push({
+      return {
         query: card,
         ebaySearchQuery: ebayQuery,
         listingFormat: config.listingFormat,
@@ -477,10 +479,10 @@ export async function main() {
           sold: soldRes.items?.length ?? 0,
         },
         pipelines: { active: pipelines, sold: sp },
-      });
+      };
     } catch (e) {
       log(`  ERROR: ${formatRequestError(e)}`);
-      results.push({
+      return {
         query: card,
         ebaySearchQuery: ebayQuery,
         listingFormat: config.listingFormat,
@@ -496,20 +498,30 @@ export async function main() {
         sold: [],
         gradingLabel: gradingLabel(config),
         counts: { activeTotal: 0, sold: 0 },
-      });
+      };
     }
   }
 
   const total = cards.length;
+  const parallel = Boolean(argv.parallel) && total > 1;
   if (total) {
-    log("Startup sequence: eBay + grading verified; running cards (verbose on first).");
-    for (let i = 0; i < total; i++) {
-      await processCard(cards[i], i, total, { verbose: i === 0 });
+    log(`Startup sequence: eBay + grading verified; running cards${parallel ? ` (${total} in parallel)` : ""} (verbose on first).`);
+    if (parallel) {
+      const settled = await Promise.all(
+        cards.map((card, i) => processCard(card, i, total, { verbose: i === 0 }))
+      );
+      results.push(...settled);
+    } else {
+      for (let i = 0; i < total; i++) {
+        results.push(await processCard(cards[i], i, total, { verbose: i === 0 }));
+      }
     }
   }
 
+  const outputPrefix = argv.output != null && argv.output !== true ? String(argv.output) : "results";
   await writeMarkdown(results, config, {
     footer: `Generated with eBay Browse API. Usage logged: ${await getEbayUsageToday()}/${DAILY_CAP}.`,
+    outputPrefix,
   });
   await writeJson({
     generatedAt: new Date().toISOString(),
@@ -517,8 +529,8 @@ export async function main() {
     argv,
     cardQueries: cards,
     results,
-  });
-  log("Wrote results.md and results.json");
+  }, outputPrefix);
+  log(`Wrote ${outputPrefix}.md and ${outputPrefix}.json`);
 }
 
 main().catch((e) => {
