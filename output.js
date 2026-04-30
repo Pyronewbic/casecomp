@@ -114,10 +114,35 @@ export async function writeMarkdown(results, config, meta) {
   await fs.writeFile(path.join(__dirname, `${meta?.outputPrefix || "results"}.md`), lines.join("\n"), "utf8");
 }
 
+const JSON_STRIP_KEYS = new Set(["raw", "additionalImages"]);
+
+function strippedJson(obj) {
+  return JSON.stringify(
+    obj,
+    (key, val) => (JSON_STRIP_KEYS.has(key) ? undefined : val),
+    2,
+  );
+}
+
 export async function writeJson(payload, outputPrefix = "results") {
   await fs.writeFile(
     path.join(__dirname, `${outputPrefix}.json`),
-    JSON.stringify(payload, null, 2),
+    strippedJson(payload),
     "utf8",
+  );
+}
+
+export async function writePerCardJson(results, config, outputPrefix = "results") {
+  await Promise.all(
+    results.map((result, i) =>
+      fs.writeFile(
+        path.join(__dirname, `${outputPrefix}-${i}.json`),
+        strippedJson({
+          deliveryCountries: config.deliveryCountries,
+          ...result,
+        }),
+        "utf8",
+      ),
+    ),
   );
 }

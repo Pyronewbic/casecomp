@@ -70,17 +70,27 @@ For a **single card**, just run `node index.js` normally (no `--parallel` needed
 
 Both single and multi-card runs write to `results.json` and `results.md` by default (override with `--output <prefix>`).
 
-3. **Read results.** After the command finishes, read `results.json` from the repo root.
+3. **Render results — parallel agents.** The node script writes per-card JSON files named `results-0.json`, `results-1.json`, … (one per card). Spawn **one Agent per card, all in parallel in a single message**, to read and render tables concurrently. This is critical for speed — do NOT read and render cards sequentially.
 
-4. **Display the summary.** Do NOT echo the raw node.js logs. Show a clean table:
+   Each agent prompt must be **self-contained** (agents have no conversation context). Include in every agent prompt:
+   - The per-card JSON file path to read (e.g. `results-0.json` in the repo root)
+   - The number of sold rows to display (user-requested count)
+   - Today's date (for price trend calculation)
+   - The full output format and rules (copy the Output format section below into each prompt verbatim)
 
-### Output format
+   Use `description: "Render <card name>"`, `subagent_type: "general-purpose"`, and `model: "haiku"` for each agent.
 
-For each card searched, show:
+   When all agents return, **relay their output verbatim** to the user in card order (results-0 first, then results-1, etc.). Do NOT regenerate or reformat — just paste each agent's markdown output with `---` between cards.
+
+4. **Display the summary.** Do NOT echo the raw node.js logs. Relay agent outputs as described above, then append the eBay usage and confirmation lines.
+
+### Output format (include this in each agent prompt)
+
+Each agent reads its per-card JSON file and produces this exact markdown format:
 
 ```
 ## <Card Name>
-Search: `<ebay query>`  |  Type: <raw/slab>  |  Lang: <lang>  |  Active: <n>  |  Sold: <n>
+Search: `<ebaySearchQuery>`  |  Type: <listingFormat>  |  Lang: <lang>  |  Active: <counts.activeTotal>  |  Sold: <counts.sold>
 
 ### Active listings
 | # | Total | Ship | To | Grade | Title |
@@ -98,14 +108,16 @@ Search: `<ebay query>`  |  Type: <raw/slab>  |  Lang: <lang>  |  Active: <n>  | 
 **IMPORTANT — table width:** The terminal renderer does NOT collapse markdown links — `[text](url)` prints as literal text, so wide tables with many columns overflow and degrade into ugly key-value stacks. Keep tables to **6 columns max** for active listings and **4 columns max** for sold listings. The formats above are the maximum — do not add extra columns.
 
 Rules for the summary table:
+- **Active listings table:** Show only the items from the **first delivery country** in `deliveryCountries` (e.g. US). Do NOT repeat the same listings for every country — the items are nearly identical across countries.
 - Truncate titles to ~40 chars max, append `…` if truncated.
-- Title column is a markdown link: `[truncated title](itemWebUrl)`. Do NOT add a separate Link column.
-- "Total" = price + shipping already summed. Do NOT add a separate Price column — just show the total and shipping.
-- "To" column: combine all countries into one cell like `US:✓ IN:✗` using the shipToLocations data.
-- **Pre-grade columns:** If AI pre-grading was enabled (raw + --grade), show `Pre-Grade` and `AI Conf` columns (these replace Grade, staying within 6 cols). For slab, show the `Grade` column (seller slab grade) but never AI columns. For raw without grading, drop the Grade column entirely.
-- Format prices with currency symbol.
-- If a card errored, show the error message instead of tables.
-- **Price trend line:** After the sold table, show a `**Price trend (sold):**` line with % change over 5d, 15d, and 30d windows. To calculate: find the sold entry closest to N days ago from today and compare its price to the most recent sold price. Formula: `((recent - old) / old) * 100`. Show `+X.X%` / `-X.X%` or `—` if no sold data falls within that window. To ensure enough data for 30-day trends, internally use `--sold 20` for fetching even if the user requests fewer rows to display. Only display the number of rows the user asked for in the table.
-- At the bottom, show: `eBay usage: <n>/5000 today` from the results.
+- Title column is a markdown link: `[truncated title](url)`. Do NOT add a separate Link column. **Strip URLs** to just `https://www.ebay.com/itm/<id>` — remove all query params (`?_skw=...&hash=...`). The `itemWebUrl` field has the full URL; truncate at the first `?`.
+- "Total" = price + shipping already summed (`totalCost` field). Do NOT add a separate Price column — just show the total and shipping.
+- "To" column: combine all countries into one cell like `US:? IN:?` using the `shippingToBuyer` data. `eligible: true` → `✓`, `eligible: false` → `✗`, `eligible: null` → `?`.
+- **Pre-grade columns:** If AI pre-grading was enabled (raw + --grade), show `Pre-Grade` and `AI Conf` columns (these replace Grade, staying within 6 cols). For slab, show the `Grade` column (`listingGradeLabel`) but never AI columns. For raw without grading, drop the Grade column entirely.
+- Format prices with currency symbol (e.g. `$2,903.85`).
+- If a card errored (has `error` field), show the error message instead of tables.
+- **Price trend line:** After the sold table, show a `**Price trend (sold):**` line with % change over 5d, 15d, and 30d windows. To calculate: find the sold entry closest to N days ago from today and compare its price to the most recent sold price. Formula: `((recent - old) / old) * 100`. Show `+X.X%` / `-X.X%` or `—` if no sold data falls within that window or if the closest entry IS the most recent entry.
 
-5. **Confirm output.** End with: `Results saved to results.md and results.json`
+5. **eBay usage.** After all agent outputs are relayed, show the eBay usage from the node stdout: `eBay usage: <n>/5000 today`
+
+6. **Confirm output.** End with: `Results saved to results.md and results.json`
