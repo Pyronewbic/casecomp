@@ -49,13 +49,23 @@ Claude will show you a confirmation line before searching, then display a format
 
 ### What you get back
 
-A table for each card:
+A table for each card showing active listings:
 
-| # | Price | Ship | Total | Ships to? | Grade | Title | Link |
-|---|-------|------|-------|-----------|-------|-------|------|
-| 1 | $399.00 | $12.99 | $411.99 | US:✓ IN:✓ | PSA 10 | Giratina V Alt Art Chinese Lost A... | [eBay](https://www.ebay.com) |
+| # | Total | Ship | To | Grade | Title |
+|---|-------|------|----|-------|-------|
+| 1 | $619.99 | free | US:✓ IN:✓ | PSA 10 | [Umbreon ex SAR 217/187 2024 Pokemon T...](https://www.ebay.com/itm/318161356194) |
+| 2 | $650.00 | free | US:✓ IN:✓ | PSA 10 | [Umbreon EX SAR 217/187 Terastal Festi...](https://www.ebay.com/itm/146631348454) |
 
-Plus a recent sold table so you can see what cards actually sell for, not just what sellers are asking.
+Plus a recent sold table so you can see what cards actually sell for, not just what sellers are asking:
+
+| # | Price | Date | Title |
+|---|-------|------|-------|
+| 1 | $797.00 | Apr 24, 2026 | [PSA 10 Umbreon ex SAR 217/187 Terasta...](https://www.ebay.com/itm/405443771260) |
+| 2 | $725.00 | Apr 16, 2026 | [PSA 10 Pokemon Card Umbreon ex SV8a 2...](https://www.ebay.com/itm/227291025974) |
+
+**Price trend (sold):** 5d: +9.9% | 15d: +9.9% | 30d: +22.6%
+
+The price trend line compares the most recent sale to the closest sale ~5, 15, and 30 days ago, so you can spot whether a card is trending up or down.
 
 ---
 
@@ -102,24 +112,16 @@ Full flag list, raw vs slab details, and example commands: **[docs/cli-reference
 flowchart TD
   A[node index.js] --> B[Load .env + CONFIG]
   B --> C[OAuth token]
-  C --> D[For each card]
-  D --> E[Build eBay query: raw or slab]
+  C --> D{Multiple cards?}
+  D -->|yes| P[Parallel]
+  D -->|no| E
+  P --> E[Build eBay query: raw or slab]
   E --> F[Active BIN search + ship-to filtering]
-  F --> G[Sold search: Insights or HTML scrape]
-  G --> H{More cards?}
-  H -->|yes| D
-  H -->|no| I[Write results.md + results.json]
-```
-
-When run via `/casecomp` with **multiple cards**, each card runs as a **parallel process**:
-
-```mermaid
-flowchart LR
-  U[“/casecomp: 2 cards”] --> P1[“node index.js --output results-0 ‘Card A’”]
-  U --> P2[“node index.js --output results-1 ‘Card B’”]
-  P1 --> M[Merge → results.json]
-  P2 --> M
-  M --> D[Display combined table]
+  F --> G{Raw + --grade?}
+  G -->|yes| H[AI pre-grading on listing photos]
+  G -->|no| J[Sold search: Insights or HTML scrape]
+  H --> J
+  J --> I[Write results.md + results.json]
 ```
 
 ---
