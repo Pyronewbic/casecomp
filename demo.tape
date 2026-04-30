@@ -1,16 +1,16 @@
 # VHS demo — /casecomp multi-card parallel search
 # Run: vhs demo.tape
 
-Output demo.gif
+Output demo1.gif
 
 Set Shell zsh
 Set FontSize 14
-Set Width 1400
-Set Height 800
+Set Width 1750
+Set Height 1000
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 35ms
-Set PlaybackSpeed 2
+Set PlaybackSpeed 2.25
 
 # Start Claude Code
 Type "claude --dangerously-skip-permissions"
@@ -22,19 +22,9 @@ Type "/casecomp refresh cache and show me the last 5 results each for Team magma
 Sleep 500ms
 Enter
 
-# Claude parses intent, shows confirmation, runs a single node process
-# with --parallel. Real eBay API calls + Playwright scraping happen here.
-# One process, 3 concurrent Playwright browsers (~30s total).
-# Then Claude reads results.json and renders summary tables.
-Sleep 150s
-
-# Scroll slowly through the full output:
-# - confirmation lines (what Claude understood)
-# - Bash tool call showing live node logs (OAuth, Browse, Playwright scrape)
-# - 3 active-listing tables (one per card)
-# - 3 sold tables
-# - eBay usage counter
-
+# Wait for Claude to finish: parses intent, runs node --parallel,
+# reads results.json, renders tables (~60-90s typical + table rendering).
+Sleep 120s
 
 # Exit Claude Code
 Type "/exit"
