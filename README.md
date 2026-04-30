@@ -88,7 +88,7 @@ CLI flags override `CONFIG` for that run (see next section).
 | `--slab-provider` | Grader label for slab mode, e.g. `PSA`, `BGS`, `CGC` |
 | `--slab-grade` | Grade string, e.g. `10`, `9.5` |
 | `--raw-suffix` | Extra words appended to eBay `q` in non-slab mode (default: none — card name only) |
-| `--grade` | Turn on AI pre-grading |
+| `--grade` | Turn on AI pre-grading (**no effect** with **`--format slab`**) |
 | `--grade-mode` | `llm` or `site` |
 | `--llm-provider` | `claude` or `openai` |
 | `--llm-model` | Model id, e.g. `claude-opus-4-7`, `gpt-4o` |
@@ -107,7 +107,7 @@ CLI flags override `CONFIG` for that run (see next section).
 | Mode | eBay query shape | Extra filtering |
 |------|------------------|-----------------|
 | **raw** | `{card}` plus optional `rawSearchSuffix` (default: no extra words) | Drops titles that look like graded slabs (PSA/BGS/CGC-style). |
-| **slab** | `{card} {provider} {grade}` | Keeps titles that plausibly mention that grader + grade. |
+| **slab** | `{card} {provider} {grade}` | Keeps titles that plausibly mention that grader + grade. **`--grade` / AI pre-grade is ignored** (listing already claims a slab grade). |
 
 Examples:
 
@@ -175,7 +175,7 @@ Copy **`.env.example`** to **`.env`**. Summary:
 | `EBAY_SOLD_BROWSER` | Optional. `1` / `true` / `playwright` — same as `--sold-browser` (sold HTML via Chromium when Insights is unavailable). |
 | `EBAY_INSIGHTS_SORT` | Optional. Rarely needed. The Insights `item_sales/search` call does **not** use Browse `sort` values; leave unset unless eBay documents a valid sort for your access level. |
 | `EBAY_TCG_FOCUS` | Optional. Set to `0` to disable TCG category + title filters (same as `--wide-products`). |
-| `EBAY_BROWSE_CATEGORY_IDS` | Optional. Defaults to **`183454`** (CCG Individual Cards). Comma-separated eBay category IDs for Browse `category_ids`. |
+| `EBAY_BROWSE_CATEGORY_IDS` | Optional. Defaults to **`183454`**: breadcrumb **Toys & Hobbies › Collectible Card Games › Single Cards** (Buy API leaf name *CCG Individual Cards*). Comma-separated IDs for Browse `category_ids`. |
 | `ANTHROPIC_API_KEY` | `--grade` with `--llm-provider claude` |
 | `OPENAI_API_KEY` | `--grade` with `--llm-provider openai` |
 | `LOCAL_GRADER_URL` | Site mode with `--site-provider local` |
@@ -205,6 +205,7 @@ Use **`--refresh`** to delete the three JSON caches above (active, sold, AI grad
 | File | Role |
 |------|------|
 | `index.js` | `CARDS`, `CONFIG`, CLI, main loop |
+| `ebayCategories.js` | US category id for **Single Cards** (breadcrumb) = **183454** (`CCG Individual Cards` in API docs) |
 | `ebay.js` | OAuth, Browse search, Insights + sold scrape fallback |
 | `filters.js` | Language, relevance, raw/slab title filters |
 | `listingQuery.js` | Builds eBay `q` for raw vs slab |
