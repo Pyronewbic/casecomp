@@ -64,7 +64,7 @@ export async function writeMarkdown(results, config, meta) {
     for (const country of config.deliveryCountries) {
       const items = activeByCountry[country] || [];
       lines.push(
-        `### Active — ships to **${country}** (Browse price pool + per-listing ship-to; \`false\` from getItem/HTML drops the row)`,
+        `### Active — ships to **${country}**`,
       );
       lines.push(
         "| # | Price | Ship | Total | To? | Grade | AI conf | Title |",
@@ -111,12 +111,12 @@ export async function writeMarkdown(results, config, meta) {
   if (meta?.footer) {
     lines.push(meta.footer);
   }
-  await fs.writeFile(path.join(__dirname, "results.md"), lines.join("\n"), "utf8");
+  await fs.writeFile(path.join(__dirname, `${meta?.outputPrefix || "results"}.md`), lines.join("\n"), "utf8");
 }
 
-export async function writeJson(payload) {
+export async function writeJson(payload, outputPrefix = "results") {
   await fs.writeFile(
-    path.join(__dirname, "results.json"),
+    path.join(__dirname, `${outputPrefix}.json`),
     JSON.stringify(payload, null, 2),
     "utf8",
   );
