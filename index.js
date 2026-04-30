@@ -22,7 +22,7 @@ import {
   testGradingProvider,
   printSiteGradingHelp,
 } from "./grading.js";
-import { writeMarkdown, writeJson } from "./output.js";
+import { writeMarkdown, writeJson, writePerCardJson } from "./output.js";
 import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
 
@@ -530,7 +530,8 @@ export async function main() {
     cardQueries: cards,
     results,
   }, outputPrefix);
-  log(`Wrote ${outputPrefix}.md and ${outputPrefix}.json`);
+  await writePerCardJson(results, config, outputPrefix);
+  log(`Wrote ${outputPrefix}.md, ${outputPrefix}.json, and ${results.length} per-card files`);
 }
 
 main().catch((e) => {
@@ -563,5 +564,5 @@ export {
   getCachedGrade,
   cacheGrade,
 } from "./grading.js";
-export { writeMarkdown, writeJson } from "./output.js";
+export { writeMarkdown, writeJson, writePerCardJson } from "./output.js";
 export { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";

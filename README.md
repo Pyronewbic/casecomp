@@ -4,6 +4,8 @@ A small Node.js tool that searches the [eBay Browse API](https://developer.ebay.
 
 Results are written to **`results.md`** (human-readable) and **`results.json`** (full data).
 
+![eBay Pokémon card search demo](demo.gif)
+
 ---
 
 ## Using with Claude Code (`/casecomp`) — no terminal experience needed
