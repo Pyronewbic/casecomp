@@ -16,6 +16,7 @@ import {
   filterByListingFormat,
   filterToLikelyTcgCards,
 } from "./filters.js";
+import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const USAGE_FILE = "ebay-usage.json";
@@ -269,7 +270,7 @@ function tcgBrowseCategoryIdsString(config) {
   return (
     config.tcgBrowseCategoryIds ||
     process.env.EBAY_BROWSE_CATEGORY_IDS ||
-    "183454"
+    EBAY_CATEGORY_TCG_SINGLE_CARDS_US
   )
     .trim()
     .replace(/\s+/g, "");

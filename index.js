@@ -19,6 +19,7 @@ import {
 } from "./grading.js";
 import { writeMarkdown, writeJson } from "./output.js";
 import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
+import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
 
 export const CARDS = [
   "Giratina V Alt Art Japanese"
@@ -33,8 +34,8 @@ export const CONFIG = {
   soldBrowser: false,
   /** Narrow Browse + sold scrape to TCG singles category and drop obvious non-card titles. */
   tcgListingFocus: true,
-  /** eBay category_ids for Browse (comma-separated). Default: CCG Individual Cards. */
-  tcgBrowseCategoryIds: "183454",
+  /** Toys & Hobbies › Collectible Card Games › Single Cards (Buy API: CCG Individual Cards). */
+  tcgBrowseCategoryIds: EBAY_CATEGORY_TCG_SINGLE_CARDS_US,
   /** "raw" = ungraded bias; "slab" = graded in case (uses slab.provider + slab.grade). */
   listingFormat: "raw",
   /** Appended to eBay q when listingFormat is raw (e.g. "ungraded", or "" for card name only). */
@@ -246,6 +247,14 @@ export async function main() {
   }
 
   let config = applyArgvToConfig(CONFIG);
+  if (config.listingFormat === "slab") {
+    if (config.aiGrading.enabled) {
+      log(
+        "Slab listings already carry a seller grade — AI pre-grade disabled.",
+      );
+    }
+    config.aiGrading.enabled = false;
+  }
   const { missing, gradingMissing } = verifyEnv(config, noEbay);
   const allMissing = [...missing, ...gradingMissing];
   if (allMissing.length) {

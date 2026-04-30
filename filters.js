@@ -1,3 +1,5 @@
+import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
+
 const STOPWORDS = new Set([
   "a",
   "an",
@@ -40,8 +42,11 @@ const BLOCKLIST = [
   "oversized",
 ];
 
-/** eBay US leaf categories that are usually actual TCG singles (not figures/DVDs). */
-export const TCG_LEAF_CATEGORY_IDS = new Set(["183454"]);
+/**
+ * TCG singles leaf (`leafCategoryIds`) — browse path:
+ * Toys & Hobbies › Collectible Card Games › Single Cards (= `ebayCategories`).
+ */
+export const TCG_LEAF_CATEGORY_IDS = new Set([EBAY_CATEGORY_TCG_SINGLE_CARDS_US]);
 
 /**
  * Titles that strongly suggest non-card merchandise (DVDs, figures, stickers, etc.).
