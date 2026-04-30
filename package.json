@@ -1,5 +1,5 @@
 {
-  "name": "ebay-pokemon-cardsearch",
+  "name": "casecomp",
   "version": "1.0.0",
   "description": "eBay Browse API Pokémon card search with optional AI pre-grading",
   "type": "module",
