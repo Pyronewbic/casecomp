@@ -11,7 +11,12 @@ import {
   getEbayUsageToday,
   DAILY_CAP,
 } from "./ebay.js";
-import { filterRelevantResults, detectLanguage } from "./filters.js";
+import {
+  filterRelevantResults,
+  detectLanguage,
+  normalizeListingLanguage,
+  parseListingLanguagesFromInput,
+} from "./filters.js";
 import {
   gradeImage,
   testGradingProvider,
@@ -22,19 +27,20 @@ import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
 
 export const CARDS = [
-  "Giratina V Alt Art Japanese"
+  "Giratina V Alt Art"
 ];
 
 export const CONFIG = {
+  /** Display / JSON: `any` or `eng+jp` style. Use `languages` for wire params (set by `applyArgvToConfig`). */
   language: "any",
+  /** Canonical langs for Browse + sold: `[]` = any; otherwise subset of eng, jp, cn. */
+  languages: [],
   deliveryCountries: ["US", "IN"],
   resultsPerCard: 5,
   soldListingsLimit: 3,
   /** When true, try Playwright (Chromium) before axios for sold HTML (Insights still first). */
   soldBrowser: false,
-  /** Narrow Browse + sold scrape to TCG singles category and drop obvious non-card titles. */
-  tcgListingFocus: true,
-  /** Toys & Hobbies › Collectible Card Games › Single Cards (Buy API: CCG Individual Cards). */
+  /** Toys & Hobbies › Collectible Card Games › Single Cards (always applied; Browse + relevance filter to plausible TCG singles). */
   tcgBrowseCategoryIds: EBAY_CATEGORY_TCG_SINGLE_CARDS_US,
   /** "raw" = ungraded bias; "slab" = graded in case (uses slab.provider + slab.grade). */
   listingFormat: "raw",
@@ -62,6 +68,25 @@ export const CONFIG = {
 
 const argv = minimist(process.argv.slice(2));
 
+/**
+ * Card search lines: positional args and/or `--cards` (comma-separated).
+ * If neither is provided, uses `defaults` (`CARDS` from this module).
+ */
+function resolveCardsFromArgv(argvIn, defaults) {
+  const pos = (argvIn._ ?? [])
+    .map((s) => String(s).trim())
+    .filter(Boolean);
+  const flag =
+    argvIn.cards != null && argvIn.cards !== true
+      ? String(argvIn.cards)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+  const merged = [...pos, ...flag];
+  return merged.length ? merged : [...defaults];
+}
+
 function log(msg) {
   const t = new Date().toTimeString().slice(0, 8);
   console.log(`[${t}] ${msg}`);
@@ -88,7 +113,20 @@ function formatRequestError(err) {
 
 function applyArgvToConfig(cfg) {
   const c = structuredClone(cfg);
-  if (argv.lang) c.language = argv.lang;
+  const langFromArgv =
+    argv.lang != null && argv.lang !== true && argv.lang !== false;
+  const argvLangRaw = langFromArgv
+    ? Array.isArray(argv.lang)
+      ? argv.lang.join(",")
+      : String(argv.lang).trim()
+    : null;
+  const incomingMerged =
+    argvLangRaw ?? String(c.language ?? "any").trim();
+
+  const warnTok = (msg) => log(msg);
+  c.languages = parseListingLanguagesFromInput(incomingMerged, warnTok);
+  c.language =
+    c.languages.length > 0 ? c.languages.join("+") : "any";
   if (argv.countries) {
     c.deliveryCountries = String(argv.countries)
       .split(",")
@@ -125,11 +163,6 @@ function applyArgvToConfig(cfg) {
     const eb = (process.env.EBAY_SOLD_BROWSER || "").toLowerCase();
     c.soldBrowser =
       eb === "1" || eb === "true" || eb === "playwright" || eb === "chromium";
-  }
-  if (argv["wide-products"]) {
-    c.tcgListingFocus = false;
-  } else if (process.env.EBAY_TCG_FOCUS === "0") {
-    c.tcgListingFocus = false;
   }
   return c;
 }
@@ -234,16 +267,18 @@ export async function main() {
   const refresh = Boolean(argv.refresh);
   // minimist treats --no-ebay as { ebay: false } (not no-ebay: true)
   const noEbay = argv.ebay === false;
+  const cardList = resolveCardsFromArgv(argv, CARDS);
   const limit =
-    argv.limit != null ? Math.max(1, Number(argv.limit)) : CARDS.length;
+    argv.limit != null ? Math.max(1, Number(argv.limit)) : cardList.length;
 
   if (refresh) {
     await bustCaches([
       "ebay-active-cache.json",
       "ebay-sold-cache.json",
+      "ebay-insights-forbidden-cache.json",
       "ai-grade-cache.json",
     ]);
-    log("Cache busted (eBay active/sold + AI grades).");
+    log("Cache busted (eBay active/sold + Insights skip flag + AI grades).");
   }
 
   let config = applyArgvToConfig(CONFIG);
@@ -303,9 +338,16 @@ export async function main() {
     }
   }
 
-  const cards = CARDS.slice(0, limit);
+  const cards = cardList.slice(0, limit);
   const results = [];
   const counters = { llmCalls: 0 };
+
+  const cliCardHint =
+    (argv._?.length && argv._.some(Boolean)) ||
+    (argv.cards != null && argv.cards !== true && String(argv.cards).trim());
+  if (cliCardHint) {
+    log(`Card lines from CLI (${cards.length} run): ${cards.map((c) => JSON.stringify(c)).join(", ")}`);
+  }
 
   async function processCard(card, idx, total, { verbose }) {
     const ebayQuery = buildEbaySearchQuery(card, config);
@@ -323,76 +365,93 @@ export async function main() {
     let activeTotal = 0;
 
     try {
-      for (const country of config.deliveryCountries) {
-      const res = await searchActive({
+      const deliveryCountries = config.deliveryCountries;
+      const activeRes = await searchActive({
         query: ebayQuery,
         relevanceQuery: card,
-        country,
-        lang: config.language,
+        deliveryCountries,
+        languages: config.languages,
         config,
         refresh,
         noEbay,
         getToken,
         on401,
       });
-      const p = res.pipeline;
-      const items = res.items || [];
-      pipelines[country] = p;
 
-      const tcgStep =
-        config.tcgListingFocus !== false && p?.afterTcgFocus != null
-          ? ` → ${p.afterTcgFocus} (tcg)`
-          : "";
-      log(
-        `  Active ${country}: ${p?.fetched ?? items.length} → ${p?.afterLanguage ?? "?"} (lang) → ${p?.afterRelevance ?? items.length} (relevance) → ${p?.afterListingFormat ?? "?"} (format)${tcgStep} → top ${items.length}${p?.cardOnlyBrowseFallback ? " [card-only Browse]" : ""}${p?.unrestrictedBrowse ? " [wide Browse+BIN: verify listing]" : p?.deliveryFilterRelaxed ? " [relaxed Browse filters]" : ""}`,
-      );
-      if (verbose) {
-        log(
-          `    [verbose] relevance stats: ${JSON.stringify(p?.relevanceStats || {})}`,
-        );
+      const p = activeRes.pipeline;
+      deliveryCountries.forEach((c) => {
+        pipelines[c] = { ...p };
+      });
+
+      const by = activeRes.itemsByCountry || {};
+      const keyed = new Map();
+      for (const c of deliveryCountries) {
+        for (const r of by[c] || []) keyed.set(r.itemId || r.itemWebUrl, r);
       }
 
-      let gradedPack = { rows: items, avg: null, graded: 0 };
-      if (config.aiGrading.enabled && items.length) {
+      const mergeRows = [...keyed.values()];
+      if (config.aiGrading.enabled && mergeRows.length) {
         const prov = gradingLabel(config);
-        log(`  Grading ${items.length} images via ${prov.split(" ")[0]}...`);
-        gradedPack = await gradeItems(items, config, counters);
-        const batchCost = (gradedPack.graded * 0.02).toFixed(2);
         log(
-          `  ... done (avg ${gradedPack.avg != null ? gradedPack.avg.toFixed(1) : "—"}, ~$${batchCost} est. this batch)`,
+          `  Grading ${mergeRows.length} distinct listing image(s) across ${deliveryCountries.join("/")}… via ${prov.split(" ")[0]}…`,
+        );
+        const gp = await gradeItems(mergeRows, config, counters);
+        const batchCost = (gp.graded * 0.02).toFixed(2);
+        log(
+          `  ... done (avg ${gp.avg != null ? gp.avg.toFixed(1) : "—"}, ~$${batchCost} est. this batch)`,
         );
       } else {
-        gradedPack = {
-          rows: items.map((r) => ({ ...r, grade: null })),
-          avg: null,
-          graded: 0,
-        };
+        mergeRows.forEach((r) => {
+          /* eslint-disable no-param-reassign */
+          if (r) r.grade = r?.grade ?? null;
+        });
       }
 
-      let rows = gradedPack.rows;
-      rows = applyMinGrade(rows, config.aiGrading.minGradeToReport);
-      activeByCountry[country] = rows;
-      activeTotal += rows.length;
+      activeTotal = deliveryCountries.reduce(
+        (n, c) => n + ((by[c] || []).length),
+        0,
+      );
+
+      for (const country of deliveryCountries) {
+        const tcgStep =
+          p?.afterTcgFocus != null ? ` → ${p.afterTcgFocus} (tcg)` : "";
+        const langFacetTag = p?.browseLanguageFacet
+          ? " [Item specifics Language facet]"
+          : "";
+        log(
+          `  Active ships-to ${country}: top ${(by[country] || []).length} (Browse pool ${p?.fetched ?? "?"} → …${tcgStep})${langFacetTag}${activeRes.pipeline?.unrestrictedBrowse ? " [wide Browse+BIN]" : activeRes.pipeline?.deliveryFilterRelaxed ? " [relaxed Browse]" : ""} ship getItems=${p?.shipToGetItemLookups ?? 0}`,
+        );
+        if (verbose) {
+          log(
+            `    [verbose] relevance stats: ${JSON.stringify(p?.relevanceStats || {})}`,
+          );
+        }
+
+        let rows = (by[country] || []).map((r) => ({ ...r }));
+        rows = applyMinGrade(rows, config.aiGrading.minGradeToReport);
+        activeByCountry[country] = rows;
       }
 
       const soldRes = await searchSold({
-      query: ebayQuery,
-      relevanceQuery: card,
-      lang: config.language,
-      config,
-      refresh,
-      noEbay,
-      getToken,
-      on401,
-      soldBrowser: config.soldBrowser,
-    });
+        query: ebayQuery,
+        relevanceQuery: card,
+        languages: config.languages,
+        config,
+        refresh,
+        noEbay,
+        getToken,
+        on401,
+        soldBrowser: config.soldBrowser,
+      });
       const sp = soldRes.pipeline;
       const soldTcg =
-        config.tcgListingFocus !== false && sp?.afterTcgFocus != null
-          ? ` → ${sp.afterTcgFocus} (tcg)`
+        sp?.afterTcgFocus != null ? ` → ${sp.afterTcgFocus} (tcg)` : "";
+      const soldFacet =
+        sp?.soldBrowseGetItemCalls != null && sp.soldBrowseGetItemCalls > 0
+          ? `, ${sp.soldBrowseGetItemCalls} × getItem(lang)`
           : "";
       log(
-        `  Sold (${soldRes.source}): ${sp?.fetched ?? 0} → ${sp?.afterLanguage ?? "?"} (lang) → ${sp?.afterRelevance ?? 0} (relevance) → ${sp?.afterListingFormat ?? "?"} (format)${soldTcg} → last ${soldRes.items?.length ?? 0}`,
+        `  Sold (${soldRes.source}): ${sp?.fetched ?? 0} → ${sp?.afterLanguage ?? "?"} (lang coarse) → ${sp?.afterRelevance ?? 0} (relevance) → ${sp?.afterListingFormat ?? "?"} (format)${soldTcg} → last ${soldRes.items?.length ?? 0}${soldFacet}`,
       );
 
       const ebayUsed = await getEbayUsageToday();
@@ -407,6 +466,7 @@ export async function main() {
           config.listingFormat === "slab"
             ? { ...config.slab }
             : null,
+        languages: config.languages,
         lang: config.language,
         activeByCountry,
         sold: soldRes.items,
@@ -429,6 +489,7 @@ export async function main() {
           config.listingFormat === "slab"
             ? { ...config.slab }
             : null,
+        languages: config.languages,
         lang: config.language,
         error: formatRequestError(e),
         activeByCountry: {},
@@ -454,6 +515,7 @@ export async function main() {
     generatedAt: new Date().toISOString(),
     config,
     argv,
+    cardQueries: cards,
     results,
   });
   log("Wrote results.md and results.json");
@@ -470,6 +532,8 @@ export {
   searchSold,
   filterRelevantResults,
   detectLanguage,
+  normalizeListingLanguage,
+  parseListingLanguagesFromInput,
   gradeImage,
 };
 export {

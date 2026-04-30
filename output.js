@@ -10,14 +10,22 @@ function money(n, cur = "USD") {
   return `${Number(n).toFixed(2)} ${cur}`;
 }
 
-function gradeCell(g) {
-  if (!g || g.error) return "—";
-  return String(g.overall);
-}
-
 function confCell(g) {
   if (!g || g.error) return "—";
   return g.confidence.toFixed(1);
+}
+
+/** AI `--grade` → `Pre-Graded: …`; seller Condition / title → slab text e.g. `PSA 10` (no prefix). */
+function activeGradeDisplay(row) {
+  const g = row.grade;
+  if (g && !g.error && g.overall != null && `${g.overall}`.trim() !== "") {
+    return `Pre-Graded: ${g.overall}`;
+  }
+  const seller = row.listingGradeLabel;
+  if (seller != null && String(seller).trim() !== "") {
+    return String(seller).trim().replace(/\|/g, "\\|");
+  }
+  return "—";
 }
 
 export async function writeMarkdown(results, config, meta) {
@@ -55,17 +63,26 @@ export async function writeMarkdown(results, config, meta) {
     lines.push("");
     for (const country of config.deliveryCountries) {
       const items = activeByCountry[country] || [];
-      lines.push(`### Active — ${country} delivery (top ${config.resultsPerCard})`);
       lines.push(
-        "| # | Price | Ship | Total | Grade | Conf | Title |",
+        `### Active — ships to **${country}** (Browse price pool + per-listing ship-to; \`false\` from getItem/HTML drops the row)`,
       );
-      lines.push("|---|------:|-----:|------:|------:|-----:|-------|");
+      lines.push(
+        "| # | Price | Ship | Total | To? | Grade | AI conf | Title |",
+      );
+        lines.push("|---|------:|-----:|------:|:---:|------:|--------:|-------|");
       items.forEach((row, i) => {
         const g = row.grade;
         const title = (row.title || "").replace(/\|/g, "\\|");
         const link = `[${title.slice(0, 80)}${title.length > 80 ? "…" : ""}](${row.itemWebUrl || "#"})`;
+        const st = row.shippingToBuyer?.[country];
+        const toCell =
+          st?.eligible === true
+            ? "yes"
+            : st?.eligible === false
+              ? "no"
+              : "?";
         lines.push(
-          `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${gradeCell(g)} | ${confCell(g)} | ${link} |`,
+          `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${toCell} | ${activeGradeDisplay(row)} | ${confCell(g)} | ${link} |`,
         );
       });
       lines.push("");
@@ -82,7 +99,10 @@ export async function writeMarkdown(results, config, meta) {
     });
     lines.push("");
     lines.push(
-      "*AI pre-grade is a rough estimate from a listing photo, not an official PSA grade. Use as a filtering hint only.*",
+      "**Grade:** Seller column shows Condition or title when parsed (e.g. `PSA 10`, `BGS 10`). With `--grade`, `Pre-Graded:` is the numeric AI estimate from the listing photo—not official slab.",
+    );
+    lines.push(
+      "**AI conf:** Model-reported confidence (0–1) for `Pre-Graded:` when `--grade` is on; otherwise `—`. Not the same as a slab grade.",
     );
     lines.push("");
     lines.push("---");

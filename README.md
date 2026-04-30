@@ -23,7 +23,7 @@ cp .env.example .env
 npm start
 ```
 
-Default run uses the `CARDS` array and `CONFIG` in [`index.js`](index.js). Override behavior with CLI flags (see below).
+Default run uses **`CARDS`** and **`CONFIG`** in [`index.js`](index.js). You can override the card lines with **positional arguments** (`npm start -- "Card A" "Card B"`) or **`--cards`**; if you omit both, the script uses `CARDS`. Other behavior is overridden with CLI flags (see below).
 
 ---
 
@@ -67,8 +67,10 @@ In plain steps:
 
 Edit **`index.js`**:
 
-- **`CARDS`** — Search phrases (no special quoting for eBay; the script builds the final query).
-- **`CONFIG`** — Language (`eng` / `jp` / `any`), delivery countries, how many active/sold rows to keep, **raw vs slab** settings, and AI grading options.
+- **`CARDS`** — Default search phrases when you don’t pass card lines on the CLI (the script builds the final eBay `q`).
+- **`CONFIG`** — Language (`any`, or **`eng+jp`** joins), **`languages`**, **`deliveryCountries`** (buyer destinations `US`, `IN`, …), **`resultsPerCard`** / **`soldListingsLimit`**, **raw vs slab**, AI grading. Active search uses **one shared BIN Browse pool** (no `deliveryCountry` filter), then **`getItem` `shipToLocations`** and optional HTML “Doesn’t ship to” parsing to drop rows that exclude that buyer country.
+
+**CLI card lines:** non-flag positional args (`node index.js -- "Charizard V"` …) plus **`--cards "A,B,C"`** if you prefer comma-separated. Order is positional first, then `--cards`; duplicates are kept. Omit both to use `CARDS`.
 
 CLI flags override `CONFIG` for that run (see next section).
 
@@ -78,12 +80,13 @@ CLI flags override `CONFIG` for that run (see next section).
 
 | Flag | What it does |
 |------|----------------|
-| `--lang` | `eng`, `jp`, or `any` (`any` does not filter by script; pair with a card line that says **Japanese** / **Japan** / **JPN** to auto-drop obvious **S-Chinese** / simplified-Chinese listings) |
-| `--countries` | Comma-separated, e.g. `US,IN` |
-| `--results` | Max active rows per card **per country** |
+| *(positional)* | One or more card search lines after flags, e.g. `npm start -- --format slab "Pikachu vmax"` |
+| `--cards` | Comma-separated card lines (merged after any positional cards). If neither this nor positional args are set, **`CARDS`** in `index.js` is used. |
+| `--lang` | **Single:** `any` \| `eng` \| `jp` \| `cn` (**aliases:** `en` / `English`; `Japanese`; `Chinese` / `CN`). **Multiple:** comma / semicolon / pipe, or repeat the flag (`--lang eng --lang jp` → **`eng+jp`** in logs/JSON); unknown tokens logged and dropped. **`any`** in the mix clears narrowing. With TCG singles category (**183454**), active search uses **`Language:{English|Japanese|…}`** on Browse. **Sold (when narrowed):** `getItem` keeps listings whose Language facet matches **one of** the selected langs; **`--lang any`** skips extra `getItem` work. |
+| `--countries` | Comma-separated **buyer ship-to** ISO codes (e.g. `US,IN`). Not a Browse `deliveryCountry` filter — each listing is checked with **Browse `getItem`** (`shipToLocations`) and, when needed, a light HTML probe for “Doesn’t ship to …”. |
+| `--results` | Max active rows **per destination** after ship-to filtering |
 | `--sold` | How many recent sold rows to keep |
 | `--sold-browser` | Prefer **Playwright (Chromium)** for sold HTML when Marketplace Insights is unavailable (then axios). Requires `npx playwright install chromium` once. |
-| `--wide-products` | Turn off TCG-only filtering (figures, DVDs, etc. can appear again). |
 | `--format` | `raw` or `slab` (see below) |
 | `--slab-provider` | Grader label for slab mode, e.g. `PSA`, `BGS`, `CGC` |
 | `--slab-grade` | Grade string, e.g. `10`, `9.5` |
@@ -95,7 +98,7 @@ CLI flags override `CONFIG` for that run (see next section).
 | `--site-provider` | `tcgrader`, `pokegrade`, `snapgrade`, `local` |
 | `--min-grade` | Drop graded rows below this predicted overall (after grading) |
 | `--refresh` | Delete eBay + AI grade cache files and refetch |
-| `--limit` | Only process the first N entries in `CARDS` |
+| `--limit` | Only process the first **N** card lines (**after** resolving CLI positional / `--cards` vs `CARDS`) |
 | `--no-ebay` | Do not call eBay (uses cache if present; see note below) |
 
 **Note:** This project uses **minimist**. The flag `--no-ebay` is parsed as `{ ebay: false }`, which the script treats as “skip eBay.” Use **`--no-ebay`** exactly like that.
@@ -125,7 +128,7 @@ npm start -- --format slab --slab-provider CGC --slab-grade 9.5
 npm start -- --format slab --slab-provider PSA --slab-grade 10
 ```
 
-Fuzzy **relevance** (keywords, Pokémon name, blocklist) still uses the **card line from `CARDS`**, not the slab tokens, so matching stays centered on the card name.
+Fuzzy **relevance** (keywords, Pokémon name, blocklist) uses the **card line** (`CARDS`, positional args, or `--cards`), not the slab tokens appended to `q`, so matching stays centered on the card name.
 
 ---
 
@@ -135,11 +138,25 @@ Fuzzy **relevance** (keywords, Pokémon name, blocklist) still uses the **card l
 # Baseline: US + India, English-only, 5 BIN + 3 sold per card
 npm start -- --lang eng --countries US,IN --results 5 --sold 3
 
+# Aliases (--lang normalized to canonical eng/jp/cn)
+npm start -- --lang English --results 10 "Charizard V"
+
+# Multiple languages (OR on facet / sold getItem — English OR Japanese listings)
+npm start -- --lang eng,jp --results 5 "Pikachu promo"
+npm start -- --lang chinese "Pokemon Pikachu"
+npm start -- --lang jp --format slab --slab-provider PSA --slab-grade 10 "Rayquaza V AA"
+
 # Same, but sold comps via browser when Insights is not available (install browsers first: npm run playwright-install)
 npm start -- --lang eng --countries US,IN --results 5 --sold 3 --sold-browser
 
-# First card only (quick test)
-npm start -- --limit 1
+# Card lines from CLI (override `CARDS` in index.js)
+npm start -- --format slab --slab-provider PSA --slab-grade 10 "Giratina V Alt Art Japanese"
+
+# Or comma-separated
+npm start -- --cards "Pikachu vmax,Charizard ex"
+
+# First card line only when you pass several
+npm start -- --limit 1 "Card A" "Card B"
 
 # Refresh all caches
 npm start -- --refresh
@@ -171,17 +188,25 @@ Copy **`.env.example`** to **`.env`**. Summary:
 | `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET` | Always for live eBay (unless `--no-ebay`) |
 | `EBAY_API_BASE` | Optional. Defaults to **`https://api.ebay.com`** (production). Use `https://api.sandbox.ebay.com` only with sandbox keysets. |
 | `EBAY_OAUTH_SCOPE` | Optional. Defaults to **Browse-only** scope (works with normal keysets). Add Marketplace Insights scope only if eBay approved your app; otherwise sold data uses HTML fallback. |
-| `EBAY_TRY_INSIGHTS_SCOPE` | Optional. Set to `1` to request Insights on the token (same as adding the Insights URL to `EBAY_OAUTH_SCOPE`); token falls back to Browse-only if eBay returns `invalid_scope`. |
+| `EBAY_TRY_INSIGHTS_SCOPE` | Optional. Set to `1` to request Insights on the token (same as adding the Insights URL to `EBAY_OAUTH_SCOPE`); token falls back to Browse-only if eBay returns `invalid_scope`. If the Issued token includes Insights, the sold pipeline may call Insights; otherwise HTML scrape is used (no doomed 403 on Browse-only tokens). |
+| `EBAY_SKIP_MARKETPLACE_INSIGHTS` | Optional. `1` / `true` — never calls Marketplace Insights (HTML sold scrape only), even when your env requests the Insights scope. |
 | `EBAY_SOLD_BROWSER` | Optional. `1` / `true` / `playwright` — same as `--sold-browser` (sold HTML via Chromium when Insights is unavailable). |
 | `EBAY_INSIGHTS_SORT` | Optional. Rarely needed. The Insights `item_sales/search` call does **not** use Browse `sort` values; leave unset unless eBay documents a valid sort for your access level. |
-| `EBAY_TCG_FOCUS` | Optional. Set to `0` to disable TCG category + title filters (same as `--wide-products`). |
 | `EBAY_BROWSE_CATEGORY_IDS` | Optional. Defaults to **`183454`**: breadcrumb **Toys & Hobbies › Collectible Card Games › Single Cards** (Buy API leaf name *CCG Individual Cards*). Comma-separated IDs for Browse `category_ids`. |
+| `EBAY_BROWSE_CONTEXT_COUNTRY` | Optional. Default **`US`**. Passed as `X-EBAY-C-ENDUSERCTX` contextual location for Browse sort/price (not the same as ship-to). |
+| `EBAY_SHIP_LOOKUP_MAX_POOL` | Optional. Cap (default **96**) on how many cheapest qualifying listings are considered before per-listing ship **getItem** calls. |
+| `EBAY_ACTIVE_SHIP_GETITEM_CAP` | Optional. Max **getItem** calls per card for ship-to refinement (default **64**). |
+| `EBAY_ACTIVE_ITEM_FIELDGROUPS` | Optional. Browse `getItem` `fieldgroups` for ship lookup (default **`EXTENDED`**). |
 | `ANTHROPIC_API_KEY` | `--grade` with `--llm-provider claude` |
 | `OPENAI_API_KEY` | `--grade` with `--llm-provider openai` |
 | `LOCAL_GRADER_URL` | Site mode with `--site-provider local` |
 | `TCGRADER_*`, `POKEGRADE_*`, `SNAPGRADE_*` | Matching site providers |
 
-If sold always shows **`playwright`** / **`scrape`** despite Insights scope on the token, read the **`[insights]`** log lines: `HTTP 4xx/5xx` means the API rejected the call (permissions or bad params); **`0 sold rows`** means the call succeeded but returned no comps for that keyword.
+If sold comps always show **`http`** / **`playwright`** / **`scrape`**, that is normal: default OAuth scopes are **Browse-only**, so Insights is intentionally skipped until you configure `buy.marketplace.insights`, get the token granted with that scope, and have eBay’s **restricted-API approval** — otherwise Insights returns HTTP **403** (“Insufficient permissions”). One-time `[sold]` log lines explain skips; `--refresh` also clears **`ebay-insights-forbidden-cache.json`** when you retry after gaining access.
+
+If Insight calls fail with **`[insights]`** plus **HTTP 4xx/5xx** while probing, permissions or params are wrong. **`[insights]` 0 rows** means the call succeeded but returned no comps.
+
+Read eBay Marketplace Insights docs (Limited Release): https://developer.ebay.com/api-docs/buy/marketplace-insights/static/overview.html
 
 ---
 
@@ -189,14 +214,15 @@ If sold always shows **`playwright`** / **`scrape`** despite Insights scope on t
 
 | Output / file | Purpose |
 |---------------|---------|
-| `results.md` | Tables: active per country, sold list, grading disclaimer |
-| `results.json` | Full structured payload + config snapshot |
+| `results.md` | Tables: active per `--countries` destination, sold list, grading disclaimer |
+| `results.json` | Full structured payload + `cardQueries` (resolved list) + config snapshot |
 | `ebay-active-cache.json` | Cached active searches (6h TTL by default) |
 | `ebay-sold-cache.json` | Cached sold searches (24h) |
+| `ebay-insights-forbidden-cache.json` | Written after Marketplace Insights HTTP 403 — suppresses Insight retries ~14 days (also removed by `--refresh`) |
 | `ai-grade-cache.json` | Cached AI grades (30d, key includes model/provider) |
 | `ebay-usage.json` | Rough daily eBay call counter (logged vs 5000/day cap) |
 
-Use **`--refresh`** to delete the three JSON caches above (active, sold, AI grades) before a run.
+Use **`--refresh`** to delete those JSON cache files (including the Insights 403 cooldown file) before a run.
 
 ---
 
@@ -204,7 +230,7 @@ Use **`--refresh`** to delete the three JSON caches above (active, sold, AI grad
 
 | File | Role |
 |------|------|
-| `index.js` | `CARDS`, `CONFIG`, CLI, main loop |
+| `index.js` | `CARDS`, `CONFIG`, CLI (positional / `--cards` card lines), main loop |
 | `ebayCategories.js` | US category id for **Single Cards** (breadcrumb) = **183454** (`CCG Individual Cards` in API docs) |
 | `ebay.js` | OAuth, Browse search, Insights + sold scrape fallback |
 | `filters.js` | Language, relevance, raw/slab title filters |
