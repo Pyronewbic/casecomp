@@ -76,6 +76,22 @@ Plus a recent sold table so you can see what cards actually sell for, not just w
 
 The price trend line compares the most recent sale to the closest sale ~5, 15, and 30 days ago, so you can spot whether a card is trending up or down.
 
+With `--grade-decision`, a break-even table appears before the listings showing whether submitting for grading is worth it at current comps:
+
+**Grading Decision** (PSA submission analysis)
+
+Raw ask median: $196.00 | PSA 9 sold median: $730.00 | PSA 10 sold median: $2,325.00
+
+| Tier | Fee | Net PSA 9 | Upside | Net PSA 10 | Upside |
+|------|----:|----------:|-------:|-----------:|-------:|
+| Economy | $25 | $705.00 | +260% | $2,300.00 | +1073% |
+| Regular | $50 | $680.00 | +247% | $2,275.00 | +1060% |
+| Express | $150 | $580.00 | +196% | $2,175.00 | +1009% |
+| Super Express | $300 | $430.00 | +119% | $2,025.00 | +933% |
+| Walk-through | $600 | $130.00 | -34% | $1,725.00 | +780% |
+
+_Net = median sold − submission fee. Upside vs raw median ask._
+
 ---
 
 ## Requirements
@@ -144,21 +160,7 @@ Per-card JSON files are written to `output/` so they don't clutter the project r
 /casecomp "Team aqua's kyogre ex 006/034" japanese --grade-decision
 ```
 
-Output panel:
-
-```
-Raw ask median: $196 | PSA 9 sold median: $730 | PSA 10 sold median: $2,325
-
-| Tier         |  Fee | Net PSA 9 | Upside | Net PSA 10 | Upside |
-|--------------|-----:|----------:|-------:|-----------:|-------:|
-| Economy      |  $25 |    $705   | +260%  |   $2,300   | +1073% |
-| Regular      |  $50 |    $680   | +247%  |   $2,275   | +1060% |
-| Express      | $150 |    $580   | +196%  |   $2,175   | +1009% |
-| Super Express| $300 |    $430   | +119%  |   $2,025   |  +933% |
-| Walk-through | $600 |    $130   |  -34%  |   $1,725   |  +780% |
-```
-
-Net = median sold − submission fee. Upside vs raw median ask. Negative rows flag tiers where grading at that grade isn't worth the fee.
+Net = median sold − submission fee. Upside vs raw median ask. Negative rows flag tiers where the submission fee exceeds the grade uplift.
 
 Tip: include the set number in the card name (e.g. `006/034`) to avoid variant mixing in the sold comps.
 
