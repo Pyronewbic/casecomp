@@ -379,7 +379,7 @@
           }
         }
       },
-      "lastUpdated": "2026-05-02T08:06:13.754Z"
+      "lastUpdated": "2026-05-02T08:28:18.695Z"
     },
     {
       "query": "Team aqua's kyogre ex",
@@ -714,7 +714,7 @@
       "soldSource": "playwright",
       "gradingLabel": "off",
       "counts": {
-        "activeTotal": 10,
+        "activeTotal": 5,
         "sold": 3
       },
       "pipelines": {
@@ -776,7 +776,425 @@
           }
         }
       },
-      "lastUpdated": "2026-05-02T08:06:08.819Z"
+      "lastUpdated": "2026-05-02T08:28:18.695Z"
+    },
+    {
+      "query": "Terastal festival Umbreon Ex 217/187",
+      "ebaySearchQuery": "Terastal festival Umbreon Ex 217/187 PSA 10",
+      "listingFormat": "slab",
+      "listingDescription": "slab (PSA 10)",
+      "slab": {
+        "provider": "PSA",
+        "grade": "10"
+      },
+      "languages": [
+        "jp"
+      ],
+      "lang": "jp",
+      "activeByCountry": {
+        "US": [
+          {
+            "itemId": "v1|318161356194|0",
+            "title": "Umbreon ex SAR 217/187 2024 Pokemon Terastal Festival sv8a Alt Art PSA 10",
+            "itemWebUrl": "https://www.ebay.com/itm/318161356194?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item4a13e505a2:g:HMAAAeSwyXBp4dDc",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 619.99,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "free",
+            "totalCost": 619.99,
+            "location": "KR",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/HMAAAeSwyXBp4dDc/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          },
+          {
+            "itemId": "v1|146631348454|0",
+            "title": "Umbreon EX SAR 217/187 Terastal Festival Korean PSA 10 MISLABLED AS JAPANESE??",
+            "itemWebUrl": "https://www.ebay.com/itm/146631348454?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item2223e8d0e6:g:63EAAeSwUN9oQ0M8",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 650,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "—",
+            "totalCost": 650,
+            "location": "US",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/63EAAeSwUN9oQ0M8/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          },
+          {
+            "itemId": "v1|366382213646|0",
+            "title": "Pokémon TCG Umbreon EX Festival Terastal Card 217/187 PSA 10 Japanese Edition",
+            "itemWebUrl": "https://www.ebay.com/itm/366382213646?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item554e14ea0e:g:cJEAAeSw8kxp785e",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 733.48,
+            "priceCurrency": "USD",
+            "shippingCost": 33.96,
+            "shippingLabel": "$33.96",
+            "totalCost": 767.44,
+            "location": "GB",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/cJEAAeSw8kxp785e/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          },
+          {
+            "itemId": "v1|236748074192|0",
+            "title": "PSA 10 Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese",
+            "itemWebUrl": "https://www.ebay.com/itm/236748074192?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item371f48ecd0:g:g-EAAeSwqBVp2MV0",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 795,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "—",
+            "totalCost": 795,
+            "location": "US",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/g-EAAeSwqBVp2MV0/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          },
+          {
+            "itemId": "v1|127786602567|0",
+            "title": "PSA 10 Pokemon Card Umbreon ex SV8a 217/187 SAR Terastal Festival EX Japanese",
+            "itemWebUrl": "https://www.ebay.com/itm/127786602567?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item1dc0acd047:g:QFMAAeSwTIlpzgJQ",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 799.98,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "free",
+            "totalCost": 799.98,
+            "location": "US",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/QFMAAeSwTIlpzgJQ/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          }
+        ],
+        "IN": [
+          {
+            "itemId": "v1|318161356194|0",
+            "title": "Umbreon ex SAR 217/187 2024 Pokemon Terastal Festival sv8a Alt Art PSA 10",
+            "itemWebUrl": "https://www.ebay.com/itm/318161356194?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item4a13e505a2:g:HMAAAeSwyXBp4dDc",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 619.99,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "free",
+            "totalCost": 619.99,
+            "location": "KR",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/HMAAAeSwyXBp4dDc/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          },
+          {
+            "itemId": "v1|146631348454|0",
+            "title": "Umbreon EX SAR 217/187 Terastal Festival Korean PSA 10 MISLABLED AS JAPANESE??",
+            "itemWebUrl": "https://www.ebay.com/itm/146631348454?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item2223e8d0e6:g:63EAAeSwUN9oQ0M8",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 650,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "—",
+            "totalCost": 650,
+            "location": "US",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/63EAAeSwUN9oQ0M8/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          },
+          {
+            "itemId": "v1|366382213646|0",
+            "title": "Pokémon TCG Umbreon EX Festival Terastal Card 217/187 PSA 10 Japanese Edition",
+            "itemWebUrl": "https://www.ebay.com/itm/366382213646?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item554e14ea0e:g:cJEAAeSw8kxp785e",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 733.48,
+            "priceCurrency": "USD",
+            "shippingCost": 33.96,
+            "shippingLabel": "$33.96",
+            "totalCost": 767.44,
+            "location": "GB",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/cJEAAeSw8kxp785e/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          },
+          {
+            "itemId": "v1|236748074192|0",
+            "title": "PSA 10 Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese",
+            "itemWebUrl": "https://www.ebay.com/itm/236748074192?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item371f48ecd0:g:g-EAAeSwqBVp2MV0",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 795,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "—",
+            "totalCost": 795,
+            "location": "US",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/g-EAAeSwqBVp2MV0/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          },
+          {
+            "itemId": "v1|127786602567|0",
+            "title": "PSA 10 Pokemon Card Umbreon ex SV8a 217/187 SAR Terastal Festival EX Japanese",
+            "itemWebUrl": "https://www.ebay.com/itm/127786602567?_skw=Terastal+festival+Umbreon+Ex+217%2F187+PSA+10&hash=item1dc0acd047:g:QFMAAeSwTIlpzgJQ",
+            "leafCategoryIds": [
+              "183454"
+            ],
+            "price": 799.98,
+            "priceCurrency": "USD",
+            "shippingCost": 0,
+            "shippingLabel": "free",
+            "totalCost": 799.98,
+            "location": "US",
+            "condition": "Graded",
+            "conditionFacet": null,
+            "listingGradeLabel": "PSA 10",
+            "imageUrl": "https://i.ebayimg.com/images/g/QFMAAeSwTIlpzgJQ/s-l225.jpg",
+            "shippingToBuyer": {
+              "US": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              },
+              "IN": {
+                "eligible": null,
+                "detail": "no_ship_block"
+              }
+            },
+            "grade": null
+          }
+        ]
+      },
+      "sold": [
+        {
+          "title": "PSA 10 Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese",
+          "itemWebUrl": "https://www.ebay.com/itm/405443771260",
+          "price": 797,
+          "currency": "USD",
+          "endedDate": "Apr 24, 2026",
+          "imageUrl": "https://i.ebayimg.com/images/g/ukoAAOSwH0xnbsYk/s-l500.webp"
+        },
+        {
+          "title": "PSA 10 Pokemon Card Umbreon ex SV8a 217/187 SAR Terastal Festival EX Japanese",
+          "itemWebUrl": "https://www.ebay.com/itm/227291025974",
+          "price": 725,
+          "currency": "USD",
+          "endedDate": "Apr 16, 2026",
+          "imageUrl": "https://i.ebayimg.com/images/g/5MYAAeSwt3tp1VfL/s-l500.webp"
+        },
+        {
+          "title": "PSA 10 Umbreon ex SAR 217/187 sv8a Terastal Festival ex Pokemon Card Japanese",
+          "itemWebUrl": "https://www.ebay.com/itm/358439010622",
+          "price": 700,
+          "currency": "USD",
+          "endedDate": "Apr 14, 2026",
+          "imageUrl": "https://i.ebayimg.com/images/g/2eIAAeSwCmBp2W~D/s-l500.webp"
+        },
+        {
+          "title": "PSA 10 Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese",
+          "itemWebUrl": "https://www.ebay.com/itm/366344109215",
+          "price": 700,
+          "currency": "USD",
+          "endedDate": "Apr 14, 2026",
+          "imageUrl": "https://i.ebayimg.com/images/g/fUsAAeSwtV5p3JZ9/s-l500.webp"
+        },
+        {
+          "title": "PSA 10 Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese",
+          "itemWebUrl": "https://www.ebay.com/itm/137214287965",
+          "price": 694.99,
+          "currency": "USD",
+          "endedDate": "Apr 13, 2026",
+          "imageUrl": "https://i.ebayimg.com/images/g/WXEAAeSwOqpp2MYN/s-l500.webp"
+        }
+      ],
+      "soldSource": "playwright",
+      "gradingLabel": "off",
+      "counts": {
+        "activeTotal": 5,
+        "sold": 5
+      },
+      "pipelines": {
+        "active": {
+          "US": {
+            "fetched": 30,
+            "afterLanguage": 30,
+            "afterRelevance": 30,
+            "afterListingFormat": 30,
+            "afterTcgFocus": 30,
+            "browseLanguageFacet": true,
+            "deliveryFilterRelaxed": false,
+            "unrestrictedBrowse": false,
+            "cardOnlyBrowseFallback": false,
+            "relevanceStats": {
+              "input": 30,
+              "afterKeywordRatio": 30,
+              "afterBlocklist": 30,
+              "afterPokemonName": 30,
+              "keywordFallback": false
+            },
+            "browseUsedDeliveryCountryFilter": false,
+            "shipToGetItemLookups": 30
+          },
+          "IN": {
+            "fetched": 30,
+            "afterLanguage": 30,
+            "afterRelevance": 30,
+            "afterListingFormat": 30,
+            "afterTcgFocus": 30,
+            "browseLanguageFacet": true,
+            "deliveryFilterRelaxed": false,
+            "unrestrictedBrowse": false,
+            "cardOnlyBrowseFallback": false,
+            "relevanceStats": {
+              "input": 30,
+              "afterKeywordRatio": 30,
+              "afterBlocklist": 30,
+              "afterPokemonName": 30,
+              "keywordFallback": false
+            },
+            "browseUsedDeliveryCountryFilter": false,
+            "shipToGetItemLookups": 30
+          }
+        },
+        "sold": {
+          "fetched": 60,
+          "afterLanguage": 60,
+          "afterRelevance": 60,
+          "afterListingFormat": 60,
+          "afterTcgFocus": 60,
+          "soldBrowseGetItemCalls": 9,
+          "relevanceStats": {
+            "input": 60,
+            "afterKeywordRatio": 60,
+            "afterBlocklist": 60,
+            "afterPokemonName": 60,
+            "keywordFallback": false
+          }
+        }
+      },
+      "lastUpdated": "2026-05-02T08:28:18.696Z"
     }
   ]
 }
