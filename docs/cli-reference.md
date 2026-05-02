@@ -7,9 +7,10 @@
 | *(positional)* | One or more card search lines after flags, e.g. `node index.js --format slab "Pikachu vmax"` |
 | `--cards` | Comma-separated card lines (merged after any positional cards). If neither this nor positional args are set, **`CARDS`** in `index.js` is used. |
 | `--lang` | `any` \| `eng` \| `jp` \| `cn` (aliases: `en`/`English`, `Japanese`, `Chinese`/`CN`). Comma-separate for multiple (`--lang eng,jp`). `any` skips language narrowing. Active search uses Browse **Language** facet; sold uses `getItem` to verify. |
-| `--countries` | Comma-separated **buyer ship-to** ISO codes (e.g. `US,IN`). Each listing is checked with Browse `getItem` (`shipToLocations`) and, when needed, a light HTML probe for "Doesn't ship to …". |
-| `--results` | Max active rows **per destination** after ship-to filtering |
-| `--sold` | How many recent sold rows to keep |
+| `--countries` | Comma-separated **buyer ship-to** ISO codes (e.g. `US,IN`). Each listing is checked with Browse `getItem` (`shipToLocations`) and, when needed, a light HTML probe for "Doesn't ship to …". Default: `US,IN`. |
+| `--pincodes` | Override default delivery pincodes per country, e.g. `US:10001,IN:110001`. Defaults: `US:19701`, `IN:600028`. Shown in the "To" column and passed as `zip` in the eBay Browse context header. |
+| `--results` | Max active rows **per destination** after ship-to filtering (default: `5`) |
+| `--sold` | How many recent sold rows to keep (default: `5`) |
 | `--sold-browser` | Prefer **Playwright (Chromium)** for sold HTML when Marketplace Insights is unavailable. Requires `npx playwright install chromium` once. |
 | `--format` | `raw` or `slab` (see Raw vs slab below) |
 | `--slab-provider` | Grader label for slab mode, e.g. `PSA`, `BGS`, `CGC` |
@@ -23,7 +24,7 @@
 | `--min-grade` | Drop graded rows below this predicted overall |
 | `--refresh` | Delete eBay + AI grade cache files and refetch |
 | `--limit` | Only process the first **N** card lines |
-| `--output` | Output filename prefix (default: `results`). Writes `<prefix>.json` and `<prefix>.md`. Used by `/casecomp` for parallel multi-card searches. |
+| `--output` | Output filename prefix (default: `results`). Writes `<prefix>.json`, `<prefix>.md`, and per-card `<prefix>-N.json` files. Every run also appends to `resultsCombined.md` (deduplicated across runs). |
 | `--no-ebay` | Do not call eBay (uses cache if present) |
 
 **Note:** This project uses **minimist**. `--no-ebay` is parsed as `{ ebay: false }`.
@@ -58,8 +59,8 @@ node index.js --format slab --slab-provider CGC --slab-grade 9.5 "Pikachu VMAX"
 ## Example commands
 
 ```bash
-# Baseline: US + India, English-only, 5 BIN + 3 sold per card
-node index.js --lang eng --countries US,IN --results 5 --sold 3
+# Baseline: US + India, English-only, 5 BIN + 5 sold per card
+node index.js --lang eng --countries US,IN --results 5 --sold 5
 
 # Multiple languages (English OR Japanese)
 node index.js --lang eng,jp --results 5 "Pikachu promo"
