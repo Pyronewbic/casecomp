@@ -22,7 +22,7 @@ import {
   testGradingProvider,
   printSiteGradingHelp,
 } from "./grading.js";
-import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary } from "./output.js";
+import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary, mergeAndWrite } from "./output.js";
 import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
 
@@ -256,27 +256,41 @@ function applyMinGrade(items, min) {
 }
 
 async function gradeItems(items, config, counters) {
-  const out = [];
+  const results = await Promise.all(
+    items.map(async (row) => {
+      try {
+        const g = await gradeImage(row.imageUrl, config);
+        return { row, g, err: null };
+      } catch (e) {
+        return { row, g: null, err: e };
+      }
+    }),
+  );
   let sum = 0;
   let n = 0;
-  for (const row of items) {
-    try {
-      const g = await gradeImage(row.imageUrl, config);
-      if (g && !g.error) {
-        sum += g.overall;
-        n++;
-        if (config.aiGrading.mode === "llm") counters.llmCalls += 1;
-      }
-      out.push({ ...row, grade: g });
-    } catch (e) {
-      log(`  grade error: ${e.message || e}`);
-      out.push({ ...row, grade: { error: e.message, raw: null } });
+  const out = results.map(({ row, g, err }) => {
+    if (err) {
+      log(`  grade error: ${err.message || err}`);
+      return { ...row, grade: { error: err.message, raw: null } };
     }
-  }
+    if (g && !g.error) {
+      sum += g.overall;
+      n++;
+      if (config.aiGrading.mode === "llm") counters.llmCalls += 1;
+    }
+    return { ...row, grade: g };
+  });
   return { rows: out, avg: n ? sum / n : null, graded: n };
 }
 
 export async function main() {
+  if (argv.merge) {
+    const prefixes = String(argv.merge).split(",").map((s) => s.trim());
+    const outputPrefix = argv.output != null && argv.output !== true ? String(argv.output) : "results";
+    await mergeAndWrite(prefixes, outputPrefix);
+    return;
+  }
+
   const refresh = Boolean(argv.refresh);
   // minimist treats --no-ebay as { ebay: false } (not no-ebay: true)
   const noEbay = argv.ebay === false;

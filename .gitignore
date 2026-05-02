@@ -7,3 +7,6 @@ ebay-usage.json
 results.json
 results-*.json
 results.md
+results-*.md
+resultsCombined.json
+resultsCombined.md
