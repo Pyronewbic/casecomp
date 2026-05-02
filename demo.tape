@@ -18,7 +18,7 @@ Enter
 Sleep 5s
 
 # Type the /casecomp command in natural language
-Type "/casecomp refresh cache and show me the last 5 results each for Team magma's groudon ex, Team aqua's kyogre ex and Terastal festival Umbreon Ex 217/187 - all japanese and PSA 10, as well as last 5 sold results for each"
+Type "/casecomp Team magma's groudon ex, Team aqua's kyogre ex and Terastal festival Umbreon Ex 217/187 - all japanese, PSA 10 & TAG 10, on ebay and magi"
 Sleep 500ms
 Enter
 

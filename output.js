@@ -3,6 +3,17 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const OUTPUT_DIR = path.join(__dirname, "output");
+
+// results.json / results.md stay in root; everything else goes in output/
+function outPath(prefix, filename) {
+  if (prefix === "results") return path.join(__dirname, filename);
+  return path.join(OUTPUT_DIR, filename);
+}
+
+async function ensureOutputDir() {
+  await fs.mkdir(OUTPUT_DIR, { recursive: true });
+}
 
 function money(n, cur = "USD") {
   if (n == null || Number.isNaN(n)) return "—";
@@ -24,6 +35,37 @@ function confCell(g) {
 }
 
 const GRADE_RE = /\b(PSA|BGS|CGC|TAG|SGC|HGA|ACE)\s+(\d+(?:\.\d+)?)\b/i;
+
+function detectMetaFromBlock(block) {
+  const allItems = [
+    ...Object.values(block.activeByCountry || {}).flat(),
+    ...(block.sold || []),
+  ];
+  const hasEbay = allItems.some((r) => (r.itemWebUrl || "").includes("ebay.com"));
+  const hasMagi = allItems.some((r) => (r.itemWebUrl || "").includes("magi.camp"));
+  const sources = [...(hasEbay ? ["eBay"] : []), ...(hasMagi ? ["magi"] : [])];
+
+  const providerSet = new Set();
+  for (const item of allItems) {
+    const label = item.listingGradeLabel;
+    if (label) {
+      const m = GRADE_RE.exec(String(label));
+      if (m) providerSet.add(`${m[1].toUpperCase()} ${m[2]}`);
+    }
+  }
+
+  const searchBase = (block.ebaySearchQuery || block.query || "")
+    .replace(/\s+(PSA|BGS|CGC|TAG|SGC|HGA|ACE)\s+\d+(?:\.\d+)?$/i, "")
+    .trim();
+
+  return { sources, providers: [...providerSet], searchBase };
+}
+
+function linkLabel(url) {
+  if (!url) return "—";
+  if (url.includes("magi.camp")) return "magi";
+  return "eBay";
+}
 
 function soldGradeLabel(s) {
   if (s.listingGradeLabel) return String(s.listingGradeLabel).trim().replace(/\|/g, "\\|");
@@ -52,10 +94,8 @@ export async function writeMarkdown(results, config, meta) {
       lang,
       activeByCountry,
       sold,
-      gradingLabel,
       counts,
       error,
-      ebaySearchQuery,
       listingDescription,
     } = block;
     lines.push(`## ${query}`);
@@ -66,15 +106,17 @@ export async function writeMarkdown(results, config, meta) {
       lines.push("");
       continue;
     }
-    if (ebaySearchQuery) {
-      lines.push(`**eBay search:** \`${ebaySearchQuery}\``);
-    }
-    if (listingDescription) {
+    const { sources, providers, searchBase } = detectMetaFromBlock(block);
+    lines.push(`**Search:** \`${searchBase}\``);
+    if (sources.length) lines.push(`**Sources:** ${sources.join(", ")}`);
+    if (providers.length) {
+      lines.push(`**Listing type:** slab (${providers.join(" + ")})`);
+    } else if (listingDescription) {
       lines.push(`**Listing type:** ${listingDescription}`);
     }
     lines.push("");
     lines.push(
-      `**Language:** ${lang} | **Found:** ${counts.activeTotal} active, ${counts.sold} sold | **Grading:** ${gradingLabel}`,
+      `**Language:** ${lang} | **Found:** ${counts.activeTotal} active, ${counts.sold} sold`,
     );
     lines.push("");
     const seenActiveIds = new Set();
@@ -87,36 +129,27 @@ export async function writeMarkdown(results, config, meta) {
     }
     mergedActive.sort((a, b) => (a.totalCost ?? Infinity) - (b.totalCost ?? Infinity));
     lines.push(`### Active listings`);
-    lines.push("| # | Price | Ship | Total | To | Grade | AI conf | Title |");
-    lines.push("|---|------:|-----:|------:|:---|------:|--------:|-------|");
+    lines.push("| # | Total | Ship | To | Grade | Title | Link |");
+    lines.push("|---|------:|------|-------|-------|------|------|");
     mergedActive.forEach((row, i) => {
-      const g = row.grade;
       const title = (row.title || "").replace(/\|/g, "\\|");
-      const link = `[${title.slice(0, 80)}${title.length > 80 ? "…" : ""}](${row.itemWebUrl || "#"})`;
+      const url = (row.itemWebUrl || "").split("?")[0];
+      const link = url ? `[${linkLabel(url)}](${url})` : "—";
       const toCell = shipToCell(row, config.deliveryCountries, config.deliveryPincodes);
       lines.push(
-        `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${toCell} | ${activeGradeDisplay(row)} | ${confCell(g)} | ${link} |`,
+        `| ${i + 1} | ${money(row.totalCost, row.priceCurrency)} | ${row.shippingLabel} | ${toCell} | ${activeGradeDisplay(row)} | ${title} | ${link} |`,
       );
     });
     lines.push("");
-    lines.push(`### Last ${config.soldListingsLimit} sold`);
+    lines.push(`### Last ${(sold || []).length} sold`);
     lines.push("| # | Price | Date | Grade | Title | Link |");
     lines.push("|---|------:|------|-------|-------|------|");
     (sold || []).forEach((s, i) => {
-      const date = s.endedDate || "—";
       const title = (s.title || "").replace(/\|/g, "\\|");
-      const trunc = title.length > 60 ? title.slice(0, 60) + "…" : title;
       const url = (s.itemWebUrl || "").split("?")[0];
-      const link = url ? `[eBay](${url})` : "—";
-      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${date} | ${soldGradeLabel(s)} | ${trunc} | ${link} |`);
+      const link = url ? `[${linkLabel(url)}](${url})` : "—";
+      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${s.endedDate || "—"} | ${soldGradeLabel(s)} | ${title} | ${link} |`);
     });
-    lines.push("");
-    lines.push(
-      "**Grade:** Seller column shows Condition or title when parsed (e.g. `PSA 10`, `BGS 10`). With `--grade`, `Pre-Graded:` is the numeric AI estimate from the listing photo—not official slab.",
-    );
-    lines.push(
-      "**AI conf:** Model-reported confidence (0–1) for `Pre-Graded:` when `--grade` is on; otherwise `—`. Not the same as a slab grade.",
-    );
     lines.push("");
     lines.push("---");
     lines.push("");
@@ -124,7 +157,9 @@ export async function writeMarkdown(results, config, meta) {
   if (meta?.footer) {
     lines.push(meta.footer);
   }
-  await fs.writeFile(path.join(__dirname, `${meta?.outputPrefix || "results"}.md`), lines.join("\n"), "utf8");
+  const pfx = meta?.outputPrefix || "results";
+  await ensureOutputDir();
+  await fs.writeFile(outPath(pfx, `${pfx}.md`), lines.join("\n"), "utf8");
 }
 
 function priceTrend(sold, todayStr) {
@@ -159,12 +194,15 @@ export function printSummary(results, config) {
   const today = new Date().toISOString().slice(0, 10);
   const lines = [];
   for (const block of results) {
-    const { query, lang, activeByCountry, sold, counts, error, ebaySearchQuery, listingFormat } = block;
+    const { query, lang, activeByCountry, sold, counts, error, listingFormat } = block;
     lines.push(`## ${query}`);
     if (error) { lines.push(`**Error:** ${error}`); lines.push(""); lines.push("---"); lines.push(""); continue; }
 
     const type = listingFormat || "raw";
-    lines.push(`Search: \`${ebaySearchQuery}\`  |  Type: ${type}  |  Lang: ${lang}  |  Active: ${counts?.activeTotal ?? "?"}  |  Sold: ${counts?.sold ?? "?"}`);
+    const { sources: pSources, providers: pProviders, searchBase: pBase } = detectMetaFromBlock(block);
+    const sourceStr = pSources.length ? pSources.join("+") : "eBay";
+    const typeStr = pProviders.length ? `slab (${pProviders.join("+")})` : type;
+    lines.push(`Search: \`${pBase}\`  |  Sources: ${sourceStr}  |  Type: ${typeStr}  |  Lang: ${lang}  |  Active: ${counts?.activeTotal ?? "?"}  |  Sold: ${counts?.sold ?? "?"}`);
     lines.push("");
 
     const seenIds = new Set();
@@ -181,32 +219,15 @@ export function printSummary(results, config) {
     const hasAI = type !== "slab" && items.some(r => r.grade && !r.grade.error);
 
     lines.push("### Active listings");
-    if (hasAI) {
-      lines.push("| # | Total | Ship | To | Pre-Grade | Title |");
-      lines.push("|---|-------|------|----|-----------|-------|");
-    } else if (hasGrade) {
-      lines.push("| # | Total | Ship | To | Grade | Title |");
-      lines.push("|---|-------|------|----|-------|-------|");
-    } else {
-      lines.push("| # | Total | Ship | To | Title |");
-      lines.push("|---|-------|------|----|----|");
-    }
+    lines.push("| # | Total | Ship | To | Grade | Title | Link |");
+    lines.push("|---|------:|------|-------|-------|------|------|");
     for (let i = 0; i < items.length; i++) {
       const row = items[i];
       const title = (row.title || "").replace(/\|/g, "\\|");
-      const trunc = title.length > 40 ? title.slice(0, 40) + "…" : title;
       const url = (row.itemWebUrl || "").split("?")[0];
-      const link = `[${trunc}](${url})`;
+      const link = url ? `[${linkLabel(url)}](${url})` : "—";
       const to = shipToCell(row, config.deliveryCountries || [], config.deliveryPincodes || {});
-      if (hasAI) {
-        const g = row.grade;
-        const pre = g && !g.error && g.overall != null ? g.overall : "—";
-        lines.push(`| ${i + 1} | ${money(row.totalCost, row.priceCurrency)} | ${row.shippingLabel} | ${to} | ${pre} | ${link} |`);
-      } else if (hasGrade) {
-        lines.push(`| ${i + 1} | ${money(row.totalCost, row.priceCurrency)} | ${row.shippingLabel} | ${to} | ${activeGradeDisplay(row)} | ${link} |`);
-      } else {
-        lines.push(`| ${i + 1} | ${money(row.totalCost, row.priceCurrency)} | ${row.shippingLabel} | ${to} | ${link} |`);
-      }
+      lines.push(`| ${i + 1} | ${money(row.totalCost, row.priceCurrency)} | ${row.shippingLabel} | ${to} | ${activeGradeDisplay(row)} | ${title} | ${link} |`);
     }
     lines.push("");
 
@@ -217,10 +238,9 @@ export function printSummary(results, config) {
     for (let i = 0; i < soldRows.length; i++) {
       const s = soldRows[i];
       const title = (s.title || "").replace(/\|/g, "\\|");
-      const trunc = title.length > 40 ? title.slice(0, 40) + "…" : title;
       const url = (s.itemWebUrl || "").split("?")[0];
-      const link = url ? `[eBay](${url})` : "—";
-      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${s.endedDate || "—"} | ${soldGradeLabel(s)} | ${trunc} | ${link} |`);
+      const link = url ? `[${linkLabel(url)}](${url})` : "—";
+      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${s.endedDate || "—"} | ${soldGradeLabel(s)} | ${title} | ${link} |`);
     }
     lines.push("");
     lines.push(`**Price trend (sold):** ${priceTrend(soldRows, today)}`);
@@ -242,15 +262,16 @@ function strippedJson(obj) {
 }
 
 export async function writeJson(payload, outputPrefix = "results") {
+  await ensureOutputDir();
   await fs.writeFile(
-    path.join(__dirname, `${outputPrefix}.json`),
+    outPath(outputPrefix, `${outputPrefix}.json`),
     strippedJson(payload),
     "utf8",
   );
 }
 
-const COMBINED_JSON = path.join(__dirname, "resultsCombined.json");
-const COMBINED_MD = path.join(__dirname, "resultsCombined.md");
+const COMBINED_JSON = path.join(OUTPUT_DIR, "resultsCombined.json");
+const COMBINED_MD = path.join(OUTPUT_DIR, "resultsCombined.md");
 
 export async function appendCombinedMarkdown(results, config) {
   // Load existing combined store
@@ -313,6 +334,7 @@ export async function appendCombinedMarkdown(results, config) {
     }
   }
 
+  await ensureOutputDir();
   await fs.writeFile(COMBINED_JSON, JSON.stringify(store, null, 2), "utf8");
 
   // Regenerate combined MD from the full merged store
@@ -330,19 +352,23 @@ export async function appendCombinedMarkdown(results, config) {
       lang,
       activeByCountry,
       sold,
-      gradingLabel,
       counts,
-      ebaySearchQuery,
       listingDescription,
       lastUpdated,
     } = block;
     lines.push(`## ${query}`);
-    if (ebaySearchQuery) lines.push(`**eBay search:** \`${ebaySearchQuery}\``);
-    if (listingDescription) lines.push(`**Listing type:** ${listingDescription}`);
+    const { sources: cSources, providers: cProviders, searchBase: cBase } = detectMetaFromBlock(block);
+    lines.push(`**Search:** \`${cBase}\``);
+    if (cSources.length) lines.push(`**Sources:** ${cSources.join(", ")}`);
+    if (cProviders.length) {
+      lines.push(`**Listing type:** slab (${cProviders.join(" + ")})`);
+    } else if (listingDescription) {
+      lines.push(`**Listing type:** ${listingDescription}`);
+    }
     if (lastUpdated) lines.push(`**Last updated:** ${lastUpdated}`);
     lines.push("");
     lines.push(
-      `**Language:** ${lang} | **Found:** ${counts?.activeTotal ?? "?"} active, ${counts?.sold ?? "?"} sold | **Grading:** ${gradingLabel ?? "—"}`,
+      `**Language:** ${lang} | **Found:** ${counts?.activeTotal ?? "?"} active, ${counts?.sold ?? "?"} sold`,
     );
     lines.push("");
     const seenCombinedIds = new Set();
@@ -355,15 +381,15 @@ export async function appendCombinedMarkdown(results, config) {
     }
     mergedCombined.sort((a, b) => (a.totalCost ?? Infinity) - (b.totalCost ?? Infinity));
     lines.push(`### Active listings`);
-    lines.push("| # | Price | Ship | Total | To | Grade | AI conf | Title |");
-    lines.push("|---|------:|-----:|------:|:---|------:|--------:|-------|");
+    lines.push("| # | Total | Ship | To | Grade | Title | Link |");
+    lines.push("|---|------:|------|-------|-------|------|------|");
     mergedCombined.forEach((row, i) => {
-      const g = row.grade;
       const title = (row.title || "").replace(/\|/g, "\\|");
-      const link = `[${title.slice(0, 80)}${title.length > 80 ? "…" : ""}](${row.itemWebUrl || "#"})`;
+      const url = (row.itemWebUrl || "").split("?")[0];
+      const link = url ? `[${linkLabel(url)}](${url})` : "—";
       const toCell = shipToCell(row, config.deliveryCountries, config.deliveryPincodes);
       lines.push(
-        `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${toCell} | ${activeGradeDisplay(row)} | ${confCell(g)} | ${link} |`,
+        `| ${i + 1} | ${money(row.totalCost, row.priceCurrency)} | ${row.shippingLabel} | ${toCell} | ${activeGradeDisplay(row)} | ${title} | ${link} |`,
       );
     });
     lines.push("");
@@ -371,12 +397,10 @@ export async function appendCombinedMarkdown(results, config) {
     lines.push("| # | Price | Date | Grade | Title | Link |");
     lines.push("|---|------:|------|-------|-------|------|");
     (sold || []).forEach((s, i) => {
-      const date = s.endedDate || "—";
       const title = (s.title || "").replace(/\|/g, "\\|");
-      const trunc = title.length > 60 ? title.slice(0, 60) + "…" : title;
       const url = (s.itemWebUrl || "").split("?")[0];
-      const link = url ? `[eBay](${url})` : "—";
-      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${date} | ${soldGradeLabel(s)} | ${trunc} | ${link} |`);
+      const link = url ? `[${linkLabel(url)}](${url})` : "—";
+      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${s.endedDate || "—"} | ${soldGradeLabel(s)} | ${title} | ${link} |`);
     });
     lines.push("");
     lines.push("---");
@@ -393,7 +417,7 @@ export async function mergeAndWrite(prefixes, outputPrefix = "results") {
     for (let i = 0; ; i++) {
       let data;
       try {
-        data = JSON.parse(await fs.readFile(path.join(__dirname, `${prefix}-${i}.json`), "utf8"));
+        data = JSON.parse(await fs.readFile(path.join(OUTPUT_DIR, `${prefix}-${i}.json`), "utf8"));
       } catch {
         break;
       }
@@ -446,10 +470,11 @@ export async function mergeAndWrite(prefixes, outputPrefix = "results") {
 }
 
 export async function writePerCardJson(results, config, outputPrefix = "results") {
+  await ensureOutputDir();
   await Promise.all(
     results.map((result, i) =>
       fs.writeFile(
-        path.join(__dirname, `${outputPrefix}-${i}.json`),
+        path.join(OUTPUT_DIR, `${outputPrefix}-${i}.json`),
         strippedJson({
           deliveryCountries: config.deliveryCountries,
           deliveryPincodes: config.deliveryPincodes ?? {},
