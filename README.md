@@ -64,7 +64,7 @@ Then the active listings table (sources labelled eBay or magi):
 |---|------:|------|-------|-------|------|------|
 | 1 | $619.99 | free | US:19701 IN:600028 | PSA 10 | Umbreon ex SAR 217/187 2024 Pokemon Terastal Festival sv8a Alt Art PSA 10 | [eBay](https://www.ebay.com/itm/318161356194) |
 | 2 | $664.71 | — | US:19701 IN:600028 | PSA 10 | 【PSA10】ブラッキーex SAR 217/187 1枚 | [magi](https://magi.camp/items/472702272) |
-| 3 | $810.00 | $10.00 | US:19701 IN:600028 | — | TAG GEM MINT 10 UMBREON EX 2024 POKÉMON SCARLET & VIOLET JAPANESE #217/187 | [eBay](https://www.ebay.com/itm/376058718185) |
+| 3 | $810.00 | $10.00 | US:19701 IN:600028 | TAG 10 | TAG GEM MINT 10 UMBREON EX 2024 POKÉMON SCARLET & VIOLET JAPANESE #217/187 | [eBay](https://www.ebay.com/itm/376058718185) |
 
 Plus a recent sold table so you can see what cards actually sell for, not just what sellers are asking:
 
