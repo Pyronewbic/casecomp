@@ -23,6 +23,14 @@ function confCell(g) {
   return g.confidence.toFixed(1);
 }
 
+const GRADE_RE = /\b(PSA|BGS|CGC|TAG|SGC|HGA|ACE)\s+(\d+(?:\.\d+)?)\b/i;
+
+function soldGradeLabel(s) {
+  if (s.listingGradeLabel) return String(s.listingGradeLabel).trim().replace(/\|/g, "\\|");
+  const m = GRADE_RE.exec(s.title || "");
+  return m ? `${m[1].toUpperCase()} ${m[2]}` : "—";
+}
+
 /** AI `--grade` → `Pre-Graded: …`; seller Condition / title → slab text e.g. `PSA 10` (no prefix). */
 function activeGradeDisplay(row) {
   const g = row.grade;
@@ -69,35 +77,38 @@ export async function writeMarkdown(results, config, meta) {
       `**Language:** ${lang} | **Found:** ${counts.activeTotal} active, ${counts.sold} sold | **Grading:** ${gradingLabel}`,
     );
     lines.push("");
+    const seenActiveIds = new Set();
+    const mergedActive = [];
     for (const country of config.deliveryCountries) {
-      const items = activeByCountry[country] || [];
-      lines.push(
-        `### Active — ships to **${country}**`,
-      );
-      lines.push(
-        "| # | Price | Ship | Total | To | Grade | AI conf | Title |",
-      );
-      lines.push("|---|------:|-----:|------:|:---|------:|--------:|-------|");
-      items.forEach((row, i) => {
-        const g = row.grade;
-        const title = (row.title || "").replace(/\|/g, "\\|");
-        const link = `[${title.slice(0, 80)}${title.length > 80 ? "…" : ""}](${row.itemWebUrl || "#"})`;
-        const toCell = shipToCell(row, config.deliveryCountries, config.deliveryPincodes);
-        lines.push(
-          `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${toCell} | ${activeGradeDisplay(row)} | ${confCell(g)} | ${link} |`,
-        );
-      });
-      lines.push("");
+      for (const row of (activeByCountry[country] || [])) {
+        const key = row.itemId || row.itemWebUrl;
+        if (!seenActiveIds.has(key)) { seenActiveIds.add(key); mergedActive.push(row); }
+      }
     }
+    mergedActive.sort((a, b) => (a.totalCost ?? Infinity) - (b.totalCost ?? Infinity));
+    lines.push(`### Active listings`);
+    lines.push("| # | Price | Ship | Total | To | Grade | AI conf | Title |");
+    lines.push("|---|------:|-----:|------:|:---|------:|--------:|-------|");
+    mergedActive.forEach((row, i) => {
+      const g = row.grade;
+      const title = (row.title || "").replace(/\|/g, "\\|");
+      const link = `[${title.slice(0, 80)}${title.length > 80 ? "…" : ""}](${row.itemWebUrl || "#"})`;
+      const toCell = shipToCell(row, config.deliveryCountries, config.deliveryPincodes);
+      lines.push(
+        `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${toCell} | ${activeGradeDisplay(row)} | ${confCell(g)} | ${link} |`,
+      );
+    });
+    lines.push("");
     lines.push(`### Last ${config.soldListingsLimit} sold`);
+    lines.push("| # | Price | Date | Grade | Title | Link |");
+    lines.push("|---|------:|------|-------|-------|------|");
     (sold || []).forEach((s, i) => {
       const date = s.endedDate || "—";
-      const link = s.itemWebUrl
-        ? `[${(s.title || "").slice(0, 60)}](${s.itemWebUrl})`
-        : s.title || "—";
-      lines.push(
-        `${i + 1}. ${money(s.price, s.currency)} — ${date} — ${link}`,
-      );
+      const title = (s.title || "").replace(/\|/g, "\\|");
+      const trunc = title.length > 60 ? title.slice(0, 60) + "…" : title;
+      const url = (s.itemWebUrl || "").split("?")[0];
+      const link = url ? `[eBay](${url})` : "—";
+      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${date} | ${soldGradeLabel(s)} | ${trunc} | ${link} |`);
     });
     lines.push("");
     lines.push(
@@ -156,8 +167,16 @@ export function printSummary(results, config) {
     lines.push(`Search: \`${ebaySearchQuery}\`  |  Type: ${type}  |  Lang: ${lang}  |  Active: ${counts?.activeTotal ?? "?"}  |  Sold: ${counts?.sold ?? "?"}`);
     lines.push("");
 
-    const firstCountry = config.deliveryCountries?.[0] || "US";
-    const items = (activeByCountry?.[firstCountry] || []).slice(0, config.resultsPerCard || 5);
+    const seenIds = new Set();
+    const allActive = [];
+    for (const country of (config.deliveryCountries || [])) {
+      for (const row of (activeByCountry?.[country] || [])) {
+        const key = row.itemId || row.itemWebUrl;
+        if (!seenIds.has(key)) { seenIds.add(key); allActive.push(row); }
+      }
+    }
+    allActive.sort((a, b) => (a.totalCost ?? Infinity) - (b.totalCost ?? Infinity));
+    const items = allActive.slice(0, config.resultsPerCard || 5);
     const hasGrade = type === "slab" || items.some(r => r.grade && !r.grade.error);
     const hasAI = type !== "slab" && items.some(r => r.grade && !r.grade.error);
 
@@ -193,15 +212,15 @@ export function printSummary(results, config) {
 
     const soldRows = (sold || []).slice(0, config.soldListingsLimit || 5);
     lines.push("### Recent sold");
-    lines.push("| # | Price | Date | Title |");
-    lines.push("|---|-------|------|-------|");
+    lines.push("| # | Price | Date | Grade | Title | Link |");
+    lines.push("|---|------:|------|-------|-------|------|");
     for (let i = 0; i < soldRows.length; i++) {
       const s = soldRows[i];
       const title = (s.title || "").replace(/\|/g, "\\|");
       const trunc = title.length > 40 ? title.slice(0, 40) + "…" : title;
       const url = (s.itemWebUrl || "").split("?")[0];
-      const link = url ? `[${trunc}](${url})` : trunc;
-      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${s.endedDate || "—"} | ${link} |`);
+      const link = url ? `[eBay](${url})` : "—";
+      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${s.endedDate || "—"} | ${soldGradeLabel(s)} | ${trunc} | ${link} |`);
     }
     lines.push("");
     lines.push(`**Price trend (sold):** ${priceTrend(soldRows, today)}`);
@@ -326,35 +345,104 @@ export async function appendCombinedMarkdown(results, config) {
       `**Language:** ${lang} | **Found:** ${counts?.activeTotal ?? "?"} active, ${counts?.sold ?? "?"} sold | **Grading:** ${gradingLabel ?? "—"}`,
     );
     lines.push("");
+    const seenCombinedIds = new Set();
+    const mergedCombined = [];
     for (const country of (config.deliveryCountries || [])) {
-      const items = activeByCountry?.[country] || [];
-      lines.push(`### Active — ships to **${country}**`);
-      lines.push("| # | Price | Ship | Total | To | Grade | AI conf | Title |");
-      lines.push("|---|------:|-----:|------:|:---|------:|--------:|-------|");
-      items.forEach((row, i) => {
-        const g = row.grade;
-        const title = (row.title || "").replace(/\|/g, "\\|");
-        const link = `[${title.slice(0, 80)}${title.length > 80 ? "…" : ""}](${row.itemWebUrl || "#"})`;
-        const toCell = shipToCell(row, config.deliveryCountries, config.deliveryPincodes);
-        lines.push(
-          `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${toCell} | ${activeGradeDisplay(row)} | ${confCell(g)} | ${link} |`,
-        );
-      });
-      lines.push("");
+      for (const row of (activeByCountry?.[country] || [])) {
+        const key = row.itemId || row.itemWebUrl;
+        if (!seenCombinedIds.has(key)) { seenCombinedIds.add(key); mergedCombined.push(row); }
+      }
     }
+    mergedCombined.sort((a, b) => (a.totalCost ?? Infinity) - (b.totalCost ?? Infinity));
+    lines.push(`### Active listings`);
+    lines.push("| # | Price | Ship | Total | To | Grade | AI conf | Title |");
+    lines.push("|---|------:|-----:|------:|:---|------:|--------:|-------|");
+    mergedCombined.forEach((row, i) => {
+      const g = row.grade;
+      const title = (row.title || "").replace(/\|/g, "\\|");
+      const link = `[${title.slice(0, 80)}${title.length > 80 ? "…" : ""}](${row.itemWebUrl || "#"})`;
+      const toCell = shipToCell(row, config.deliveryCountries, config.deliveryPincodes);
+      lines.push(
+        `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${toCell} | ${activeGradeDisplay(row)} | ${confCell(g)} | ${link} |`,
+      );
+    });
+    lines.push("");
     lines.push(`### ${(sold || []).length} sold (combined)`);
+    lines.push("| # | Price | Date | Grade | Title | Link |");
+    lines.push("|---|------:|------|-------|-------|------|");
     (sold || []).forEach((s, i) => {
       const date = s.endedDate || "—";
-      const link = s.itemWebUrl
-        ? `[${(s.title || "").slice(0, 60)}](${s.itemWebUrl})`
-        : s.title || "—";
-      lines.push(`${i + 1}. ${money(s.price, s.currency)} — ${date} — ${link}`);
+      const title = (s.title || "").replace(/\|/g, "\\|");
+      const trunc = title.length > 60 ? title.slice(0, 60) + "…" : title;
+      const url = (s.itemWebUrl || "").split("?")[0];
+      const link = url ? `[eBay](${url})` : "—";
+      lines.push(`| ${i + 1} | ${money(s.price, s.currency)} | ${date} | ${soldGradeLabel(s)} | ${trunc} | ${link} |`);
     });
     lines.push("");
     lines.push("---");
     lines.push("");
   }
   await fs.writeFile(COMBINED_MD, lines.join("\n"), "utf8");
+}
+
+export async function mergeAndWrite(prefixes, outputPrefix = "results") {
+  const cardMaps = new Map();
+  let sharedConfig = null;
+
+  for (const prefix of prefixes) {
+    for (let i = 0; ; i++) {
+      let data;
+      try {
+        data = JSON.parse(await fs.readFile(path.join(__dirname, `${prefix}-${i}.json`), "utf8"));
+      } catch {
+        break;
+      }
+      if (!sharedConfig) {
+        sharedConfig = {
+          deliveryCountries: data.deliveryCountries || ["US", "IN"],
+          deliveryPincodes: data.deliveryPincodes || {},
+          soldListingsLimit: 5,
+          resultsPerCard: 5,
+        };
+      }
+      if (!cardMaps.has(i)) {
+        cardMaps.set(i, JSON.parse(JSON.stringify(data)));
+      } else {
+        const existing = cardMaps.get(i);
+        for (const [country, items] of Object.entries(data.activeByCountry || {})) {
+          if (!existing.activeByCountry) existing.activeByCountry = {};
+          const existingItems = existing.activeByCountry[country] || [];
+          const seenIds = new Set(existingItems.map((r) => r.itemId).filter(Boolean));
+          const toAdd = items.filter((r) => r.itemId && !seenIds.has(r.itemId));
+          existing.activeByCountry[country] = [...existingItems, ...toAdd];
+        }
+        const seenUrls = new Set((existing.sold || []).map((s) => s.itemWebUrl).filter(Boolean));
+        const newSold = (data.sold || []).filter((s) => s.itemWebUrl && !seenUrls.has(s.itemWebUrl));
+        existing.sold = [...(existing.sold || []), ...newSold].sort(
+          (a, b) => new Date(b.endedDate || 0) - new Date(a.endedDate || 0),
+        );
+        existing.counts = {
+          ...existing.counts,
+          activeTotal: Math.max(...Object.values(existing.activeByCountry || {}).map((a) => a.length), 0),
+          sold: (existing.sold || []).length,
+        };
+      }
+    }
+  }
+
+  if (!cardMaps.size) {
+    process.stderr.write(`mergeAndWrite: no per-card JSON files found for prefixes: ${prefixes.join(", ")}\n`);
+    return;
+  }
+
+  const results = Array.from({ length: Math.max(...cardMaps.keys()) + 1 }, (_, i) => cardMaps.get(i)).filter(Boolean);
+  const config = {
+    ...sharedConfig,
+    soldListingsLimit: Math.max(...results.map((r) => (r.sold || []).length), sharedConfig.soldListingsLimit),
+  };
+  printSummary(results, config);
+  await writeMarkdown(results, config, { outputPrefix });
+  await writeJson({ generatedAt: new Date().toISOString(), results }, outputPrefix);
 }
 
 export async function writePerCardJson(results, config, outputPrefix = "results") {
