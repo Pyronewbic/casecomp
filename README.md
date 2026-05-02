@@ -61,18 +61,23 @@ For **raw searches**, a grading signal panel appears above the listings using li
 Then the active listings table (sources labelled eBay or magi):
 
 | # | Total | Ship | To | Grade | Title | Link |
-|---|-------|------|----|-------|-------|------|
-| 1 | $619.99 | free | US:19701 IN:600028 | PSA 10 | [Umbreon ex SAR 217/187 2024 Pokemon T...](https://www.ebay.com/itm/318161356194) | [eBay](https://www.ebay.com/itm/318161356194) |
-| 2 | $650.00 | free | US:19701 IN:600028 | PSA 10 | [Umbreon EX SAR 217/187 Terastal Festi...](https://www.ebay.com/itm/146631348454) | [eBay](https://www.ebay.com/itm/146631348454) |
+|---|------:|------|-------|-------|------|------|
+| 1 | $400.00 | free | US:19701 IN:600028 | Ungraded | Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese NM | [eBay](https://www.ebay.com/itm/177832326093) |
+| 2 | $415.31 | free | US:19701 IN:600028 | Ungraded | With tracking Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card | [eBay](https://www.ebay.com/itm/397643034526) |
+| 3 | $425.65 | free | US:19701 IN:600028 | Ungraded | With tracking Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card | [eBay](https://www.ebay.com/itm/397467499018) |
+| 4 | $435.00 | free | US:19701 IN:600028 | Ungraded | Umbreon SAR 217/187 SV8a Japanese Pokemon Terastal Festival -NM | [eBay](https://www.ebay.com/itm/387976341074) |
 
 Plus a recent sold table so you can see what cards actually sell for, not just what sellers are asking:
 
 | # | Price | Date | Grade | Title | Link |
-|---|-------|------|-------|-------|------|
-| 1 | $797.00 | Apr 24, 2026 | PSA 10 | [PSA 10 Umbreon ex SAR 217/187 Terasta...](https://www.ebay.com/itm/405443771260) | [eBay](https://www.ebay.com/itm/405443771260) |
-| 2 | $725.00 | Apr 16, 2026 | PSA 10 | [PSA 10 Pokemon Card Umbreon ex SV8a 2...](https://www.ebay.com/itm/227291025974) | [eBay](https://www.ebay.com/itm/227291025974) |
+|---|------:|------|-------|-------|------|
+| 1 | $466.66 | Apr 30, 2026 | — | Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese | [eBay](https://www.ebay.com/itm/306809727384) |
+| 2 | $450.00 | Apr 29, 2026 | — | Umbreon SAR 217/187 Terastal Festival Japanese Pokemon NM Pack Fresh Very Clean | [eBay](https://www.ebay.com/itm/318222858533) |
+| 3 | $424.95 | Apr 29, 2026 | — | Pokemon Card Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Japanese | [eBay](https://www.ebay.com/itm/188306959599) |
+| 4 | $402.00 | Apr 26, 2026 | — | Umbreon 217/187 Japanese Terastal Festival SAR NM Pokemon TCG US Seller | [eBay](https://www.ebay.com/itm/198311263676) |
+| 5 | $468.80 | Apr 23, 2026 | — | Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese NM | [eBay](https://www.ebay.com/itm/226483437050) |
 
-**Price trend (sold):** 5d: +9.9% | 15d: +9.9% | 30d: +22.6%
+**Price trend (sold):** 5d: +16.1% | 15d: -0.5% | 30d: -0.5%
 
 The price trend line compares the most recent sale to the closest sale ~5, 15, and 30 days ago, so you can spot whether a card is trending up or down.
 
@@ -80,15 +85,15 @@ With `--grade-decision`, a break-even table appears before the listings showing 
 
 **Grading Decision** (PSA submission analysis)
 
-Raw ask median: $196.00 | PSA 9 sold median: $730.00 | PSA 10 sold median: $2,325.00
+Raw ask median: $415.31 | PSA 9 sold avg: $445.79 | PSA 10 sold avg: $742.19
 
 | Tier | Fee | Net PSA 9 | Upside | Net PSA 10 | Upside |
 |------|----:|----------:|-------:|-----------:|-------:|
-| Economy | $25 | $705.00 | +260% | $2,300.00 | +1073% |
-| Regular | $50 | $680.00 | +247% | $2,275.00 | +1060% |
-| Express | $150 | $580.00 | +196% | $2,175.00 | +1009% |
-| Super Express | $300 | $430.00 | +119% | $2,025.00 | +933% |
-| Walk-through | $600 | $130.00 | -34% | $1,725.00 | +780% |
+| Economy | $25 | $421.00 | +1% | $717.00 | +73% |
+| Regular | $50 | $396.00 | -5% | $692.00 | +67% |
+| Express | $150 | $296.00 | -29% | $592.00 | +43% |
+| Super Express | $300 | $146.00 | -65% | $442.00 | +6% |
+| Walk-through | $600 | $-154.00 | -137% | $142.00 | -66% |
 
 _Net = median sold − submission fee. Upside vs raw median ask._
 
