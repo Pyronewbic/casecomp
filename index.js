@@ -22,7 +22,7 @@ import {
   testGradingProvider,
   printSiteGradingHelp,
 } from "./grading.js";
-import { writeMarkdown, writeJson, writePerCardJson } from "./output.js";
+import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown } from "./output.js";
 import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
 
@@ -36,8 +36,9 @@ export const CONFIG = {
   /** Canonical langs for Browse + sold: `[]` = any; otherwise subset of eng, jp, cn. */
   languages: [],
   deliveryCountries: ["US", "IN"],
+  deliveryPincodes: { US: "19701", IN: "600028" },
   resultsPerCard: 5,
-  soldListingsLimit: 3,
+  soldListingsLimit: 5,
   /** When true, try Playwright (Chromium) before axios for sold HTML (Insights still first). */
   soldBrowser: false,
   /** Toys & Hobbies › Collectible Card Games › Single Cards (always applied; Browse + relevance filter to plausible TCG singles). */
@@ -134,6 +135,16 @@ function applyArgvToConfig(cfg) {
       .split(",")
       .map((s) => s.trim().toUpperCase())
       .filter(Boolean);
+  }
+  if (argv.pincodes) {
+    const overrides = {};
+    String(argv.pincodes)
+      .split(",")
+      .forEach((pair) => {
+        const [iso, code] = pair.split(":").map((s) => s.trim());
+        if (iso && code) overrides[iso.toUpperCase()] = code;
+      });
+    c.deliveryPincodes = { ...c.deliveryPincodes, ...overrides };
   }
   if (argv.results != null) c.resultsPerCard = Number(argv.results);
   if (argv.sold != null) c.soldListingsLimit = Number(argv.sold);
@@ -531,6 +542,7 @@ export async function main() {
     results,
   }, outputPrefix);
   await writePerCardJson(results, config, outputPrefix);
+  await appendCombinedMarkdown(results, config);
   log(`Wrote ${outputPrefix}.md, ${outputPrefix}.json, and ${results.length} per-card files`);
 }
 
@@ -564,5 +576,5 @@ export {
   getCachedGrade,
   cacheGrade,
 } from "./grading.js";
-export { writeMarkdown, writeJson, writePerCardJson } from "./output.js";
+export { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown } from "./output.js";
 export { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";

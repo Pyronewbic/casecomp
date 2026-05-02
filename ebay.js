@@ -1214,6 +1214,8 @@ export async function searchActive(
   )
     .trim()
     .toUpperCase();
+  const browseCtxPincode =
+    config?.deliveryPincodes?.[browseCtxCountry] ?? null;
 
   const key = `${query}::vship::${destKey}::${langKey}`;
   if (!refresh && !noEbay) {
@@ -1286,7 +1288,7 @@ export async function searchActive(
         headers: {
           Authorization: `Bearer ${token}`,
           "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
-          "X-EBAY-C-ENDUSERCTX": `contextualLocation=country=${browseCtxCountry}`,
+          "X-EBAY-C-ENDUSERCTX": `contextualLocation=country=${browseCtxCountry}${browseCtxPincode ? `,zip=${browseCtxPincode}` : ""}`,
         },
         params,
         timeout: 30_000,

@@ -132,6 +132,135 @@ export async function writeJson(payload, outputPrefix = "results") {
   );
 }
 
+const COMBINED_JSON = path.join(__dirname, "resultsCombined.json");
+const COMBINED_MD = path.join(__dirname, "resultsCombined.md");
+
+export async function appendCombinedMarkdown(results, config) {
+  // Load existing combined store
+  let store = { entries: [] };
+  try {
+    store = JSON.parse(await fs.readFile(COMBINED_JSON, "utf8"));
+  } catch {
+    // first run — start fresh
+  }
+
+  for (const newResult of results) {
+    if (newResult.error) continue;
+
+    const matchKey = newResult.ebaySearchQuery || newResult.query;
+    const idx = store.entries.findIndex(
+      (e) => (e.ebaySearchQuery || e.query) === matchKey,
+    );
+
+    if (idx === -1) {
+      store.entries.push({
+        ...JSON.parse(strippedJson(newResult)),
+        lastUpdated: new Date().toISOString(),
+      });
+    } else {
+      const existing = store.entries[idx];
+
+      // Merge active listings per country — dedupe by itemId
+      for (const [country, newItems] of Object.entries(
+        newResult.activeByCountry || {},
+      )) {
+        const existingItems = existing.activeByCountry?.[country] || [];
+        const seenIds = new Set(existingItems.map((r) => r.itemId).filter(Boolean));
+        const toAdd = JSON.parse(strippedJson(newItems)).filter(
+          (r) => r.itemId && !seenIds.has(r.itemId),
+        );
+        existing.activeByCountry[country] = [...existingItems, ...toAdd];
+      }
+
+      // Merge sold — dedupe by itemWebUrl, keep sorted newest-first
+      const existingSold = existing.sold || [];
+      const seenUrls = new Set(
+        existingSold.map((s) => s.itemWebUrl).filter(Boolean),
+      );
+      const newSold = JSON.parse(strippedJson(newResult.sold || [])).filter(
+        (s) => s.itemWebUrl && !seenUrls.has(s.itemWebUrl),
+      );
+      existing.sold = [...existingSold, ...newSold].sort(
+        (a, b) => new Date(b.endedDate || 0) - new Date(a.endedDate || 0),
+      );
+
+      existing.counts = {
+        ...existing.counts,
+        activeTotal: Math.max(
+          ...Object.values(existing.activeByCountry || {}).map((a) => a.length),
+          0,
+        ),
+        sold: existing.sold.length,
+      };
+      existing.lastUpdated = new Date().toISOString();
+    }
+  }
+
+  await fs.writeFile(COMBINED_JSON, JSON.stringify(store, null, 2), "utf8");
+
+  // Regenerate combined MD from the full merged store
+  const combinedConfig = {
+    ...config,
+    soldListingsLimit: Math.max(
+      ...store.entries.map((e) => (e.sold || []).length),
+      config.soldListingsLimit,
+    ),
+  };
+  const lines = [];
+  for (const block of store.entries) {
+    const {
+      query,
+      lang,
+      activeByCountry,
+      sold,
+      gradingLabel,
+      counts,
+      ebaySearchQuery,
+      listingDescription,
+      lastUpdated,
+    } = block;
+    lines.push(`## ${query}`);
+    if (ebaySearchQuery) lines.push(`**eBay search:** \`${ebaySearchQuery}\``);
+    if (listingDescription) lines.push(`**Listing type:** ${listingDescription}`);
+    if (lastUpdated) lines.push(`**Last updated:** ${lastUpdated}`);
+    lines.push("");
+    lines.push(
+      `**Language:** ${lang} | **Found:** ${counts?.activeTotal ?? "?"} active, ${counts?.sold ?? "?"} sold | **Grading:** ${gradingLabel ?? "—"}`,
+    );
+    lines.push("");
+    for (const country of (config.deliveryCountries || [])) {
+      const items = activeByCountry?.[country] || [];
+      lines.push(`### Active — ships to **${country}**`);
+      lines.push("| # | Price | Ship | Total | To? | Grade | AI conf | Title |");
+      lines.push("|---|------:|-----:|------:|:---:|------:|--------:|-------|");
+      items.forEach((row, i) => {
+        const g = row.grade;
+        const title = (row.title || "").replace(/\|/g, "\\|");
+        const link = `[${title.slice(0, 80)}${title.length > 80 ? "…" : ""}](${row.itemWebUrl || "#"})`;
+        const st = row.shippingToBuyer?.[country];
+        const toCell =
+          st?.eligible === true ? "yes" : st?.eligible === false ? "no" : "?";
+        lines.push(
+          `| ${i + 1} | ${money(row.price, row.priceCurrency)} | ${row.shippingLabel} | ${money(row.totalCost, row.priceCurrency)} | ${toCell} | ${activeGradeDisplay(row)} | ${confCell(g)} | ${link} |`,
+        );
+      });
+      lines.push("");
+    }
+    lines.push(`### ${(sold || []).length} sold (combined)`);
+    (sold || []).forEach((s, i) => {
+      const date = s.endedDate || "—";
+      const link = s.itemWebUrl
+        ? `[${(s.title || "").slice(0, 60)}](${s.itemWebUrl})`
+        : s.title || "—";
+      lines.push(`${i + 1}. ${money(s.price, s.currency)} — ${date} — ${link}`);
+    });
+    lines.push("");
+    lines.push("---");
+    lines.push("");
+  }
+  await fs.writeFile(COMBINED_MD, lines.join("\n"), "utf8");
+}
+
 export async function writePerCardJson(results, config, outputPrefix = "results") {
   await Promise.all(
     results.map((result, i) =>
@@ -139,6 +268,7 @@ export async function writePerCardJson(results, config, outputPrefix = "results"
         path.join(__dirname, `${outputPrefix}-${i}.json`),
         strippedJson({
           deliveryCountries: config.deliveryCountries,
+          deliveryPincodes: config.deliveryPincodes ?? {},
           ...result,
         }),
         "utf8",
