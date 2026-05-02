@@ -5,8 +5,5 @@ ebay-sold-cache.json
 ai-grade-cache.json
 ebay-usage.json
 results.json
-results-*.json
 results.md
-results-*.md
-resultsCombined.json
-resultsCombined.md
+output/

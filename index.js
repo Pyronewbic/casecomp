@@ -25,6 +25,7 @@ import {
 import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary, mergeAndWrite } from "./output.js";
 import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
+import { searchMagi } from "./magi.js";
 
 export const CARDS = [
   "Giratina V Alt Art"
@@ -176,6 +177,9 @@ function applyArgvToConfig(cfg) {
     const eb = (process.env.EBAY_SOLD_BROWSER || "").toLowerCase();
     c.soldBrowser =
       eb === "1" || eb === "true" || eb === "playwright" || eb === "chromium";
+  }
+  if (argv.source) {
+    c.source = String(argv.source).toLowerCase().trim();
   }
   return c;
 }
@@ -340,7 +344,9 @@ export async function main() {
     invalidateToken();
   }
 
-  if (!noEbay) {
+  if (config.source === "magi") {
+    log("Source: magi.camp (skipping eBay auth)");
+  } else if (!noEbay) {
     try {
       await testEbayAuth(clientId, clientSecret);
       log("eBay OAuth: OK");
@@ -377,6 +383,11 @@ export async function main() {
   }
 
   async function processCard(card, idx, total, { verbose }) {
+    if (config.source === "magi") {
+      log(`[${idx + 1}/${total}] "${card}" (magi, lang=jp)`);
+      return searchMagi(card, config, { log });
+    }
+
     const ebayQuery = buildEbaySearchQuery(card, config);
     const listingDesc = describeListingSearch(config);
     log(
