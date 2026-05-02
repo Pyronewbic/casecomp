@@ -2,7 +2,7 @@
 
 A Claude Skill + Node.js tool that searches the [eBay Browse API](https://developer.ebay.com/api-docs/buy/browse/static/overview.html) for Pokémon cards from a list you define, finds **lowest fixed-price (BIN) listings** with **US / India delivery** filters, pulls **recent sold** prices (Marketplace Insights when allowed, otherwise HTML fallback), and optionally runs **AI pre-grading** on listing photos.
 
-Results are written to **`results.md`** (human-readable) and **`results.json`** (full data).
+Results are written to **`results.md`** (human-readable) and **`results.json`** (full data). Every run also appends to **`resultsCombined.md`** — a deduplicated running log across all searches.
 
 ![eBay Pokémon card search demo](demo.gif)
 
@@ -40,7 +40,7 @@ Once Claude Code is running in this project, just type `/casecomp` followed by w
 
 | You type | What happens |
 |----------|--------------|
-| `/casecomp Giratina V Alt Art` | Searches for raw (ungraded) listings, default 5 results + 3 sold |
+| `/casecomp Giratina V Alt Art` | Searches for raw (ungraded) listings, default 5 results + 5 sold |
 | `/casecomp Pikachu VMAX PSA 10` | Searches for PSA 10 graded slabs |
 | `/casecomp charizard ex BGS 9.5 japanese, 10 results` | Japanese BGS 9.5 slabs, 10 active results |
 | `/casecomp compare Umbreon VMAX alt art and Espeon VMAX alt art` | Searches both cards **in parallel** (faster!) |
@@ -55,8 +55,8 @@ A table for each card showing active listings:
 
 | # | Total | Ship | To | Grade | Title |
 |---|-------|------|----|-------|-------|
-| 1 | $619.99 | free | US:✓ IN:✓ | PSA 10 | [Umbreon ex SAR 217/187 2024 Pokemon T...](https://www.ebay.com/itm/318161356194) |
-| 2 | $650.00 | free | US:✓ IN:✓ | PSA 10 | [Umbreon EX SAR 217/187 Terastal Festi...](https://www.ebay.com/itm/146631348454) |
+| 1 | $619.99 | free | US:19701 IN:600028 | PSA 10 | [Umbreon ex SAR 217/187 2024 Pokemon T...](https://www.ebay.com/itm/318161356194) |
+| 2 | $650.00 | free | US:19701 IN:600028 | PSA 10 | [Umbreon EX SAR 217/187 Terastal Festi...](https://www.ebay.com/itm/146631348454) |
 
 Plus a recent sold table so you can see what cards actually sell for, not just what sellers are asking:
 
@@ -99,7 +99,7 @@ Override cards on the fly: `node index.js “Charizard ex” “Pikachu VMAX”`
 | `--slab-grade` | `10`, `9.5` | Grade number for slab mode |
 | `--lang` | `eng`, `jp`, `eng,jp` | Filter by card language |
 | `--countries` | `US,IN`, `US,GB` | Ship-to countries (default: `US,IN`) |
-| `--sold` | `10` | Number of recent sold comps (default: `3`) |
+| `--sold` | `10` | Number of recent sold comps (default: `5`) |
 | `--results` | `10` | Active listings per country (default: `5`) |
 | `--grade` | *(flag)* | AI pre-grading on raw listings |
 | `--refresh` | *(flag)* | Clear caches and fetch fresh data |
