@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config";
 import minimist from "minimist";
-import { bustCaches } from "./cache.js";
+import { bustCaches } from "./lib/cache.js";
 import {
   getAccessToken,
   invalidateToken,
@@ -10,22 +10,23 @@ import {
   testEbayAuth,
   getEbayUsageToday,
   DAILY_CAP,
-} from "./ebay.js";
+} from "./lib/ebay.js";
 import {
   filterRelevantResults,
   detectLanguage,
   normalizeListingLanguage,
   parseListingLanguagesFromInput,
-} from "./filters.js";
+} from "./lib/filters.js";
 import {
   gradeImage,
   testGradingProvider,
   printSiteGradingHelp,
-} from "./grading.js";
-import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary, mergeAndWrite } from "./output.js";
-import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
-import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
-import { searchMagi } from "./magi.js";
+} from "./lib/grading.js";
+import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary, mergeAndWrite } from "./lib/output.js";
+import { buildEbaySearchQuery, describeListingSearch } from "./lib/listingQuery.js";
+import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
+import { searchMagi } from "./lib/magi.js";
+import { getPsaGradingSignal } from "./lib/psa.js";
 
 export const CARDS = [
   "Giratina V Alt Art"
@@ -495,6 +496,10 @@ export async function main() {
       const ebayUsed = await getEbayUsageToday();
       log(`  eBay: ${ebayUsed}/${DAILY_CAP} today | LLM calls: ${counters.llmCalls}`);
 
+      const psaSignal = config.listingFormat === "raw"
+        ? await getPsaGradingSignal(card, { log })
+        : null;
+
       return {
         query: card,
         ebaySearchQuery: ebayQuery,
@@ -510,6 +515,7 @@ export async function main() {
         sold: soldRes.items,
         soldSource: soldRes.source,
         gradingLabel: gradingLabel(config),
+        psaSignal,
         counts: {
           activeTotal,
           sold: soldRes.items?.length ?? 0,
@@ -600,10 +606,10 @@ export {
   gradeViaSnapGrade,
   gradeViaLocal,
   parseGradeJSON,
-} from "./grading.js";
+} from "./lib/grading.js";
 export {
   getCachedGrade,
   cacheGrade,
-} from "./grading.js";
-export { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary } from "./output.js";
-export { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
+} from "./lib/grading.js";
+export { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary } from "./lib/output.js";
+export { buildEbaySearchQuery, describeListingSearch } from "./lib/listingQuery.js";

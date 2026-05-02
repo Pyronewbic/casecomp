@@ -1,8 +1,8 @@
-# eBay Pokémon card search
+# Casecomp
 
-A Claude Skill + Node.js tool that searches the [eBay Browse API](https://developer.ebay.com/api-docs/buy/browse/static/overview.html) for Pokémon cards from a list you define, finds **lowest fixed-price (BIN) listings** with **US / India delivery** filters, pulls **recent sold** prices (Marketplace Insights when allowed, otherwise HTML fallback), and optionally runs **AI pre-grading** on listing photos.
+**Casecomp** is a card research tool for collectors. Ask it for a card in plain English — `/casecomp Umbreon ex 217/187 PSA 10 japanese` — and it pulls live listings from eBay and magi.camp, recent sold comps, and (for raw searches) a PSA grading signal showing difficulty, 10 chance, and population. Results land in a clean markdown table with prices, shipping costs, and clickable links.
 
-Results are written to **`results.md`** (human-readable) and **`results.json`** (full data). Every run also appends to **`resultsCombined.md`** — a deduplicated running log across all searches.
+Results are written to **`results.md`** (human-readable) and **`results.json`** (full data). Every run also appends to **`output/resultsCombined.md`** — a deduplicated running log across all searches.
 
 ![eBay Pokémon card search demo](demo.gif)
 
@@ -40,30 +40,36 @@ Once Claude Code is running in this project, just type `/casecomp` followed by w
 
 | You type | What happens |
 |----------|--------------|
-| `/casecomp Giratina V Alt Art` | Searches for raw (ungraded) listings, default 5 results + 5 sold |
+| `/casecomp Giratina V Alt Art` | Searches eBay for raw (ungraded) listings, 5 results + 5 sold |
 | `/casecomp Pikachu VMAX PSA 10` | Searches for PSA 10 graded slabs |
 | `/casecomp charizard ex BGS 9.5 japanese, 10 results` | Japanese BGS 9.5 slabs, 10 active results |
 | `/casecomp compare Umbreon VMAX alt art and Espeon VMAX alt art` | Searches both cards **in parallel** (faster!) |
 | `/casecomp Mew ex, ship to UK only, last 15 solds` | Ships to UK, 15 recent sold comps |
 | `/casecomp fresh search for Rayquaza V alt art` | Clears cache and fetches new data |
 
-Claude will show you a confirmation line before searching, then display a formatted table with prices, shipping, and clickable eBay links.
+Claude will show you a confirmation line before searching, then display a formatted table with prices, shipping, and clickable links.
 
 ### What you get back
 
-A table for each card showing active listings:
+For **raw searches**, a grading signal panel appears above the listings using live PSA pop report data:
 
-| # | Total | Ship | To | Grade | Title |
-|---|-------|------|----|-------|-------|
-| 1 | $619.99 | free | US:19701 IN:600028 | PSA 10 | [Umbreon ex SAR 217/187 2024 Pokemon T...](https://www.ebay.com/itm/318161356194) |
-| 2 | $650.00 | free | US:19701 IN:600028 | PSA 10 | [Umbreon EX SAR 217/187 Terastal Festi...](https://www.ebay.com/itm/146631348454) |
+| Difficulty | PSA 10 Chance | Population | PSA 9/10 |
+|:----------:|:-------------:|:----------:|:--------:|
+| **Hard** | 3.2% | 1,204 | 0.87 : 1 |
+
+Then the active listings table (sources labelled eBay or magi):
+
+| # | Total | Ship | To | Grade | Title | Link |
+|---|-------|------|----|-------|-------|------|
+| 1 | $619.99 | free | US:19701 IN:600028 | PSA 10 | [Umbreon ex SAR 217/187 2024 Pokemon T...](https://www.ebay.com/itm/318161356194) | [eBay](https://www.ebay.com/itm/318161356194) |
+| 2 | $650.00 | free | US:19701 IN:600028 | PSA 10 | [Umbreon EX SAR 217/187 Terastal Festi...](https://www.ebay.com/itm/146631348454) | [eBay](https://www.ebay.com/itm/146631348454) |
 
 Plus a recent sold table so you can see what cards actually sell for, not just what sellers are asking:
 
-| # | Price | Date | Title |
-|---|-------|------|-------|
-| 1 | $797.00 | Apr 24, 2026 | [PSA 10 Umbreon ex SAR 217/187 Terasta...](https://www.ebay.com/itm/405443771260) |
-| 2 | $725.00 | Apr 16, 2026 | [PSA 10 Pokemon Card Umbreon ex SV8a 2...](https://www.ebay.com/itm/227291025974) |
+| # | Price | Date | Grade | Title | Link |
+|---|-------|------|-------|-------|------|
+| 1 | $797.00 | Apr 24, 2026 | PSA 10 | [PSA 10 Umbreon ex SAR 217/187 Terasta...](https://www.ebay.com/itm/405443771260) | [eBay](https://www.ebay.com/itm/405443771260) |
+| 2 | $725.00 | Apr 16, 2026 | PSA 10 | [PSA 10 Pokemon Card Umbreon ex SV8a 2...](https://www.ebay.com/itm/227291025974) | [eBay](https://www.ebay.com/itm/227291025974) |
 
 **Price trend (sold):** 5d: +9.9% | 15d: +9.9% | 30d: +22.6%
 
@@ -86,7 +92,7 @@ cp .env.example .env        # set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET
 npm start                    # runs default cards in index.js
 ```
 
-Override cards on the fly: `node index.js “Charizard ex” “Pikachu VMAX”`
+Override cards on the fly: `node index.js "Charizard ex" "Pikachu VMAX"`
 
 ---
 
@@ -95,16 +101,49 @@ Override cards on the fly: `node index.js “Charizard ex” “Pikachu VMAX”`
 | Flag | Example | What it does |
 |------|---------|--------------|
 | `--format` | `slab` / `raw` | Graded slab search vs ungraded raw (default: `raw`) |
-| `--slab-provider` | `PSA`, `BGS`, `CGC` | Grading company for slab mode |
+| `--slab-provider` | `PSA`, `BGS`, `CGC`, `TAG` | Grading company for slab mode |
 | `--slab-grade` | `10`, `9.5` | Grade number for slab mode |
 | `--lang` | `eng`, `jp`, `eng,jp` | Filter by card language |
 | `--countries` | `US,IN`, `US,GB` | Ship-to countries (default: `US,IN`) |
 | `--sold` | `10` | Number of recent sold comps (default: `5`) |
-| `--results` | `10` | Active listings per country (default: `5`) |
+| `--results` | `10` | Active listings per card (default: `5`) |
 | `--grade` | *(flag)* | AI pre-grading on raw listings |
 | `--refresh` | *(flag)* | Clear caches and fetch fresh data |
+| `--source` | `magi` | Force magi.camp as the listing source instead of eBay |
+| `--output` | `results-psa` | Output file prefix (default: `results`) |
+| `--merge` | `results-psa,results-tag` | Merge per-card JSON files from multiple runs into one output |
+| `--parallel` | *(flag)* | Search multiple cards concurrently |
 
 Full flag list, raw vs slab details, and example commands: **[docs/cli-reference.md](docs/cli-reference.md)**
+
+---
+
+## Multi-source and multi-provider searches
+
+You can run the same cards against **multiple grading providers** (e.g. PSA and TAG) and then merge the results into a single `results.md`:
+
+```bash
+node index.js --refresh --lang jp --format slab --slab-provider PSA --output results-psa "Umbreon ex 217/187"
+node index.js --refresh --lang jp --format slab --slab-provider TAG --output results-tag "Umbreon ex 217/187"
+node index.js --merge results-psa,results-tag
+```
+
+You can also mix **eBay and magi.camp** sources the same way — run each separately with `--output` prefixes, then merge.
+
+Per-card JSON files are written to `output/` so they don't clutter the project root. The final `results.md` and `results.json` always land in the root.
+
+---
+
+## PSA Grading Signal
+
+For raw (ungraded) card searches, the tool automatically fetches pop report data from the [PSA public API](https://api.psacard.com/publicapi) and displays a grading signal panel:
+
+- **Difficulty** — Brutal / Hard / Moderate / Easy based on the % of cards that grade PSA 10
+- **PSA 10 Chance** — percentage of submitted cards that received a 10
+- **Population** — total cards graded
+- **PSA 9/10 ratio** — how many 9s exist for every 10 (higher = many near-misses)
+
+The anonymous tier allows 100 requests/day and results are cached for 24 hours. For higher quota, set `PSA_AUTH_TOKEN` in `.env`.
 
 ---
 
@@ -113,17 +152,23 @@ Full flag list, raw vs slab details, and example commands: **[docs/cli-reference
 ```mermaid
 flowchart TD
   A[node index.js] --> B[Load .env + CONFIG]
-  B --> C[OAuth token]
-  C --> D{Multiple cards?}
-  D -->|yes| P[Parallel]
-  D -->|no| E
-  P --> E[Build eBay query: raw or slab]
-  E --> F[Active BIN search + ship-to filtering]
-  F --> G{Raw + --grade?}
-  G -->|yes| H[AI pre-grading on listing photos]
-  G -->|no| J[Sold search: Insights or HTML scrape]
-  H --> J
-  J --> I[Write results.md + results.json]
+  B --> C{Source?}
+  C -->|eBay| D[OAuth token]
+  C -->|magi| M[magi.camp search\nHaiku translation for JP names]
+  D --> E{Multiple cards?}
+  E -->|yes| P[Parallel]
+  E -->|no| F
+  P --> F[Build query: raw or slab]
+  F --> G[Active BIN search + ship-to filtering]
+  G --> H{Raw + --grade?}
+  H -->|yes| I[AI pre-grading on listing photos]
+  H -->|no| J[Sold search: Insights or HTML scrape]
+  I --> J
+  J --> K{Raw format?}
+  K -->|yes| L[PSA pop signal]
+  K -->|no| N
+  L --> N[Write results.md + results.json\noutput/ per-card JSON]
+  M --> N
 ```
 
 ---
@@ -137,7 +182,16 @@ EBAY_CLIENT_ID=your-client-id
 EBAY_CLIENT_SECRET=your-client-secret
 ```
 
-For AI grading, add `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Full list: **[docs/env-vars.md](docs/env-vars.md)**
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `EBAY_CLIENT_ID` | Yes | eBay Browse API |
+| `EBAY_CLIENT_SECRET` | Yes | eBay Browse API |
+| `ANTHROPIC_API_KEY` | For `--grade` (Claude) | AI pre-grading |
+| `OPENAI_API_KEY` | For `--grade` (OpenAI) | AI pre-grading |
+| `ANTHROPIC_HAIKU_KEY` | For magi.camp | Translates English card names to Japanese (uses claude-haiku-4-5) |
+| `PSA_AUTH_TOKEN` | Optional | Higher quota for PSA pop report (anonymous = 100 req/day) |
+
+Full list: **[docs/env-vars.md](docs/env-vars.md)**
 
 ---
 
@@ -149,4 +203,4 @@ See **[docs/internals.md](docs/internals.md)** for file descriptions, cache TTLs
 
 ## Disclaimer
 
-AI “grades” are **rough estimates from photos**, not official PSA/CGC/etc. grades. Use them only as a screening hint. Respect eBay’s [API terms](https://developer.ebay.com/join/api-license-agreement) and rate limits.
+AI "grades" are **rough estimates from photos**, not official PSA/CGC/etc. grades. Use them only as a screening hint. Respect eBay's [API terms](https://developer.ebay.com/join/api-license-agreement) and rate limits.
