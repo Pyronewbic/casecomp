@@ -70,7 +70,7 @@ export const CONFIG = {
 };
 
 const argv = minimist(process.argv.slice(2), {
-  boolean: ["refresh", "parallel", "grade", "sold-browser"],
+  boolean: ["refresh", "parallel", "grade", "sold-browser", "grade-decision"],
 });
 
 /**
@@ -383,16 +383,18 @@ export async function main() {
     log(`Card lines from CLI (${cards.length} run): ${cards.map((c) => JSON.stringify(c)).join(", ")}`);
   }
 
-  async function processCard(card, idx, total, { verbose }) {
-    if (config.source === "magi") {
+  async function processCard(card, idx, total, { verbose, configOverride } = {}) {
+    const cfg = configOverride ?? config;
+
+    if (cfg.source === "magi") {
       log(`[${idx + 1}/${total}] "${card}" (magi, lang=jp)`);
-      return searchMagi(card, config, { log });
+      return searchMagi(card, cfg, { log });
     }
 
-    const ebayQuery = buildEbaySearchQuery(card, config);
-    const listingDesc = describeListingSearch(config);
+    const ebayQuery = buildEbaySearchQuery(card, cfg);
+    const listingDesc = describeListingSearch(cfg);
     log(
-      `[${idx + 1}/${total}] "${card}" (lang=${config.language}, ${listingDesc})`,
+      `[${idx + 1}/${total}] "${card}" (lang=${cfg.language}, ${listingDesc})`,
     );
     log(`  eBay q: ${ebayQuery}`);
     if (verbose) {
@@ -404,13 +406,13 @@ export async function main() {
     let activeTotal = 0;
 
     try {
-      const deliveryCountries = config.deliveryCountries;
+      const deliveryCountries = cfg.deliveryCountries;
       const activeRes = await searchActive({
         query: ebayQuery,
         relevanceQuery: card,
         deliveryCountries,
-        languages: config.languages,
-        config,
+        languages: cfg.languages,
+        config: cfg,
         refresh,
         noEbay,
         getToken,
@@ -429,12 +431,12 @@ export async function main() {
       }
 
       const mergeRows = [...keyed.values()];
-      if (config.aiGrading.enabled && mergeRows.length) {
-        const prov = gradingLabel(config);
+      if (cfg.aiGrading.enabled && mergeRows.length) {
+        const prov = gradingLabel(cfg);
         log(
           `  Grading ${mergeRows.length} distinct listing image(s) across ${deliveryCountries.join("/")}… via ${prov.split(" ")[0]}…`,
         );
-        const gp = await gradeItems(mergeRows, config, counters);
+        const gp = await gradeItems(mergeRows, cfg, counters);
         const batchCost = (gp.graded * 0.02).toFixed(2);
         log(
           `  ... done (avg ${gp.avg != null ? gp.avg.toFixed(1) : "—"}, ~$${batchCost} est. this batch)`,
@@ -467,20 +469,20 @@ export async function main() {
         }
 
         let rows = (by[country] || []).map((r) => ({ ...r }));
-        rows = applyMinGrade(rows, config.aiGrading.minGradeToReport);
+        rows = applyMinGrade(rows, cfg.aiGrading.minGradeToReport);
         activeByCountry[country] = rows;
       }
 
       const soldRes = await searchSold({
         query: ebayQuery,
         relevanceQuery: card,
-        languages: config.languages,
-        config,
+        languages: cfg.languages,
+        config: cfg,
         refresh,
         noEbay,
         getToken,
         on401,
-        soldBrowser: config.soldBrowser,
+        soldBrowser: cfg.soldBrowser,
       });
       const sp = soldRes.pipeline;
       const soldTcg =
@@ -496,25 +498,25 @@ export async function main() {
       const ebayUsed = await getEbayUsageToday();
       log(`  eBay: ${ebayUsed}/${DAILY_CAP} today | LLM calls: ${counters.llmCalls}`);
 
-      const psaSignal = config.listingFormat === "raw"
+      const psaSignal = cfg.listingFormat === "raw"
         ? await getPsaGradingSignal(card, { log })
         : null;
 
       return {
         query: card,
         ebaySearchQuery: ebayQuery,
-        listingFormat: config.listingFormat,
+        listingFormat: cfg.listingFormat,
         listingDescription: listingDesc,
         slab:
-          config.listingFormat === "slab"
-            ? { ...config.slab }
+          cfg.listingFormat === "slab"
+            ? { ...cfg.slab }
             : null,
-        languages: config.languages,
-        lang: config.language,
+        languages: cfg.languages,
+        lang: cfg.language,
         activeByCountry,
         sold: soldRes.items,
         soldSource: soldRes.source,
-        gradingLabel: gradingLabel(config),
+        gradingLabel: gradingLabel(cfg),
         psaSignal,
         counts: {
           activeTotal,
@@ -527,35 +529,50 @@ export async function main() {
       return {
         query: card,
         ebaySearchQuery: ebayQuery,
-        listingFormat: config.listingFormat,
+        listingFormat: cfg.listingFormat,
         listingDescription: listingDesc,
         slab:
-          config.listingFormat === "slab"
-            ? { ...config.slab }
+          cfg.listingFormat === "slab"
+            ? { ...cfg.slab }
             : null,
-        languages: config.languages,
-        lang: config.language,
+        languages: cfg.languages,
+        lang: cfg.language,
         error: formatRequestError(e),
         activeByCountry: {},
         sold: [],
-        gradingLabel: gradingLabel(config),
+        gradingLabel: gradingLabel(cfg),
         counts: { activeTotal: 0, sold: 0 },
       };
     }
   }
 
+  const gradeDecision = Boolean(argv["grade-decision"]);
   const total = cards.length;
   const parallel = Boolean(argv.parallel) && total > 1;
+
+  async function runCard(card, idx, { verbose }) {
+    if (!gradeDecision) return processCard(card, idx, total, { verbose });
+    const psa9Cfg  = { ...config, listingFormat: "slab", slab: { provider: "PSA", grade: "9"  }, aiGrading: { ...config.aiGrading, enabled: false } };
+    const psa10Cfg = { ...config, listingFormat: "slab", slab: { provider: "PSA", grade: "10" }, aiGrading: { ...config.aiGrading, enabled: false } };
+    log(`[grade-decision] running raw + PSA 9 + PSA 10 in parallel for "${card}"`);
+    const [rawResult, psa9Result, psa10Result] = await Promise.all([
+      processCard(card, idx, total, { verbose }),
+      processCard(card, idx, total, { verbose: false, configOverride: psa9Cfg }),
+      processCard(card, idx, total, { verbose: false, configOverride: psa10Cfg }),
+    ]);
+    return { ...rawResult, gradeDecision: { psa9: psa9Result, psa10: psa10Result } };
+  }
+
   if (total) {
-    log(`Startup sequence: eBay + grading verified; running cards${parallel ? ` (${total} in parallel)` : ""} (verbose on first).`);
+    log(`Startup sequence: eBay + grading verified; running cards${parallel ? ` (${total} in parallel)` : ""}${gradeDecision ? " [grade-decision mode]" : ""} (verbose on first).`);
     if (parallel) {
       const settled = await Promise.all(
-        cards.map((card, i) => processCard(card, i, total, { verbose: i === 0 }))
+        cards.map((card, i) => runCard(card, i, { verbose: i === 0 }))
       );
       results.push(...settled);
     } else {
       for (let i = 0; i < total; i++) {
-        results.push(await processCard(cards[i], i, total, { verbose: i === 0 }));
+        results.push(await runCard(cards[i], i, { verbose: i === 0 }));
       }
     }
   }
