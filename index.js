@@ -22,7 +22,7 @@ import {
   testGradingProvider,
   printSiteGradingHelp,
 } from "./grading.js";
-import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown } from "./output.js";
+import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary } from "./output.js";
 import { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./ebayCategories.js";
 
@@ -530,19 +530,23 @@ export async function main() {
   }
 
   const outputPrefix = argv.output != null && argv.output !== true ? String(argv.output) : "results";
-  await writeMarkdown(results, config, {
-    footer: `Generated with eBay Browse API. Usage logged: ${await getEbayUsageToday()}/${DAILY_CAP}.`,
-    outputPrefix,
-  });
-  await writeJson({
-    generatedAt: new Date().toISOString(),
-    config,
-    argv,
-    cardQueries: cards,
-    results,
-  }, outputPrefix);
-  await writePerCardJson(results, config, outputPrefix);
-  await appendCombinedMarkdown(results, config);
+  const usageCount = await getEbayUsageToday();
+  printSummary(results, config);
+  await Promise.all([
+    writeMarkdown(results, config, {
+      footer: `Generated with eBay Browse API. Usage logged: ${usageCount}/${DAILY_CAP}.`,
+      outputPrefix,
+    }),
+    writeJson({
+      generatedAt: new Date().toISOString(),
+      config,
+      argv,
+      cardQueries: cards,
+      results,
+    }, outputPrefix),
+    writePerCardJson(results, config, outputPrefix),
+    appendCombinedMarkdown(results, config),
+  ]);
   log(`Wrote ${outputPrefix}.md, ${outputPrefix}.json, and ${results.length} per-card files`);
 }
 
@@ -576,5 +580,5 @@ export {
   getCachedGrade,
   cacheGrade,
 } from "./grading.js";
-export { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown } from "./output.js";
+export { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary } from "./output.js";
 export { buildEbaySearchQuery, describeListingSearch } from "./listingQuery.js";
