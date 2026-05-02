@@ -62,22 +62,19 @@ Then the active listings table (sources labelled eBay or magi):
 
 | # | Total | Ship | To | Grade | Title | Link |
 |---|------:|------|-------|-------|------|------|
-| 1 | $400.00 | free | US:19701 IN:600028 | Ungraded | Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese NM | [eBay](https://www.ebay.com/itm/177832326093) |
-| 2 | $415.31 | free | US:19701 IN:600028 | Ungraded | With tracking Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card | [eBay](https://www.ebay.com/itm/397643034526) |
-| 3 | $425.65 | free | US:19701 IN:600028 | Ungraded | With tracking Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card | [eBay](https://www.ebay.com/itm/397467499018) |
-| 4 | $435.00 | free | US:19701 IN:600028 | Ungraded | Umbreon SAR 217/187 SV8a Japanese Pokemon Terastal Festival -NM | [eBay](https://www.ebay.com/itm/387976341074) |
+| 1 | $619.99 | free | US:19701 IN:600028 | PSA 10 | Umbreon ex SAR 217/187 2024 Pokemon Terastal Festival sv8a Alt Art PSA 10 | [eBay](https://www.ebay.com/itm/318161356194) |
+| 2 | $664.71 | — | US:19701 IN:600028 | PSA 10 | 【PSA10】ブラッキーex SAR 217/187 1枚 | [magi](https://magi.camp/items/472702272) |
+| 3 | $810.00 | $10.00 | US:19701 IN:600028 | — | TAG GEM MINT 10 UMBREON EX 2024 POKÉMON SCARLET & VIOLET JAPANESE #217/187 | [eBay](https://www.ebay.com/itm/376058718185) |
 
 Plus a recent sold table so you can see what cards actually sell for, not just what sellers are asking:
 
 | # | Price | Date | Grade | Title | Link |
 |---|------:|------|-------|-------|------|
-| 1 | $466.66 | Apr 30, 2026 | — | Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese | [eBay](https://www.ebay.com/itm/306809727384) |
-| 2 | $450.00 | Apr 29, 2026 | — | Umbreon SAR 217/187 Terastal Festival Japanese Pokemon NM Pack Fresh Very Clean | [eBay](https://www.ebay.com/itm/318222858533) |
-| 3 | $424.95 | Apr 29, 2026 | — | Pokemon Card Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Japanese | [eBay](https://www.ebay.com/itm/188306959599) |
-| 4 | $402.00 | Apr 26, 2026 | — | Umbreon 217/187 Japanese Terastal Festival SAR NM Pokemon TCG US Seller | [eBay](https://www.ebay.com/itm/198311263676) |
-| 5 | $468.80 | Apr 23, 2026 | — | Umbreon ex SAR 217/187 Terastal Festival sv8a 2024 Pokemon Card Japanese NM | [eBay](https://www.ebay.com/itm/226483437050) |
+| 1 | $750.00 | Apr 30, 2026 | PSA 10 | Umbreon EX 217/187 Special Art Rare Pokemon Japanese PSA 10 | [eBay](https://www.ebay.com/itm/406891668625) |
+| 2 | $673.54 | — | PSA 10 | 【PSA10】ブラッキーex SAR 217/187 1枚 | [magi](https://magi.camp/items/597154378) |
+| 3 | $749.00 | Apr 22, 2026 | TAG 10 | TAG GEM MINT 10 UMBREON EX 2024 POKÉMON SCARLET & VIOLET JAPANESE #217/187 | [eBay](https://www.ebay.com/itm/366361136416) |
 
-**Price trend (sold):** 5d: +16.1% | 15d: -0.5% | 30d: -0.5%
+**Price trend (sold):** 5d: +25.0% | 15d: -0.3% | 30d: -11.8%
 
 The price trend line compares the most recent sale to the closest sale ~5, 15, and 30 days ago, so you can spot whether a card is trending up or down.
 
