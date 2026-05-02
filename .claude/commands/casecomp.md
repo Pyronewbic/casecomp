@@ -16,6 +16,7 @@ The user writes a **plain English sentence** after `/casecomp`. Your job is to e
 | `Charizard ex raw ungraded, ship to india only` | `node index.js --refresh --format raw --raw-suffix ungraded --countries IN "Charizard ex"` |
 | `Pikachu vmax BGS 9.5 japanese, 10 results` | `node index.js --refresh --format slab --slab-provider BGS --slab-grade 9.5 --lang jp --results 10 "Pikachu vmax"` |
 | `Giratina V alt art with AI grading, only show grade 8+` | `node index.js --refresh --grade --min-grade 8 "Giratina V Alt Art"` |
+| `should I grade Kyogre ex japanese?` | `node index.js --refresh --lang jp --grade-decision "Kyogre ex"` |
 | `Charizard ex CGC 10 shipped to US, UK and India, 15 solds` | `node index.js --refresh --format slab --slab-provider CGC --slab-grade 10 --countries US,GB,IN --sold 15 "Charizard ex"` |
 | `Umbreon vmax alt art — use cache` | `node index.js "Umbreon vmax Alt Art"` (no `--refresh`) |
 
@@ -38,6 +39,7 @@ Read the sentence and look for these signals. Anything not mentioned uses defaul
 | Result count | `--results` | `5` | "10 results", "top 20", "show 3" |
 | Sold count | `--sold` | `5` | "last 10 solds", "5 sold", "20 recent sales" |
 | Refresh cache | `--refresh` | **on** (always passed) | Omit `--refresh` only when user explicitly says "use cache", "cached", "no refresh", or "from cache" |
+| Grading decision | `--grade-decision` | off | "should I grade", "grade decision", "worth grading?", "grade or sell raw". Forces raw format. Runs 3 parallel searches (raw + PSA 9 + PSA 10) and shows a break-even table by submission tier. |
 
 ### Ambiguity rules
 

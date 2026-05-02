@@ -45,6 +45,7 @@ Once Claude Code is running in this project, just type `/casecomp` followed by w
 | `/casecomp charizard ex BGS 9.5 japanese, 10 results` | Japanese BGS 9.5 slabs, 10 active results |
 | `/casecomp compare Umbreon VMAX alt art and Espeon VMAX alt art` | Searches both cards **in parallel** (faster!) |
 | `/casecomp Mew ex, ship to UK only, last 15 solds` | Ships to UK, 15 recent sold comps |
+| `/casecomp should I grade Team aqua's kyogre ex japanese?` | Grading decision — shows PSA break-even table by submission tier |
 | `/casecomp fresh search for Rayquaza V alt art` | Clears cache and fetches new data |
 
 Claude will show you a confirmation line before searching, then display a formatted table with prices, shipping, and clickable links.
@@ -113,6 +114,7 @@ Override cards on the fly: `node index.js "Charizard ex" "Pikachu VMAX"`
 | `--output` | `results-psa` | Output file prefix (default: `results`) |
 | `--merge` | `results-psa,results-tag` | Merge per-card JSON files from multiple runs into one output |
 | `--parallel` | *(flag)* | Search multiple cards concurrently |
+| `--grade-decision` | *(flag)* | Run raw + PSA 9 + PSA 10 searches in parallel and show a break-even table by submission tier |
 
 Full flag list, raw vs slab details, and example commands: **[docs/cli-reference.md](docs/cli-reference.md)**
 
@@ -131,6 +133,34 @@ node index.js --merge results-psa,results-tag
 You can also mix **eBay and magi.camp** sources the same way — run each separately with `--output` prefixes, then merge.
 
 Per-card JSON files are written to `output/` so they don't clutter the project root. The final `results.md` and `results.json` always land in the root.
+
+---
+
+## Grading Decision
+
+`--grade-decision` answers "should I grade this raw card?" by running three searches in parallel — raw, PSA 9, and PSA 10 — and computing a break-even table across every PSA submission tier:
+
+```
+/casecomp "Team aqua's kyogre ex 006/034" japanese --grade-decision
+```
+
+Output panel:
+
+```
+Raw ask median: $196 | PSA 9 sold median: $730 | PSA 10 sold median: $2,325
+
+| Tier         |  Fee | Net PSA 9 | Upside | Net PSA 10 | Upside |
+|--------------|-----:|----------:|-------:|-----------:|-------:|
+| Economy      |  $25 |    $705   | +260%  |   $2,300   | +1073% |
+| Regular      |  $50 |    $680   | +247%  |   $2,275   | +1060% |
+| Express      | $150 |    $580   | +196%  |   $2,175   | +1009% |
+| Super Express| $300 |    $430   | +119%  |   $2,025   |  +933% |
+| Walk-through | $600 |    $130   |  -34%  |   $1,725   |  +780% |
+```
+
+Net = median sold − submission fee. Upside vs raw median ask. Negative rows flag tiers where grading at that grade isn't worth the fee.
+
+Tip: include the set number in the card name (e.g. `006/034`) to avoid variant mixing in the sold comps.
 
 ---
 
@@ -160,7 +190,11 @@ flowchart TD
   E -->|no| F
   P --> F[Build query: raw or slab]
   F --> G[Active BIN search + ship-to filtering]
-  G --> H{Raw + --grade?}
+  G --> GD{--grade-decision?}
+  GD -->|yes| GD2[Run PSA 9 + PSA 10 searches in parallel\ncompute break-even table]
+  GD -->|no| H
+  GD2 --> H
+  H{Raw + --grade?}
   H -->|yes| I[AI pre-grading on listing photos]
   H -->|no| J[Sold search: Insights or HTML scrape]
   I --> J
