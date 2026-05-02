@@ -64,12 +64,24 @@ When the user searches for **2+ cards**, pass all card names as separate positio
 
 Example — user asks for Charizard ex and Rayquaza V Alt Art, english only:
 ```
-node index.js --lang eng --parallel "Charizard ex" "Rayquaza V Alt Art"
+node index.js --refresh --lang eng --parallel "Charizard ex" "Rayquaza V Alt Art"
 ```
 
 For a **single card**, just run `node index.js` normally (no `--parallel` needed).
 
 Both single and multi-card runs write to `results.json` and `results.md` by default (override with `--output <prefix>`).
+
+### Multiple slab providers (e.g. "both PSA and TAG")
+
+When the user asks for **2+ grading providers** for the same cards, run each provider separately with distinct `--output` prefixes, then merge into a single `results.md`:
+
+```
+node index.js --refresh [shared flags] --slab-provider PSA --output results-psa [cards]
+node index.js --refresh [shared flags] --slab-provider TAG --output results-tag [cards]
+node index.js --merge results-psa,results-tag
+```
+
+The `--merge` command reads the per-card JSON files from each prefix, combines active listings and sold across all providers (deduped by itemId/URL), and writes the final `results.md` + prints the combined stdout summary. Relay that combined stdout as the result.
 
 3. **Relay stdout directly.** The node script prints formatted markdown tables to stdout as its final step (via `printSummary`). No agents needed — just extract and relay the stdout block that starts after the last `]` log line. It contains one `## CardName` section per card, all combined in order.
 
