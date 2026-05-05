@@ -1,4 +1,4 @@
-# VHS demo — /casecomp multi-card parallel search
+# VHS demo — grade decision with PSA pop + tier table
 # Run: vhs demo.tape
 
 Output demo1.gif
@@ -10,23 +10,13 @@ Set Height 1000
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 35ms
-Set PlaybackSpeed 2.25
+Set PlaybackSpeed 5
 
-# Start Claude Code
-Type "claude --dangerously-skip-permissions"
+# Run via Claude Code — -p mode prints output and exits automatically
+Type "claude" 
 Enter
-Sleep 5s
-
-# Type the /casecomp command in natural language
-Type "/casecomp Team magma's groudon ex, Team aqua's kyogre ex and Terastal festival Umbreon Ex 217/187 - all japanese, PSA 10 & TAG 10, on ebay and magi"
+Type "/casecomp should I grade Team Aquas Kyogre EX 006/034 Double Crisis japanese, compare PSA and TAG'"
+Enter
 Sleep 500ms
 Enter
 
-# Wait for Claude to finish: parses intent, runs node --parallel,
-# reads results.json, renders tables (~60-90s typical + table rendering).
-Sleep 120s
-
-# Exit Claude Code
-Type "/exit"
-Enter
-Sleep 1s
