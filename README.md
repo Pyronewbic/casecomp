@@ -46,6 +46,8 @@ Once Claude Code is running in this project, just type `/casecomp` followed by w
 | `/casecomp compare Umbreon VMAX alt art and Espeon VMAX alt art` | Searches both cards **in parallel** (faster!) |
 | `/casecomp Mew ex, ship to UK only, last 15 solds` | Ships to UK, 15 recent sold comps |
 | `/casecomp should I grade Team aqua's kyogre ex japanese?` | Grading decision — shows PSA break-even table by submission tier |
+| `/casecomp Umbreon ex 217/187 with AI grading` | AI pre-grades each raw listing from front + back photos |
+| `/casecomp Mega Greninja on yahoo auctions` | Searches Yahoo Auctions JP instead of eBay |
 | `/casecomp fresh search for Rayquaza V alt art` | Clears cache and fetches new data |
 
 Claude will show you a confirmation line before searching, then display a formatted table with prices, shipping, and clickable links.
@@ -78,21 +80,40 @@ Plus a recent sold table so you can see what cards actually sell for, not just w
 
 The price trend line compares the most recent sale to the closest sale ~5, 15, and 30 days ago, so you can spot whether a card is trending up or down.
 
-With `--grade-decision`, a break-even table appears before the listings showing whether submitting for grading is worth it at current comps:
+### Grading decision
 
-**Grading Decision** (PSA submission analysis)
-
-Raw ask median: $415.31 | PSA 9 sold avg: $445.79 | PSA 10 sold avg: $742.19
+With `--grade-decision`, a break-even table shows whether submitting for grading is worth it at current comps:
 
 | Tier | Fee | Net PSA 9 | Upside | Net PSA 10 | Upside |
 |------|----:|----------:|-------:|-----------:|-------:|
 | Economy | $25 | $421.00 | +1% | $717.00 | +73% |
 | Regular | $50 | $396.00 | -5% | $692.00 | +67% |
 | Express | $150 | $296.00 | -29% | $592.00 | +43% |
-| Super Express | $300 | $146.00 | -65% | $442.00 | +6% |
-| Walk-through | $600 | $-154.00 | -137% | $142.00 | -66% |
 
-_Net = median sold − submission fee. Upside vs raw median ask._
+_Net = sold avg − submission fee. Upside vs raw median ask. Supports PSA, BGS, CGC side-by-side with `--grade-companies`._
+
+### PSA grading signal
+
+For raw searches, a pop report panel appears automatically:
+
+| Difficulty | PSA 10 Chance | Population | PSA 9/10 |
+|:----------:|:-------------:|:----------:|:--------:|
+| **Hard** | 3.2% | 1,204 | 0.87 : 1 |
+
+### AI pre-grading (`--grade`)
+
+When `--grade` is enabled, the tool sends each listing's front and back photos to an LLM and returns a grade estimate:
+
+| | Score |
+|---|---|
+| **Overall** | **PSA 9 (Mint)** — borderline 9/10 |
+| Centering (Front) | 9/10 — ~55/45 L/R, close to even T/B |
+| Centering (Back) | 8.5–9/10 — border thicker bottom-right, grade limiter |
+| Corners | 9/10 — clean, faint softness bottom-left back |
+| Edges | 9/10 — clean gold border, micro wear on back top edge |
+| Surface | 9.5/10 — no scratches, print lines, or scuffs |
+
+**Minimum photos needed:** a clear front and back shot. Corners and edges are estimated conservatively without close-ups and flagged with a `limitations` note.
 
 ---
 
@@ -128,7 +149,7 @@ Override cards on the fly: `node index.js "Charizard ex" "Pikachu VMAX"`
 | `--results` | `10` | Active listings per card (default: `5`) |
 | `--grade` | *(flag)* | AI pre-grading on raw listings |
 | `--refresh` | *(flag)* | Clear caches and fetch fresh data |
-| `--source` | `magi` | Force magi.camp as the listing source instead of eBay |
+| `--source` | `magi`, `yahoo` | Force magi.camp or Yahoo Auctions JP as the listing source instead of eBay |
 | `--output` | `results-psa` | Output file prefix (default: `results`) |
 | `--merge` | `results-psa,results-tag` | Merge per-card JSON files from multiple runs into one output |
 | `--parallel` | *(flag)* | Search multiple cards concurrently |
@@ -154,33 +175,6 @@ Per-card JSON files are written to `output/` so they don't clutter the project r
 
 ---
 
-## Grading Decision
-
-`--grade-decision` answers "should I grade this raw card?" by running three searches in parallel — raw, PSA 9, and PSA 10 — and computing a break-even table across every PSA submission tier:
-
-```
-/casecomp "Team aqua's kyogre ex 006/034" japanese --grade-decision
-```
-
-Net = median sold − submission fee. Upside vs raw median ask. Negative rows flag tiers where the submission fee exceeds the grade uplift.
-
-Tip: include the set number in the card name (e.g. `006/034`) to avoid variant mixing in the sold comps.
-
----
-
-## PSA Grading Signal
-
-For raw (ungraded) card searches, the tool automatically fetches pop report data from the [PSA public API](https://api.psacard.com/publicapi) and displays a grading signal panel:
-
-- **Difficulty** — Brutal / Hard / Moderate / Easy based on the % of cards that grade PSA 10
-- **PSA 10 Chance** — percentage of submitted cards that received a 10
-- **Population** — total cards graded
-- **PSA 9/10 ratio** — how many 9s exist for every 10 (higher = many near-misses)
-
-The anonymous tier allows 100 requests/day and results are cached for 24 hours. For higher quota, set `PSA_AUTH_TOKEN` in `.env`.
-
----
-
 ## How it works
 
 ```mermaid
@@ -189,6 +183,7 @@ flowchart TD
   B --> C{Source?}
   C -->|eBay| D[OAuth token]
   C -->|magi| M[magi.camp search\nHaiku translation for JP names]
+  C -->|yahoo| Y[Yahoo Auctions JP\nHaiku translation for JP names]
   D --> E{Multiple cards?}
   E -->|yes| P[Parallel]
   E -->|no| F
@@ -207,6 +202,7 @@ flowchart TD
   K -->|no| N
   L --> N[Write results.md + results.json\noutput/ per-card JSON]
   M --> N
+  Y --> N
 ```
 
 ---
