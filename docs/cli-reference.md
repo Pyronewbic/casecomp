@@ -25,6 +25,8 @@
 | `--refresh` | Delete eBay + AI grade cache files and refetch |
 | `--limit` | Only process the first **N** card lines |
 | `--output` | Output filename prefix (default: `results`). Writes `<prefix>.json`, `<prefix>.md`, and per-card `<prefix>-N.json` files. Every run also appends to `resultsCombined.md` (deduplicated across runs). |
+| `--grade-decision` | Run raw + graded (9+10) searches in parallel and show a break-even table per submission tier |
+| `--grade-companies` | Grading companies to include in `--grade-decision` (default: `PSA`). Comma-separated: `PSA`, `BGS`, `CGC`, or `all` |
 | `--no-ebay` | Do not call eBay (uses cache if present) |
 
 **Note:** This project uses **minimist**. `--no-ebay` is parsed as `{ ebay: false }`.
