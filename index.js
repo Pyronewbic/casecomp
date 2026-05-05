@@ -26,6 +26,7 @@ import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, pri
 import { buildEbaySearchQuery, describeListingSearch } from "./lib/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
 import { searchMagi } from "./lib/magi.js";
+import { searchYahooAuctions } from "./lib/yahooauctions.js";
 import { getPsaGradingSignal } from "./lib/psa.js";
 
 export const CARDS = [
@@ -264,7 +265,9 @@ async function gradeItems(items, config, counters) {
   const results = await Promise.all(
     items.map(async (row) => {
       try {
-        const g = await gradeImage(row.imageUrl, config);
+        const backImg = (row.additionalImages || [])[0];
+        const extraImages = backImg ? [backImg] : [];
+        const g = await gradeImage(row.imageUrl, config, extraImages);
         return { row, g, err: null };
       } catch (e) {
         return { row, g: null, err: e };
@@ -347,6 +350,8 @@ export async function main() {
 
   if (config.source === "magi") {
     log("Source: magi.camp (skipping eBay auth)");
+  } else if (config.source === "yahoo") {
+    log("Source: Yahoo Auctions JP (skipping eBay auth)");
   } else if (!noEbay) {
     try {
       await testEbayAuth(clientId, clientSecret);
@@ -389,6 +394,10 @@ export async function main() {
     if (cfg.source === "magi") {
       log(`[${idx + 1}/${total}] "${card}" (magi, lang=jp)`);
       return searchMagi(card, cfg, { log });
+    }
+    if (cfg.source === "yahoo") {
+      log(`[${idx + 1}/${total}] "${card}" (yahoo auctions, lang=jp)`);
+      return searchYahooAuctions(card, cfg, { log });
     }
 
     const ebayQuery = buildEbaySearchQuery(card, cfg);
@@ -547,24 +556,39 @@ export async function main() {
   }
 
   const gradeDecision = Boolean(argv["grade-decision"]);
+  const gradeCompanies = (() => {
+    const raw = argv["grade-companies"];
+    if (!raw || raw === true) return ["PSA"];
+    const v = String(raw).trim().toUpperCase();
+    if (v === "ALL") return ["PSA", "BGS", "CGC"];
+    return v.split(",").map(s => s.trim()).filter(Boolean);
+  })();
   const total = cards.length;
   const parallel = Boolean(argv.parallel) && total > 1;
 
   async function runCard(card, idx, { verbose }) {
     if (!gradeDecision) return processCard(card, idx, total, { verbose });
-    const psa9Cfg  = { ...config, listingFormat: "slab", slab: { provider: "PSA", grade: "9"  }, aiGrading: { ...config.aiGrading, enabled: false } };
-    const psa10Cfg = { ...config, listingFormat: "slab", slab: { provider: "PSA", grade: "10" }, aiGrading: { ...config.aiGrading, enabled: false } };
-    log(`[grade-decision] running raw + PSA 9 + PSA 10 in parallel for "${card}"`);
-    const [rawResult, psa9Result, psa10Result] = await Promise.all([
-      processCard(card, idx, total, { verbose }),
-      processCard(card, idx, total, { verbose: false, configOverride: psa9Cfg }),
-      processCard(card, idx, total, { verbose: false, configOverride: psa10Cfg }),
+
+    const slabSearches = gradeCompanies.flatMap(company => [
+      { company, grade: "9",  cfg: { ...config, listingFormat: "slab", slab: { provider: company, grade: "9"  }, aiGrading: { ...config.aiGrading, enabled: false } } },
+      { company, grade: "10", cfg: { ...config, listingFormat: "slab", slab: { provider: company, grade: "10" }, aiGrading: { ...config.aiGrading, enabled: false } } },
     ]);
-    return { ...rawResult, gradeDecision: { psa9: psa9Result, psa10: psa10Result } };
+
+    log(`[grade-decision] running raw + ${gradeCompanies.map(c => `${c} 9+10`).join(" + ")} in parallel for "${card}"`);
+    const [rawResult, ...slabResults] = await Promise.all([
+      processCard(card, idx, total, { verbose }),
+      ...slabSearches.map(({ cfg }) => processCard(card, idx, total, { verbose: false, configOverride: cfg })),
+    ]);
+
+    const companies = {};
+    for (let i = 0; i < gradeCompanies.length; i++) {
+      companies[gradeCompanies[i]] = { g9: slabResults[i * 2], g10: slabResults[i * 2 + 1] };
+    }
+    return { ...rawResult, gradeDecision: { companies } };
   }
 
   if (total) {
-    log(`Startup sequence: eBay + grading verified; running cards${parallel ? ` (${total} in parallel)` : ""}${gradeDecision ? " [grade-decision mode]" : ""} (verbose on first).`);
+    log(`Startup sequence: eBay + grading verified; running cards${parallel ? ` (${total} in parallel)` : ""}${gradeDecision ? ` [grade-decision: ${gradeCompanies.join("+")}]` : ""} (verbose on first).`);
     if (parallel) {
       const settled = await Promise.all(
         cards.map((card, i) => runCard(card, i, { verbose: i === 0 }))

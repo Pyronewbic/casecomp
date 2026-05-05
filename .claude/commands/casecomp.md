@@ -17,8 +17,11 @@ The user writes a **plain English sentence** after `/casecomp`. Your job is to e
 | `Pikachu vmax BGS 9.5 japanese, 10 results` | `node index.js --refresh --format slab --slab-provider BGS --slab-grade 9.5 --lang jp --results 10 "Pikachu vmax"` |
 | `Giratina V alt art with AI grading, only show grade 8+` | `node index.js --refresh --grade --min-grade 8 "Giratina V Alt Art"` |
 | `should I grade Kyogre ex japanese?` | `node index.js --refresh --lang jp --grade-decision "Kyogre ex"` |
+| `should I grade Kyogre ex japanese, compare PSA BGS CGC` | `node index.js --refresh --lang jp --grade-decision --grade-companies PSA,BGS,CGC "Kyogre ex"` |
 | `Charizard ex CGC 10 shipped to US, UK and India, 15 solds` | `node index.js --refresh --format slab --slab-provider CGC --slab-grade 10 --countries US,GB,IN --sold 15 "Charizard ex"` |
 | `Umbreon vmax alt art — use cache` | `node index.js "Umbreon vmax Alt Art"` (no `--refresh`) |
+| `Charizard ex on yahoo auctions` | `node index.js --refresh --source yahoo "Charizard ex"` |
+| `Mega Greninja PSA 10 yahoo` | `node index.js --refresh --source yahoo --format slab --slab-provider PSA --slab-grade 10 "Mega Greninja"` |
 
 ### How to extract fields
 
@@ -39,7 +42,9 @@ Read the sentence and look for these signals. Anything not mentioned uses defaul
 | Result count | `--results` | `5` | "10 results", "top 20", "show 3" |
 | Sold count | `--sold` | `5` | "last 10 solds", "5 sold", "20 recent sales" |
 | Refresh cache | `--refresh` | **on** (always passed) | Omit `--refresh` only when user explicitly says "use cache", "cached", "no refresh", or "from cache" |
-| Grading decision | `--grade-decision` | off | "should I grade", "grade decision", "worth grading?", "grade or sell raw". Forces raw format. Runs 3 parallel searches (raw + PSA 9 + PSA 10) and shows a break-even table by submission tier. |
+| Grading decision | `--grade-decision` | off | "should I grade", "grade decision", "worth grading?", "grade or sell raw". Forces raw format. Runs raw + graded (9+10) searches in parallel and shows a break-even table by submission tier. |
+| Grade companies | `--grade-companies` | `PSA` | Which grading companies to include in the break-even table. Comma-separated: `PSA`, `BGS`, `CGC`, or `all`. Only used with `--grade-decision`. Signals: "compare PSA and BGS", "all grading companies", "PSA BGS CGC", "for BGS only". |
+| Source | `--source` | *(none = eBay)* | "yahoo", "yahoo auctions", "ヤフオク" → `yahoo`. "magi", "magi.camp" → `magi`. Omit for default eBay. Skips eBay auth when set. |
 
 ### Ambiguity rules
 
@@ -51,6 +56,28 @@ Read the sentence and look for these signals. Anything not mentioned uses defaul
 - **Comma-separated names** without any verb preamble are a multi-card search. Split on commas (respecting set numbers like `217/187`), treat each segment as a card name, apply any shared flags (lang, format, etc.) to all.
 - If you can't figure out the card name, ask the user before running anything.
 - Preserve the user's card name capitalization style but fix obvious typos in flag-words (e.g. "englsh" → eng).
+
+## Japanese name lookup (Magi search)
+
+When the user asks for "haiku", "japanese name", or "jp name" for a card (without asking to run an eBay search), respond with the **katakana Japanese name** of that Pokémon/card so they can paste it into Magi or other Japanese marketplaces. Do NOT run the CLI — just provide the translation.
+
+Common names:
+| English | Japanese |
+|---------|----------|
+| Greninja | ゲッコウガ |
+| Mega Greninja | メガゲッコウガ |
+| Charizard | リザードン |
+| Mega Charizard | メガリザードン |
+| Pikachu | ピカチュウ |
+| Umbreon | ブラッキー |
+| Rayquaza | レックウザ |
+| Mewtwo | ミュウツー |
+| Giratina | ギラティナ |
+| Kyogre | カイオーガ |
+| Lugia | ルギア |
+| Eevee | イーブイ |
+
+For cards not in the table, use your knowledge of official Japanese Pokémon names. Append common TCG suffixes as needed: ex → ex, EX → EX, V → V, VMAX → VMAX, Alt Art → SA/SAR/AR depending on era.
 
 ## Execution
 
