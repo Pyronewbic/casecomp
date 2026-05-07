@@ -70,12 +70,26 @@
     return false;
   }
 
+  function isMainSiteLoaded() {
+    return !!(
+      document.querySelector('nav, header a[href="/"], [data-testid="header"], .site-header') ||
+      document.querySelector('input[placeholder*="Search" i], form[action*="search"]') ||
+      document.querySelector('[data-testid="product-grid"], .product-card, [class*="productTile"]')
+    );
+  }
+
   function detect() {
     if (detectCaptcha()) {
       return { inQueue: true, captcha: true, joinable: false, detail: "CAPTCHA detected — solve manually!" };
     }
 
     const iframe = findIncapsulaIframe();
+    const siteLoaded = isMainSiteLoaded();
+
+    if (siteLoaded && iframe) {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      return { inQueue: false, through: true, detail: "You're through — site loaded" };
+    }
 
     if (iframe) {
       if (!pollTimer) {
@@ -98,21 +112,13 @@
       };
     }
 
-    if (lastPolledPos === -1 || !findIncapsulaIframe()) {
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-
-      const atcBtn = findAtcButton();
-      if (atcBtn) {
-        return { inQueue: false, through: true, detail: "Product page loaded — you're through!" };
-      }
+    if (lastPolledPos === -1 || siteLoaded) {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      return { inQueue: false, through: true, detail: "You're through — site loaded" };
     }
 
-    // Fallback: text-based detection for unknown queue variants
     const bodyText = document.body?.innerText || "";
-    if (/you are now in line|waiting room|queue/i.test(bodyText) && !/add to cart/i.test(bodyText)) {
+    if (/you are now in line|waiting room/i.test(bodyText) && !siteLoaded) {
       return { inQueue: true, joinable: false, detail: "Waiting room text detected" };
     }
 
