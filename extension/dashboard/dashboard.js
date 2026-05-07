@@ -205,7 +205,36 @@ function filterBySearch(entries) {
 function renderWorkerPanel(el, entries) {
   entries = filterBySearch(entries);
   if (!entries.length) {
-    el.innerHTML = '<div style="color:var(--paper-dd);padding:40px;text-align:center;">No worker activity yet.</div>';
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+          <defs>
+            <linearGradient id="e-foil" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#8a6d3a"/><stop offset=".45" stop-color="#d9b676"/>
+              <stop offset=".55" stop-color="#f1d79a"/><stop offset="1" stop-color="#8a6d3a"/>
+            </linearGradient>
+            <linearGradient id="e-holo" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#6ee7ff"/><stop offset=".5" stop-color="#c084fc"/>
+              <stop offset="1" stop-color="#fde68a"/>
+            </linearGradient>
+          </defs>
+          <rect x="21" y="26.5" width="50" height="67" rx="4" ry="4" fill="#14151c" stroke="url(#e-holo)" stroke-width="1.6" transform="rotate(-7.5,46,60)" opacity=".5"/>
+          <rect x="57" y="34.5" width="50" height="67" rx="4" ry="4" fill="#1c1e27" stroke="url(#e-foil)" stroke-width="2.4" transform="rotate(7.5,82,68)" opacity=".5"/>
+          <polyline fill="none" stroke="url(#e-foil)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="16,64 40,64 48,44 56,80 64,50 72,64 112,64" opacity=".4"/>
+        </svg>
+      </div>
+      <div class="empty-title">No activity yet</div>
+      <div class="empty-sub">Add a target URL to start monitoring product drops and queue events.</div>
+      <div class="empty-actions">
+        <button class="empty-btn" onclick="document.querySelector('[data-tab=targets]').click()">+ Add Target</button>
+        <button class="empty-btn secondary" onclick="document.querySelector('[data-tab=news]').click()">Set Up News</button>
+      </div>
+      <div class="empty-hints">
+        <div class="empty-hint"><span class="eh-num">1</span>Paste a product URL in the Targets tab</div>
+        <div class="empty-hint"><span class="eh-num">2</span>The extension opens and watches the page</div>
+        <div class="empty-hint"><span class="eh-num">3</span>When a queue activates, it auto-joins</div>
+      </div>
+    </div>`;
     return;
   }
 
