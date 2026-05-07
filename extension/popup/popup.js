@@ -105,6 +105,7 @@ function getLatestStatusForUrl(url) {
 
 function renderTargets() {
   const el = $("#target-list");
+  if (!el) return;
   const active = targetUrls.filter((u) => u.active).length;
   $("#targets-meta").textContent = `${active} active`;
   $("#stat-armed").textContent = active;
@@ -255,6 +256,7 @@ function groupConsecutive(entries) {
 
 function renderLog() {
   const el = $("#log");
+  if (!el) return;
   if (!logData.length) {
     el.innerHTML = '<div class="log-row" style="justify-content:center;color:var(--paper-dd);">No activity yet.</div>';
     return;
@@ -287,27 +289,26 @@ function escAttr(s) {
 }
 
 // Settings drawer
-$("#open-settings").addEventListener("click", () => $("#settings-drawer").classList.add("open"));
-$("#close-settings").addEventListener("click", () => $("#settings-drawer").classList.remove("open"));
+$("#open-settings")?.addEventListener("click", () => $("#settings-drawer")?.classList.add("open"));
+$("#close-settings")?.addEventListener("click", () => $("#settings-drawer")?.classList.remove("open"));
 
 // Settings checkboxes
 ["enabled", "auto-join", "auto-atc", "sound-alerts", "notifications"].forEach((id) => {
-  const el = $(`#${id}`);
-  if (el) el.addEventListener("change", save);
+  $(`#${id}`)?.addEventListener("change", save);
 });
 
 // Dashboard
-$("#open-dashboard").addEventListener("click", () => {
+$("#open-dashboard")?.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "OPEN_DASHBOARD" });
   window.close();
 });
 
 // URL add
-$("#url-add").addEventListener("click", addUrl);
-$("#url-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addUrl(); });
+$("#url-add")?.addEventListener("click", addUrl);
+$("#url-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") addUrl(); });
 
 // Clear log
-$("#log-clear").addEventListener("click", () => {
+$("#log-clear")?.addEventListener("click", () => {
   chrome.storage.local.get(["logArchive"], (data) => {
     const cleared = logData.map((e) => ({ ...e, archivedAt: new Date().toISOString(), reason: "manual clear" }));
     const archive = [...cleared, ...(data.logArchive || [])].slice(0, 500);
