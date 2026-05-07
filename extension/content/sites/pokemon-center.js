@@ -71,11 +71,13 @@
   }
 
   function isMainSiteLoaded() {
-    return !!(
-      document.querySelector('nav, header a[href="/"], [data-testid="header"], .site-header') ||
-      document.querySelector('input[placeholder*="Search" i], form[action*="search"]') ||
-      document.querySelector('[data-testid="product-grid"], .product-card, [class*="productTile"]')
-    );
+    if (findAtcButton()) return true;
+    const bodyText = (document.body?.innerText || "").slice(0, 5000);
+    if (/add to cart/i.test(bodyText)) return true;
+    if (document.querySelector('[class*="breadcrumb"], [class*="Breadcrumb"], nav a[href*="/collections"], nav a[href*="/category"]')) return true;
+    if (document.querySelector('[class*="price"], [class*="Price"], [class*="product-name"], [class*="ProductName"]')) return true;
+    const links = document.querySelectorAll('nav a, header a');
+    return links.length > 5;
   }
 
   function detect() {
