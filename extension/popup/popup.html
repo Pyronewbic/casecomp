@@ -5,59 +5,82 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="header">
-    <h1>Queue Auto-Join</h1>
-    <div class="header-actions">
-      <button id="open-dashboard" class="btn-dashboard">Dashboard</button>
+  <header class="header">
+    <div class="header-top">
+      <div class="header-left">
+        <div class="header-eyebrow">
+          <span class="dot"></span>
+          <span id="eyebrow-status">Live · 0 targets</span>
+        </div>
+        <h1>Case<span class="accent">comp</span></h1>
+      </div>
       <label class="toggle">
         <input type="checkbox" id="enabled">
         <span class="slider"></span>
       </label>
     </div>
-  </div>
-
-  <div class="popup-tabs">
-    <button class="popup-tab active" data-tab="main">Monitor</button>
-    <button class="popup-tab" data-tab="settings">Settings</button>
-  </div>
-
-  <div id="tab-main" class="popup-tab-content active">
-    <section>
-      <h2>Sites</h2>
-      <label><input type="checkbox" id="site-pokemon-center"> Pokemon Center (US) <span id="status-pokemon-center" class="site-status" style="display:none"></span></label>
-      <label><input type="checkbox" id="site-pokemon-center-jp"> Pokemon Center (JP) <span id="status-pokemon-center-jp" class="site-status" style="display:none"></span></label>
-      <label><input type="checkbox" id="site-walmart"> Walmart <span id="status-walmart" class="site-status" style="display:none"></span></label>
-      <label><input type="checkbox" id="site-costco"> Costco <span id="status-costco" class="site-status" style="display:none"></span></label>
-      <label><input type="checkbox" id="site-discord"> Discord <span id="status-discord" class="site-status" style="display:none"></span></label>
-    </section>
-
-    <section>
-      <h2>Activity</h2>
-      <div class="log-controls">
-        <button id="log-clear" class="btn-small">Clear</button>
+    <div class="header-meta">
+      <div class="stat">
+        <span class="stat-num holo" id="stat-best-pos">—</span>
+        <span class="stat-lbl">Best Pos</span>
       </div>
-      <div id="log"></div>
-    </section>
+      <div class="stat">
+        <span class="stat-num" id="stat-next-eta">—</span>
+        <span class="stat-lbl">Next ETA</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" id="stat-today">0</span>
+        <span class="stat-lbl">Today</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" id="stat-armed">0</span>
+        <span class="stat-lbl">Targets</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>Targets</h2>
+      <span class="rule"></span>
+      <span class="meta" id="targets-meta">0 active</span>
+    </div>
+    <div class="add-row">
+      <input type="text" id="url-input" placeholder="Paste product URL...">
+      <button id="url-add">+</button>
+    </div>
+    <div id="target-list"></div>
   </div>
 
-  <div id="tab-settings" class="popup-tab-content">
-    <section>
-      <h2>Options</h2>
-      <label><input type="checkbox" id="auto-join"> Auto-join queues</label>
-      <label><input type="checkbox" id="auto-atc"> Auto add-to-cart after queue</label>
-      <label><input type="checkbox" id="sound-alerts"> Sound alerts</label>
-      <label><input type="checkbox" id="notifications"> Desktop notifications</label>
-    </section>
+  <div class="section">
+    <div class="section-head">
+      <h2>Recent Activity</h2>
+      <span class="rule"></span>
+      <button class="meta-btn" id="log-clear">CLEAR</button>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
 
-    <section>
-      <h2>Target URLs</h2>
-      <p class="hint">Paste product URLs to monitor. The extension will open and watch these pages.</p>
-      <div class="url-input-row">
-        <input type="text" id="url-input" placeholder="https://www.pokemoncenter.com/product/...">
-        <button id="url-add">+</button>
+  <footer class="footer">
+    <button class="btn" id="open-settings">⚙</button>
+    <div class="spacer"></div>
+    <button class="btn primary" id="open-dashboard">Dashboard</button>
+  </footer>
+
+  <div class="settings-drawer" id="settings-drawer">
+    <div class="section">
+      <div class="section-head">
+        <h2>Options</h2>
+        <span class="rule"></span>
+        <button class="meta-btn" id="close-settings">✕</button>
       </div>
-      <div id="url-list"></div>
-    </section>
+      <div class="option-list">
+        <label class="option"><input type="checkbox" id="auto-join"><span class="opt-box"></span>Auto-join queues</label>
+        <label class="option"><input type="checkbox" id="auto-atc"><span class="opt-box"></span>Auto add-to-cart</label>
+        <label class="option"><input type="checkbox" id="sound-alerts"><span class="opt-box"></span>Sound alerts</label>
+        <label class="option"><input type="checkbox" id="notifications"><span class="opt-box"></span>Notifications</label>
+      </div>
+    </div>
   </div>
 
   <script src="popup.js"></script>

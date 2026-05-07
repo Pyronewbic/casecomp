@@ -19,6 +19,10 @@
     "https://pokemoncenter.pokemon.co.jp/*",
     "https://discord.com/*",
     "https://*.discord.com/*",
+    "https://www.pokemon.com/*",
+    "https://*.pokemon.com/*",
+    "https://x.com/*",
+    "https://www.reddit.com/*",
     "http://localhost:3099/*"
   ],
   "background": {
@@ -100,6 +104,15 @@
         "content/queue-monitor.js"
       ],
       "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://x.com/*"
+      ],
+      "js": [
+        "content/sites/x.js"
+      ],
       "run_at": "document_idle"
     },
     {
