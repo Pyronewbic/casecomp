@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Walmart — Product</title>
+  <style>
+    body { font-family: "Bogle", sans-serif; background: #fff; color: #333; margin: 0; padding: 40px; }
+    .product { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .price { font-size: 20px; font-weight: 700; color: #0071dc; margin-bottom: 16px; }
+    .desc { color: #666; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+    .img-placeholder {
+      width: 300px; height: 300px; background: #f5f5f5; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; color: #ccc;
+      font-size: 14px; margin-bottom: 24px;
+    }
+    button[data-testid="add-to-cart"] {
+      background: #0071dc; color: #fff; border: none; border-radius: 20px;
+      padding: 12px 36px; font-size: 16px; cursor: pointer;
+    }
+    button[data-testid="add-to-cart"]:hover { background: #004c91; }
+    .success { display: none; background: #4caf50; color: #fff; padding: 12px 20px; border-radius: 6px; margin-top: 16px; font-size: 14px; }
+    [itemprop="offers"] { font-size: 12px; color: #999; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="product">
+    <div class="img-placeholder">[Product Image]</div>
+    <h1>Pokemon TCG: Prismatic Evolutions Elite Trainer Box</h1>
+    <div class="price">$54.98</div>
+    <p class="desc">Contains 9 Prismatic Evolutions booster packs, 1 full-art foil promo card, and premium accessories.</p>
+    <button data-testid="add-to-cart" id="atc-btn">Add to Cart</button>
+    <div class="success" id="success-msg">Added to cart!</div>
+    <div itemprop="offers">In stock — Ships free</div>
+  </div>
+
+  <script>
+    document.getElementById("atc-btn").addEventListener("click", () => {
+      document.getElementById("atc-btn").disabled = true;
+      document.getElementById("atc-btn").textContent = "Added!";
+      document.getElementById("success-msg").style.display = "block";
+    });
+  </script>
+</body>
+</html>
