@@ -175,3 +175,18 @@ input[type="checkbox"] {
 .log-status-atc-success { color: #4caf50; font-weight: 700; }
 .log-status-atc-failed { color: #ff9800; }
 .log-status-target-opened { color: #2196f3; }
+.log-status-discord-intel { color: #bb86fc; }
+.log-status-new-listing { color: #ffd700; font-weight: 700; }
+
+.btn-dashboard {
+  background: #2a2a3e;
+  border: 1px solid #3a3a50;
+  color: #7c5cfc;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+.btn-dashboard:hover { background: #3a3a50; }
+.header-actions { display: flex; align-items: center; }
