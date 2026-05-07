@@ -70,14 +70,11 @@
     return false;
   }
 
-  function isMainSiteLoaded() {
-    if (findAtcButton()) return true;
-    const bodyText = (document.body?.innerText || "").slice(0, 5000);
-    if (/add to cart/i.test(bodyText)) return true;
-    if (document.querySelector('[class*="breadcrumb"], [class*="Breadcrumb"], nav a[href*="/collections"], nav a[href*="/category"]')) return true;
-    if (document.querySelector('[class*="price"], [class*="Price"], [class*="product-name"], [class*="ProductName"]')) return true;
-    const links = document.querySelectorAll('nav a, header a');
-    return links.length > 5;
+  function hasQueueIndicators() {
+    if (findIncapsulaIframe()) return true;
+    const bodyText = (document.body?.innerText || "").slice(0, 3000);
+    return /you are now in line|waiting room|please wait/i.test(bodyText) &&
+      !/add to cart/i.test(bodyText);
   }
 
   function detect() {
@@ -86,12 +83,6 @@
     }
 
     const iframe = findIncapsulaIframe();
-    const siteLoaded = isMainSiteLoaded();
-
-    if (siteLoaded && iframe) {
-      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      return { inQueue: false, through: true, detail: "You're through — site loaded" };
-    }
 
     if (iframe) {
       if (!pollTimer) {
@@ -99,9 +90,14 @@
         pollPosition();
       }
 
+      if (lastPolledPos === -1) {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        return { inQueue: false, through: true, detail: "Position cleared — you're through" };
+      }
+
       const ttw = getEstimatedWaitTime();
       const posDetail = [];
-      if (lastPolledPos != null && lastPolledPos !== -1) posDetail.push(`Position: ${lastPolledPos}`);
+      if (lastPolledPos != null) posDetail.push(`Position: ${lastPolledPos}`);
       if (ttw) posDetail.push(`ETA: ${ttw}`);
 
       return {
@@ -114,14 +110,9 @@
       };
     }
 
-    if (lastPolledPos === -1 || siteLoaded) {
+    if (!hasQueueIndicators() && document.readyState === "complete") {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      return { inQueue: false, through: true, detail: "You're through — site loaded" };
-    }
-
-    const bodyText = document.body?.innerText || "";
-    if (/you are now in line|waiting room/i.test(bodyText) && !siteLoaded) {
-      return { inQueue: true, joinable: false, detail: "Waiting room text detected" };
+      return { inQueue: false, through: true, detail: "No queue detected — site loaded" };
     }
 
     return { inQueue: false, through: false };
