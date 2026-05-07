@@ -1,4 +1,4 @@
-# Casecomp
+# <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
 **Casecomp** is a card research tool for collectors. Ask it for a card in plain English — `/casecomp Umbreon ex 217/187 PSA 10 japanese` — and it pulls live listings from eBay and magi.camp, recent sold comps, and (for raw searches) a PSA grading signal showing difficulty, 10 chance, and population. Results land in a clean markdown table with prices, shipping costs, and clickable links.
 
@@ -264,6 +264,9 @@ The `--condition` flag maps to SNKRDUNK's seller condition grades: **A** (Mint),
 
 The `extension/` directory contains a Chrome extension that auto-joins product drop queues on **Pokemon Center** (US + JP), **Walmart**, and **Costco**, monitors Discord channels for restock alerts, and detects new product listings. It uses your real browser session — no bots or spoofed requests.
 
+<!-- Replace extension-demo.gif with a screen recording of the popup + dashboard in action -->
+![Extension demo](extension-demo.gif)
+
 ### Features
 
 - **Dashboard** — full-tab view with Workers (queue events) and News Monitor (Discord intel + new listings) tabs, collapsible per-site sections, grouped duplicate entries with count + time range
@@ -306,6 +309,57 @@ flowchart TD
   I --> N
   K --> N
 ```
+
+---
+
+## REST API (`yarn api`)
+
+Run `node api.js` or `yarn api` to start the API on port 3000. Swagger docs at [localhost:3000/docs](http://localhost:3000/docs).
+
+```bash
+yarn api   # starts on :3000
+```
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/search?q=Umbreon+ex&source=snkrdunk&condition=A` | Search card listings |
+| `GET` | `/api/sold?q=Umbreon+ex&source=ebay` | Recent sold comps |
+| `GET` | `/api/psa?q=Umbreon+ex` | PSA population signal |
+| `POST` | `/api/grade` | AI pre-grade from image URL(s) |
+| `GET` | `/api/grades?q=Mega+Greninja&limit=100` | Export stored grades (training data) |
+| `GET` | `/api/health` | Health check + Redis status |
+
+### Search params
+
+`q` (required), `source` (ebay/snkrdunk/magi/yahoo), `format` (raw/slab), `countries` (US,IN), `lang` (eng/jp/any), `results`, `sold`, `slab_provider`, `slab_grade`, `condition` (A-D), `grade` (true = AI pre-grade)
+
+### AI grading for training data
+
+```bash
+# Grade a single image
+curl -X POST localhost:3000/api/grade \
+  -H "Content-Type: application/json" \
+  -d '{"imageUrl":"https://cdn.snkrdunk.com/...","cardName":"Mega Greninja ex SAR"}'
+
+# Export all stored grades
+curl "localhost:3000/api/grades?limit=500"
+```
+
+Grade results are stored permanently in Redis for future model training. Each record includes card name, source, listing ID, price, condition, provider, model, and the full grade breakdown.
+
+### Redis caching
+
+Optional — falls back to file-based cache if Redis is unavailable. Set `REDIS_URL` in `.env` to enable.
+
+| Cache | TTL |
+|-------|-----|
+| eBay active listings | 6h |
+| eBay sold listings | 24h |
+| AI grades | 30d |
+| PSA population | 24h |
+| Grade training log | permanent |
 
 ---
 

@@ -2,58 +2,131 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Casecomp Dashboard</title>
+  <title>Casecomp · Dashboard</title>
   <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-  <header>
-    <div class="header-left">
-      <img src="../icons/icon48.png" alt="" class="header-icon">
-      <h1>Casecomp Dashboard</h1>
+  <header class="top">
+    <div class="brand-row">
+      <div class="brand-mark">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+          <defs>
+            <linearGradient id="foil" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#8a6d3a"/>
+              <stop offset=".45" stop-color="#d9b676"/>
+              <stop offset=".55" stop-color="#f1d79a"/>
+              <stop offset="1" stop-color="#8a6d3a"/>
+            </linearGradient>
+            <linearGradient id="holo" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#6ee7ff"/>
+              <stop offset=".5" stop-color="#c084fc"/>
+              <stop offset="1" stop-color="#fde68a"/>
+            </linearGradient>
+          </defs>
+          <rect x="21" y="26.5" width="50" height="67" rx="4" ry="4"
+                fill="#14151c" stroke="url(#holo)" stroke-width="1.6"
+                transform="rotate(-7.5,46,60)"/>
+          <rect x="57" y="34.5" width="50" height="67" rx="4" ry="4"
+                fill="#1c1e27" stroke="url(#foil)" stroke-width="2.4"
+                transform="rotate(7.5,82,68)"/>
+          <polyline fill="none" stroke="url(#foil)" stroke-width="4"
+            stroke-linecap="round" stroke-linejoin="round"
+            points="16,64 40,64 48,44 56,80 64,50 72,64 112,64"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="eyebrow">Queue Intelligence Terminal · v0.4.2</span>
+        <h1>Case<span class="accent">comp</span></h1>
+      </div>
+      <div class="spacer"></div>
+      <div class="search">
+        <input type="text" id="search" placeholder="search sites, skus, channels…">
+        <span class="kbd">⌘ K</span>
+      </div>
+      <div class="master-toggle">
+        <span class="lbl">Engine</span>
+        <label class="toggle"><input type="checkbox" id="enabled" checked><span class="slider"></span></label>
+      </div>
     </div>
-    <div class="header-right">
-      <label class="toggle">
-        <input type="checkbox" id="enabled">
-        <span class="slider"></span>
-      </label>
-    </div>
+
   </header>
 
   <main>
-    <div class="feed-panel">
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="workers">Workers</button>
-        <button class="tab-btn" data-tab="news">News Monitor</button>
-        <input type="text" id="search" placeholder="Search...">
-      </div>
-      <div id="feed-workers" class="feed tab-content active"></div>
-      <div id="feed-news" class="feed tab-content"></div>
-    </div>
+    <section>
+      <nav class="feed-tabs">
+        <button class="feed-tab active" data-tab="workers">Workers <span class="count" id="workers-count">0</span></button>
+        <button class="feed-tab" data-tab="targets">Targets <span class="count" id="targets-count">0</span></button>
+        <button class="feed-tab" data-tab="news">News Monitor <span class="count" id="news-count">0</span></button>
+        <button class="feed-tab" data-tab="history">History <span class="count" id="history-count">0</span></button>
+        <button class="feed-tab" data-tab="logs">Logs <span class="count nerd">for nerds</span></button>
+      </nav>
 
-    <aside class="sidebar">
-      <div class="sidebar-section">
-        <h2>Active Monitors</h2>
-        <div id="monitors"></div>
+      <div class="section-head">
+        <h2>Live Site Feed</h2>
+        <span class="rule"></span>
+        <span class="meta" id="feed-meta">0 ARMED</span>
+        <button class="meta-btn" id="dash-log-clear">CLEAR</button>
       </div>
 
-      <div class="sidebar-section">
-        <h2>Discord Channels</h2>
-        <div id="discord-channels"></div>
-        <div class="channel-add-row">
-          <input type="text" id="channel-input" placeholder="channel-name">
-          <button id="channel-add">+</button>
+      <div class="feed-kpis" id="feed-kpis"></div>
+
+      <div id="feed-workers" class="feed-panel active"></div>
+      <div id="feed-news" class="feed-panel">
+        <div class="news-config">
+          <div class="news-config-col">
+            <div class="section-head">
+              <h2>Discord Channels</h2>
+              <span class="rule"></span>
+              <span class="meta" id="channel-count">0</span>
+            </div>
+            <div class="tag-cloud" id="discord-channels"></div>
+            <div class="add-row">
+              <input type="text" id="channel-input" placeholder="channel-name">
+              <button id="channel-add">+</button>
+            </div>
+          </div>
+          <div class="news-config-col">
+            <div class="section-head">
+              <h2>Reddit Subs</h2>
+              <span class="rule"></span>
+              <span class="meta" id="sub-count">0</span>
+            </div>
+            <div class="tag-cloud" id="reddit-subs"></div>
+            <div class="add-row">
+              <input type="text" id="sub-input" placeholder="subreddit name">
+              <button id="sub-add">+</button>
+            </div>
+          </div>
+          <div class="news-config-col">
+            <div class="section-head">
+              <h2>Keywords</h2>
+              <span class="rule"></span>
+              <span class="meta" id="keyword-count">0</span>
+            </div>
+            <div class="tag-cloud" id="keywords"></div>
+            <div class="add-row">
+              <input type="text" id="keyword-input" placeholder="new keyword">
+              <button id="keyword-add">+</button>
+            </div>
+          </div>
         </div>
+        <div id="news-feed"></div>
       </div>
-
-      <div class="sidebar-section">
-        <h2>Keywords</h2>
-        <div id="keywords"></div>
-        <div class="keyword-add-row">
-          <input type="text" id="keyword-input" placeholder="new keyword">
-          <button id="keyword-add">+</button>
+      <div id="feed-history" class="feed-panel"></div>
+      <div id="feed-targets" class="feed-panel">
+        <div class="section-head">
+          <h2>Target URLs</h2>
+          <span class="rule"></span>
+          <span class="meta" id="targets-meta">0 active</span>
         </div>
+        <div class="add-row targets-add">
+          <input type="text" id="dash-url-input" placeholder="https://www.pokemoncenter.com/product/...">
+          <button id="dash-url-add">+ Add Target</button>
+        </div>
+        <div id="dash-url-list"></div>
       </div>
-    </aside>
+      <div id="feed-logs" class="feed-panel"></div>
+    </section>
   </main>
 
   <script src="dashboard.js"></script>
