@@ -48,6 +48,7 @@ Once Claude Code is running in this project, just type `/casecomp` followed by w
 | `/casecomp should I grade Team aqua's kyogre ex japanese?` | Grading decision — shows PSA break-even table by submission tier |
 | `/casecomp Umbreon ex 217/187 with AI grading` | AI pre-grades each raw listing from front + back photos |
 | `/casecomp Mega Greninja on yahoo auctions` | Searches Yahoo Auctions JP instead of eBay |
+| `/casecomp Mega Greninja ex SAR on snkrdunk, condition A` | Searches SNKRDUNK for condition A (Mint) listings |
 | `/casecomp fresh search for Rayquaza V alt art` | Clears cache and fetches new data |
 
 Claude will show you a confirmation line before searching, then display a formatted table with prices, shipping, and clickable links.
@@ -149,7 +150,8 @@ Override cards on the fly: `node index.js "Charizard ex" "Pikachu VMAX"`
 | `--results` | `10` | Active listings per card (default: `5`) |
 | `--grade` | *(flag)* | AI pre-grading on raw listings |
 | `--refresh` | *(flag)* | Clear caches and fetch fresh data |
-| `--source` | `magi`, `yahoo` | Force magi.camp or Yahoo Auctions JP as the listing source instead of eBay |
+| `--source` | `magi`, `yahoo`, `snkrdunk` | Force magi.camp, Yahoo Auctions JP, or SNKRDUNK as the listing source instead of eBay |
+| `--condition` | `A`, `B`, `C`, `D` | Filter SNKRDUNK raw listings by seller condition grade (A = Mint) |
 | `--output` | `results-psa` | Output file prefix (default: `results`) |
 | `--merge` | `results-psa,results-tag` | Merge per-card JSON files from multiple runs into one output |
 | `--parallel` | *(flag)* | Search multiple cards concurrently |
@@ -184,6 +186,7 @@ flowchart TD
   C -->|eBay| D[OAuth token]
   C -->|magi| M[magi.camp search\nHaiku translation for JP names]
   C -->|yahoo| Y[Yahoo Auctions JP\nHaiku translation for JP names]
+  C -->|snkrdunk| S[SNKRDUNK JSON API\noptional --condition A/B/C/D filter]
   D --> E{Multiple cards?}
   E -->|yes| P[Parallel]
   E -->|no| F
@@ -201,8 +204,11 @@ flowchart TD
   K -->|yes| L[PSA pop signal]
   K -->|no| N
   L --> N[Write results.md + results.json\noutput/ per-card JSON]
-  M --> N
-  Y --> N
+  M --> AI{Raw + --grade?}
+  Y --> AI
+  S --> AI
+  AI -->|yes| I
+  AI -->|no| N
 ```
 
 ---
@@ -232,6 +238,72 @@ Full list: **[docs/env-vars.md](docs/env-vars.md)**
 ## Project layout, caches, and internals
 
 See **[docs/internals.md](docs/internals.md)** for file descriptions, cache TTLs, and configuration details.
+
+---
+
+## SNKRDUNK source (`--source snkrdunk`)
+
+SNKRDUNK is a Japanese marketplace for trading cards. No API key or auth is required — listings are fetched from their public JSON API.
+
+```bash
+# Condition A (Mint) raw listings
+node index.js --source snkrdunk --no-ebay --condition A "Mega Greninja ex SAR"
+
+# All raw listings (no condition filter)
+node index.js --source snkrdunk --no-ebay "Umbreon ex"
+
+# Graded slabs (PSA 10)
+node index.js --source snkrdunk --no-ebay --format slab --slab-provider PSA --slab-grade 10 "Charizard ex"
+```
+
+The `--condition` flag maps to SNKRDUNK's seller condition grades: **A** (Mint), **B** (Minor scratches), **C**, **D**. It only applies to raw listings — slab searches filter by grading company and grade instead.
+
+---
+
+## Chrome extension — Queue Auto-Join
+
+The `extension/` directory contains a Chrome extension that auto-joins product drop queues on **Pokemon Center** (US + JP), **Walmart**, and **Costco**. It monitors queue pages and automatically enters when the queue opens, using your real browser session (no bots or spoofed requests).
+
+### Install
+
+1. Open `chrome://extensions` and enable **Developer mode**
+2. Click **Load unpacked** and select the `extension/` folder
+3. Pin the extension icon to your toolbar
+
+The popup shows which sites are enabled and queue status. The extension runs entirely locally — no external servers or data collection.
+
+```mermaid
+flowchart TD
+  A[Alarm fires every 30s] --> B[Poll all open tabs matching site URLs]
+  B --> C{Site handler detect}
+  C -->|Pokemon Center US/JP| D[Incapsula iframe poll\n+ lottery button check]
+  C -->|Walmart| E[Queue-it params\n+ hold-my-spot button]
+  C -->|Costco| F[Incapsula poll\n+ virtual waiting room]
+  D --> G{Status?}
+  E --> G
+  F --> G
+  G -->|CAPTCHA| H[Urgent chime\nUser must solve manually]
+  G -->|Through| I[Success chime\n+ auto-add-to-cart if enabled]
+  G -->|In queue + joinable| J{autoJoin enabled?}
+  G -->|In queue + waiting| K[Report position]
+  J -->|yes| L[Click join/hold button]
+  J -->|no| K
+  L --> K
+  H --> N[OS notification + activity log]
+  I --> N
+  K --> N
+```
+
+---
+
+## Event & release scanner (`npm run scan`)
+
+The scanner checks upcoming Pokemon TCG events and product releases. It's available as a CLI command or the `/scan` slash command in Claude Code.
+
+```bash
+node scan.js "Ninja Spinner"       # scan for a specific set
+node scan.js --source pokemon-center --limit 5
+```
 
 ---
 
