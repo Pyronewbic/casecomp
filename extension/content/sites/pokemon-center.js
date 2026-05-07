@@ -32,17 +32,19 @@
   }
 
   function getEstimatedWaitTime() {
-    const ttwEl = document.getElementById("ttw");
-    if (ttwEl) return ttwEl.textContent?.trim() || null;
-
     const iframe = findIncapsulaIframe();
-    if (!iframe) return null;
-    try {
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      const iframeTtw = doc?.getElementById("ttw");
-      return iframeTtw?.textContent?.trim() || null;
-    } catch {
-      return null;
+    if (iframe) {
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+          const iframeTtw = doc.getElementById("ttw") || doc.querySelector('[id*="ttw"], .ttw, [class*="estimatedWait"], [class*="wait-time"]');
+          if (iframeTtw) return iframeTtw.textContent?.trim() || null;
+        }
+      } catch {}
+    }
+    const ttwEl = document.getElementById("ttw") || document.querySelector('[class*="estimatedWait"], [class*="wait-time"], [class*="waitTime"]');
+    if (ttwEl) return ttwEl.textContent?.trim() || null;
+    return null;
     }
   }
 
