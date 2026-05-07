@@ -1,4 +1,4 @@
-# Casecomp
+# <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
 **Casecomp** is a card research tool for collectors. Ask it for a card in plain English — `/casecomp Umbreon ex 217/187 PSA 10 japanese` — and it pulls live listings from eBay and magi.camp, recent sold comps, and (for raw searches) a PSA grading signal showing difficulty, 10 chance, and population. Results land in a clean markdown table with prices, shipping costs, and clickable links.
 
@@ -263,6 +263,9 @@ The `--condition` flag maps to SNKRDUNK's seller condition grades: **A** (Mint),
 ## Chrome extension — Queue Auto-Join + Dashboard
 
 The `extension/` directory contains a Chrome extension that auto-joins product drop queues on **Pokemon Center** (US + JP), **Walmart**, and **Costco**, monitors Discord channels for restock alerts, and detects new product listings. It uses your real browser session — no bots or spoofed requests.
+
+<!-- Replace extension-demo.gif with a screen recording of the popup + dashboard in action -->
+![Extension demo](extension-demo.gif)
 
 ### Features
 
