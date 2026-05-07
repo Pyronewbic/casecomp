@@ -22,6 +22,9 @@ The user writes a **plain English sentence** after `/casecomp`. Your job is to e
 | `Umbreon vmax alt art — use cache` | `node index.js "Umbreon vmax Alt Art"` (no `--refresh`) |
 | `Charizard ex on yahoo auctions` | `node index.js --refresh --source yahoo "Charizard ex"` |
 | `Mega Greninja PSA 10 yahoo` | `node index.js --refresh --source yahoo --format slab --slab-provider PSA --slab-grade 10 "Mega Greninja"` |
+| `Mega Greninja ex on snkrdunk` | `node index.js --refresh --source snkrdunk "Mega Greninja ex"` |
+| `Charizard ex snkrdunk with AI grading` | `node index.js --refresh --source snkrdunk --grade "Charizard ex"` |
+| `Umbreon ex PSA 10 snkrdunk` | `node index.js --refresh --source snkrdunk --format slab --slab-provider PSA --slab-grade 10 "Umbreon ex"` |
 
 ### How to extract fields
 
@@ -44,7 +47,7 @@ Read the sentence and look for these signals. Anything not mentioned uses defaul
 | Refresh cache | `--refresh` | **on** (always passed) | Omit `--refresh` only when user explicitly says "use cache", "cached", "no refresh", or "from cache" |
 | Grading decision | `--grade-decision` | off | "should I grade", "grade decision", "worth grading?", "grade or sell raw". Forces raw format. Runs raw + graded (9+10) searches in parallel and shows a break-even table by submission tier. |
 | Grade companies | `--grade-companies` | `PSA` | Which grading companies to include in the break-even table. Comma-separated: `PSA`, `BGS`, `CGC`, or `all`. Only used with `--grade-decision`. Signals: "compare PSA and BGS", "all grading companies", "PSA BGS CGC", "for BGS only". |
-| Source | `--source` | *(none = eBay)* | "yahoo", "yahoo auctions", "ヤフオク" → `yahoo`. "magi", "magi.camp" → `magi`. Omit for default eBay. Skips eBay auth when set. |
+| Source | `--source` | *(none = eBay)* | "yahoo", "yahoo auctions", "ヤフオク" → `yahoo`. "magi", "magi.camp" → `magi`. "snkrdunk", "SNKRDUNK", "snkr dunk" → `snkrdunk`. Omit for default eBay. Skips eBay auth when set. |
 
 ### Ambiguity rules
 
@@ -115,5 +118,5 @@ The `--merge` command reads the per-card JSON files from each prefix, combines a
 3. **Relay stdout directly.** The node script prints formatted markdown tables to stdout as its final step (via `printSummary`). No agents needed — just extract and relay the stdout block that starts after the last `]` log line. It contains one `## CardName` section per card, all combined in order.
 
 4. **Display the summary.** Relay the stdout tables verbatim, then append:
-   - `eBay usage: <n>/5000 today` (from the last `eBay: N/5000` log line in stdout)
+   - `eBay usage: <n>/5000 today` (from the last `eBay: N/5000` log line in stdout) — omit for non-eBay sources (yahoo, magi, snkrdunk)
    - `Results saved to results.md and results.json`
