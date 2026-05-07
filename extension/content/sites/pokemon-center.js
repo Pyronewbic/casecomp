@@ -10,6 +10,7 @@
 
   const ATC_SELECTORS = [
     'button[data-testid="add-to-cart"]',
+    'button[class*="add-to-cart"]',
     ".add-to-cart button",
     'button.add-to-cart',
     'input[value*="Add to Cart" i]',
@@ -32,18 +33,19 @@
   }
 
   function getEstimatedWaitTime() {
-    const ttwEl = document.getElementById("ttw");
-    if (ttwEl) return ttwEl.textContent?.trim() || null;
-
     const iframe = findIncapsulaIframe();
-    if (!iframe) return null;
-    try {
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      const iframeTtw = doc?.getElementById("ttw");
-      return iframeTtw?.textContent?.trim() || null;
-    } catch {
-      return null;
+    if (iframe) {
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+          const iframeTtw = doc.getElementById("ttw") || doc.querySelector('[id*="ttw"], .ttw, [class*="estimatedWait"], [class*="wait-time"]');
+          if (iframeTtw) return iframeTtw.textContent?.trim() || null;
+        }
+      } catch {}
     }
+    const ttwEl = document.getElementById("ttw") || document.querySelector('[class*="estimatedWait"], [class*="wait-time"], [class*="waitTime"]');
+    if (ttwEl) return ttwEl.textContent?.trim() || null;
+    return null;
   }
 
   async function pollPosition() {
@@ -68,6 +70,13 @@
     return false;
   }
 
+  function hasQueueIndicators() {
+    if (findIncapsulaIframe()) return true;
+    const bodyText = (document.body?.innerText || "").slice(0, 3000);
+    return /you are now in line|waiting room|please wait/i.test(bodyText) &&
+      !/add to cart/i.test(bodyText);
+  }
+
   function detect() {
     if (detectCaptcha()) {
       return { inQueue: true, captcha: true, joinable: false, detail: "CAPTCHA detected — solve manually!" };
@@ -81,9 +90,14 @@
         pollPosition();
       }
 
+      if (lastPolledPos === -1) {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        return { inQueue: false, through: true, detail: "Position cleared — you're through" };
+      }
+
       const ttw = getEstimatedWaitTime();
       const posDetail = [];
-      if (lastPolledPos != null && lastPolledPos !== -1) posDetail.push(`Position: ${lastPolledPos}`);
+      if (lastPolledPos != null) posDetail.push(`Position: ${lastPolledPos}`);
       if (ttw) posDetail.push(`ETA: ${ttw}`);
 
       return {
@@ -96,22 +110,11 @@
       };
     }
 
-    if (lastPolledPos === -1 || !findIncapsulaIframe()) {
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-
-      const atcBtn = findAtcButton();
-      if (atcBtn) {
-        return { inQueue: false, through: true, detail: "Product page loaded — you're through!" };
-      }
-    }
-
-    // Fallback: text-based detection for unknown queue variants
-    const bodyText = document.body?.innerText || "";
-    if (/you are now in line|waiting room|queue/i.test(bodyText) && !/add to cart/i.test(bodyText)) {
-      return { inQueue: true, joinable: false, detail: "Waiting room text detected" };
+    const ready = document.readyState === "complete" || document.readyState === "interactive";
+    const queueFound = hasQueueIndicators();
+    if (!queueFound && ready) {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      return { inQueue: false, through: true, detail: "No queue detected — site loaded" };
     }
 
     return { inQueue: false, through: false };
@@ -136,7 +139,7 @@
   function isVisible(el) {
     if (!el) return false;
     const style = getComputedStyle(el);
-    return style.display !== "none" && style.visibility !== "hidden" && el.offsetParent !== null;
+    return style.display !== "none" && style.visibility !== "hidden";
   }
 
   function join() {
@@ -147,7 +150,11 @@
   function addToCart() {
     const btn = findAtcButton();
     if (!btn) return false;
-    btn.click();
+    btn.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     return true;
   }
 

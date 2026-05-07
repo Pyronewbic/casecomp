@@ -1,5 +1,21 @@
 const $ = (s) => document.querySelector(s);
 
+const SITE_NAME_TO_ID = {
+  "Pokémon Center": "pokemon-center",
+  "Pokemon Center": "pokemon-center",
+  "PC Japan": "pokemon-center-jp",
+  "Walmart": "walmart",
+  "Costco": "costco",
+  "discord": "discord",
+  "system": "system",
+};
+
+const SITE_IDS = [
+  "pokemon-center", "pokemon-center-jp", "walmart", "costco", "discord",
+];
+
+let logData = [];
+
 function load() {
   chrome.storage.local.get(
     ["enabled", "sites", "autoJoin", "autoAddToCart", "soundAlerts", "notifications", "targetUrls", "log"],
@@ -9,12 +25,15 @@ function load() {
       $("#site-pokemon-center-jp").checked = data.sites?.["pokemon-center-jp"] !== false;
       $("#site-walmart").checked = data.sites?.walmart !== false;
       $("#site-costco").checked = data.sites?.costco !== false;
+      $("#site-discord").checked = data.sites?.discord !== false;
       $("#auto-join").checked = data.autoJoin !== false;
       $("#auto-atc").checked = data.autoAddToCart === true;
       $("#sound-alerts").checked = data.soundAlerts !== false;
       $("#notifications").checked = data.notifications !== false;
       renderUrls(data.targetUrls || []);
-      renderLog(data.log || []);
+      logData = data.log || [];
+      renderLog();
+      renderSiteStatuses();
     },
   );
 }
@@ -27,12 +46,77 @@ function save() {
       "pokemon-center-jp": $("#site-pokemon-center-jp").checked,
       walmart: $("#site-walmart").checked,
       costco: $("#site-costco").checked,
+      discord: $("#site-discord").checked,
     },
     autoJoin: $("#auto-join").checked,
     autoAddToCart: $("#auto-atc").checked,
     soundAlerts: $("#sound-alerts").checked,
     notifications: $("#notifications").checked,
   });
+}
+
+function getLatestStatusInfo(siteId) {
+  for (const e of logData) {
+    const id = SITE_NAME_TO_ID[e.site] || e.site.toLowerCase().replace(/\s+/g, "-");
+    if (id === siteId && e.status !== "target-opened") {
+      const eta = extractEta(e.detail);
+      return { status: e.status, eta };
+    }
+  }
+  return null;
+}
+
+function extractEta(detail) {
+  if (!detail) return null;
+  const m = detail.match(/ETA:\s*(\d[\d:]+)/);
+  return m ? m[1] : null;
+}
+
+function renderSiteStatuses() {
+  for (const id of SITE_IDS) {
+    const badge = $(`#status-${id}`);
+    if (!badge) continue;
+    const info = getLatestStatusInfo(id);
+    if (info) {
+      const etaLabel = info.eta ? ` · ${info.eta}` : "";
+      badge.textContent = info.status + etaLabel;
+      badge.className = "site-status site-status-" + info.status.replace(/\s+/g, "-");
+      badge.style.display = "";
+    } else {
+      badge.style.display = "none";
+    }
+  }
+}
+
+function groupConsecutive(entries) {
+  const groups = [];
+  for (const e of entries) {
+    const last = groups[groups.length - 1];
+    if (last && last.site === e.site && last.status === e.status) {
+      last.count++;
+      last.startTs = e.ts;
+    } else {
+      groups.push({ site: e.site, status: e.status, detail: e.detail || "", endTs: e.ts, startTs: e.ts, count: 1 });
+    }
+  }
+  return groups;
+}
+
+function renderLog() {
+  const el = $("#log");
+  if (!logData.length) {
+    el.textContent = "No activity yet.";
+    return;
+  }
+  const grouped = groupConsecutive(logData.slice(0, 100));
+  el.innerHTML = grouped.map((g) => {
+    const statusClass = g.status.replace(/\s+/g, "-");
+    const startTime = new Date(g.startTs).toLocaleTimeString();
+    const endTime = new Date(g.endTs).toLocaleTimeString();
+    const timeLabel = g.count > 1 ? `${endTime} – ${startTime}` : startTime;
+    const countLabel = g.count > 1 ? ` <span class="log-count">x${g.count}</span>` : "";
+    return `<div class="log-entry"><span class="log-ts">${timeLabel}</span> <span class="log-site">${escapeHtml(g.site)}</span> <span class="log-status-${statusClass}">${escapeHtml(g.status)}${countLabel}</span> ${escapeHtml(g.detail || "")}</div>`;
+  }).join("");
 }
 
 function renderUrls(urls) {
@@ -119,19 +203,6 @@ function truncateUrl(url) {
   }
 }
 
-function renderLog(entries) {
-  const el = $("#log");
-  if (!entries.length) {
-    el.textContent = "No activity yet.";
-    return;
-  }
-  el.innerHTML = entries.slice(0, 50).map((e) => {
-    const time = new Date(e.ts).toLocaleTimeString();
-    const statusClass = e.status.replace(/\s+/g, "-");
-    return `<div class="log-entry"><span class="log-ts">${time}</span><span class="log-site">${escapeHtml(e.site)}</span><span class="log-status-${statusClass}">${escapeHtml(e.status)}</span> ${escapeHtml(e.detail || "")}</div>`;
-  }).join("");
-}
-
 function escapeHtml(s) {
   const d = document.createElement("div");
   d.textContent = s;
@@ -142,19 +213,38 @@ function escapeAttr(s) {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+document.querySelectorAll(".popup-tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".popup-tab").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".popup-tab-content").forEach((c) => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
 document.querySelectorAll("input[type='checkbox']").forEach((el) => el.addEventListener("change", save));
+
+$("#open-dashboard").addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "OPEN_DASHBOARD" });
+  window.close();
+});
 
 $("#url-add").addEventListener("click", addUrl);
 $("#url-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addUrl(); });
 
 $("#log-clear").addEventListener("click", () => {
   chrome.storage.local.set({ log: [] });
-  renderLog([]);
+  logData = [];
+  renderLog();
 });
 
 load();
 
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.log) renderLog(changes.log.newValue || []);
+  if (changes.log) {
+    logData = changes.log.newValue || [];
+    renderLog();
+    renderSiteStatuses();
+  }
   if (changes.targetUrls) renderUrls(changes.targetUrls.newValue || []);
 });

@@ -15,6 +15,10 @@ const DEFAULT_CONFIG = {
   notifications: true,
   targetUrls: [],
   log: [],
+  discordChannels: [],
+  discordKeywords: [],
+  monitorStatus: {},
+  pcListings: {},
 };
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -26,7 +30,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== ALARM_NAME) return;
-  chrome.tabs.query({ url: ["https://*.queue-it.net/*", "https://www.pokemoncenter.com/*", "https://www.pokemoncenter-online.com/*", "https://pokemoncenter.pokemon.co.jp/*", "https://www.walmart.com/*", "https://www.costco.com/*"] }, (tabs) => {
+  chrome.tabs.query({ url: ["https://*.queue-it.net/*", "https://www.pokemoncenter.com/*", "https://www.pokemoncenter-online.com/*", "https://pokemoncenter.pokemon.co.jp/*", "https://www.walmart.com/*", "https://www.costco.com/*", "https://discord.com/channels/*"] }, (tabs) => {
     for (const tab of tabs) {
       chrome.tabs.sendMessage(tab.id, { type: "POLL_QUEUE" }).catch(() => {});
     }
@@ -56,8 +60,15 @@ function autoOpenTargets() {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "OPEN_DASHBOARD") {
+    chrome.tabs.create({ url: chrome.runtime.getURL("dashboard/dashboard.html") });
+    sendResponse({ ok: true });
+    return;
+  }
+
   if (msg.type === "QUEUE_STATUS") {
     appendLog(msg.site, msg.status, msg.detail);
+    updateMonitorStatus(msg.site);
 
     if (msg.status === "through") {
       notify(`${msg.site}: You're through the queue!`, msg.detail || "Go go go!");
@@ -69,13 +80,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       notify(`${msg.site}: Added to cart!`, msg.detail || "Item added — go checkout!");
     } else if (msg.status === "atc-failed") {
       notify(`${msg.site}: Add-to-cart failed`, msg.detail || "Could not find ATC button");
+    } else if (msg.status === "discord-intel") {
+      notify("Discord Intel", msg.detail || "Drop alert from Discord");
+    } else if (msg.status === "new-listing") {
+      notify("New Listing", msg.detail || "New product detected");
     }
     sendResponse({ ok: true });
   }
 
   if (msg.type === "GET_CONFIG") {
     chrome.storage.local.get(
-      ["enabled", "sites", "autoJoin", "autoAddToCart", "soundAlerts", "notifications", "targetUrls"],
+      ["enabled", "sites", "autoJoin", "autoAddToCart", "soundAlerts", "notifications", "targetUrls", "discordChannels", "discordKeywords"],
       (data) => sendResponse(data),
     );
     return true;
@@ -126,6 +141,24 @@ function notify(title, body) {
       priority: 2,
       requireInteraction: true,
     });
+  });
+}
+
+const SITE_NAME_TO_ID = {
+  "Pokémon Center": "pokemon-center",
+  "Pokemon Center": "pokemon-center",
+  "PC Japan": "pokemon-center-jp",
+  "Walmart": "walmart",
+  "Costco": "costco",
+  "discord": "discord",
+};
+
+function updateMonitorStatus(site) {
+  const id = SITE_NAME_TO_ID[site] || site.toLowerCase().replace(/\s+/g, "-");
+  chrome.storage.local.get(["monitorStatus"], (data) => {
+    const status = data.monitorStatus || {};
+    status[id] = { lastSeen: new Date().toISOString(), active: true };
+    chrome.storage.local.set({ monitorStatus: status });
   });
 }
 

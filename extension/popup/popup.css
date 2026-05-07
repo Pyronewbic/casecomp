@@ -175,3 +175,55 @@ input[type="checkbox"] {
 .log-status-atc-success { color: #4caf50; font-weight: 700; }
 .log-status-atc-failed { color: #ff9800; }
 .log-status-target-opened { color: #2196f3; }
+.log-status-discord-intel { color: #bb86fc; }
+.log-status-new-listing { color: #ffd700; font-weight: 700; }
+
+.btn-dashboard {
+  background: #2a2a3e;
+  border: 1px solid #3a3a50;
+  color: #7c5cfc;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+.btn-dashboard:hover { background: #3a3a50; }
+.header-actions { display: flex; align-items: center; }
+
+.popup-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+.popup-tab {
+  flex: 1;
+  background: #2a2a3e;
+  border: 1px solid #3a3a50;
+  color: #888;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.popup-tab:hover { color: #ccc; border-color: #555; }
+.popup-tab.active { background: #7c5cfc; color: #fff; border-color: #7c5cfc; }
+.popup-tab-content { display: none; }
+.popup-tab-content.active { display: block; }
+
+.log-count { opacity: 0.7; font-size: 9px; margin-left: 2px; }
+
+.site-status {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: auto;
+  text-transform: uppercase;
+}
+.site-status-waiting { background: #3a3a10; color: #ffeb3b; }
+.site-status-detected { background: #102a3a; color: #2196f3; }
+.site-status-through { background: #1b3a1b; color: #4caf50; }
+.site-status-joined { background: #3a2a10; color: #ff9800; }
+.site-status-captcha { background: #3a1010; color: #ff5555; }
+.site-status-atc-success { background: #1b3a1b; color: #4caf50; }
+.site-status-atc-failed { background: #3a2a10; color: #ff9800; }
+.site-status-discord-intel { background: #2a1a3a; color: #bb86fc; }
+.site-status-new-listing { background: #3a3010; color: #ffd700; }

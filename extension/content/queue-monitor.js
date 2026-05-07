@@ -19,9 +19,34 @@
     });
   }
 
-  function playChime() {
+  let audioCtx = null;
+  let userGestured = false;
+
+  function onUserGesture() {
+    if (userGestured) return;
+    userGestured = true;
+    if (!audioCtx) audioCtx = new AudioContext();
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+    document.removeEventListener("click", onUserGesture, true);
+    document.removeEventListener("keydown", onUserGesture, true);
+  }
+  document.addEventListener("click", onUserGesture, true);
+  document.addEventListener("keydown", onUserGesture, true);
+
+  async function getReadyCtx() {
+    if (!userGestured) return null;
+    if (!audioCtx) audioCtx = new AudioContext();
+    if (audioCtx.state === "suspended") {
+      try { await audioCtx.resume(); } catch { return null; }
+    }
+    if (audioCtx.state !== "running") return null;
+    return audioCtx;
+  }
+
+  async function playChime() {
     try {
-      const ctx = new AudioContext();
+      const ctx = await getReadyCtx();
+      if (!ctx) return;
       const notes = [523.25, 659.25, 783.99, 1046.50];
       notes.forEach((freq, i) => {
         const osc = ctx.createOscillator();
@@ -37,9 +62,10 @@
     } catch {}
   }
 
-  function playUrgentChime() {
+  async function playUrgentChime() {
     try {
-      const ctx = new AudioContext();
+      const ctx = await getReadyCtx();
+      if (!ctx) return;
       for (let rep = 0; rep < 3; rep++) {
         const offset = rep * 0.6;
         [880, 1108.73, 880].forEach((freq, i) => {
@@ -57,6 +83,19 @@
     } catch {}
   }
 
+  let lastUrl = window.location.href;
+  let urlChangedAt = 0;
+
+  function checkUrlChange() {
+    const current = window.location.href;
+    if (current !== lastUrl) {
+      lastUrl = current;
+      lastStatus = null;
+      chimePlayedForThrough = false;
+      urlChangedAt = Date.now();
+    }
+  }
+
   function isTargetUrl(config) {
     const targets = config.targetUrls || [];
     if (!targets.length) return true;
@@ -65,6 +104,7 @@
   }
 
   async function tick() {
+    checkUrlChange();
     let config;
     try {
       config = await chrome.runtime.sendMessage({ type: "GET_CONFIG" });
@@ -90,13 +130,13 @@
           playChime();
         }
 
-        if (config.autoAddToCart && SITE_HANDLER.addToCart) {
+        if (config.autoAddToCart && SITE_HANDLER.addToCart && lastStatus !== "atc-success") {
+          const sincNav = Date.now() - urlChangedAt;
+          if (urlChangedAt && sincNav < 2000) return;
           const atcOk = SITE_HANDLER.addToCart();
           if (atcOk) {
             report("atc-success", "Auto-added to cart!");
             if (config.soundAlerts) playChime();
-          } else {
-            report("atc-failed", "ATC button not found or not ready");
           }
         }
       }

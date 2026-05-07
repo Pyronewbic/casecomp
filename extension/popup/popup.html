@@ -7,45 +7,58 @@
 <body>
   <div class="header">
     <h1>Queue Auto-Join</h1>
-    <label class="toggle">
-      <input type="checkbox" id="enabled">
-      <span class="slider"></span>
-    </label>
+    <div class="header-actions">
+      <button id="open-dashboard" class="btn-dashboard">Dashboard</button>
+      <label class="toggle">
+        <input type="checkbox" id="enabled">
+        <span class="slider"></span>
+      </label>
+    </div>
   </div>
 
-  <section>
-    <h2>Sites</h2>
-    <label><input type="checkbox" id="site-pokemon-center"> Pokemon Center (US)</label>
-    <label><input type="checkbox" id="site-pokemon-center-jp"> Pokemon Center (JP)</label>
-    <label><input type="checkbox" id="site-walmart"> Walmart</label>
-    <label><input type="checkbox" id="site-costco"> Costco</label>
-  </section>
+  <div class="popup-tabs">
+    <button class="popup-tab active" data-tab="main">Monitor</button>
+    <button class="popup-tab" data-tab="settings">Settings</button>
+  </div>
 
-  <section>
-    <h2>Options</h2>
-    <label><input type="checkbox" id="auto-join"> Auto-join queues</label>
-    <label><input type="checkbox" id="auto-atc"> Auto add-to-cart after queue</label>
-    <label><input type="checkbox" id="sound-alerts"> Sound alerts</label>
-    <label><input type="checkbox" id="notifications"> Desktop notifications</label>
-  </section>
+  <div id="tab-main" class="popup-tab-content active">
+    <section>
+      <h2>Sites</h2>
+      <label><input type="checkbox" id="site-pokemon-center"> Pokemon Center (US) <span id="status-pokemon-center" class="site-status" style="display:none"></span></label>
+      <label><input type="checkbox" id="site-pokemon-center-jp"> Pokemon Center (JP) <span id="status-pokemon-center-jp" class="site-status" style="display:none"></span></label>
+      <label><input type="checkbox" id="site-walmart"> Walmart <span id="status-walmart" class="site-status" style="display:none"></span></label>
+      <label><input type="checkbox" id="site-costco"> Costco <span id="status-costco" class="site-status" style="display:none"></span></label>
+      <label><input type="checkbox" id="site-discord"> Discord <span id="status-discord" class="site-status" style="display:none"></span></label>
+    </section>
 
-  <section>
-    <h2>Target URLs</h2>
-    <p class="hint">Paste product URLs to monitor. The extension will open and watch these pages.</p>
-    <div class="url-input-row">
-      <input type="text" id="url-input" placeholder="https://www.pokemoncenter.com/product/...">
-      <button id="url-add">+</button>
-    </div>
-    <div id="url-list"></div>
-  </section>
+    <section>
+      <h2>Activity</h2>
+      <div class="log-controls">
+        <button id="log-clear" class="btn-small">Clear</button>
+      </div>
+      <div id="log"></div>
+    </section>
+  </div>
 
-  <section>
-    <h2>Activity</h2>
-    <div class="log-controls">
-      <button id="log-clear" class="btn-small">Clear</button>
-    </div>
-    <div id="log"></div>
-  </section>
+  <div id="tab-settings" class="popup-tab-content">
+    <section>
+      <h2>Options</h2>
+      <label><input type="checkbox" id="auto-join"> Auto-join queues</label>
+      <label><input type="checkbox" id="auto-atc"> Auto add-to-cart after queue</label>
+      <label><input type="checkbox" id="sound-alerts"> Sound alerts</label>
+      <label><input type="checkbox" id="notifications"> Desktop notifications</label>
+    </section>
+
+    <section>
+      <h2>Target URLs</h2>
+      <p class="hint">Paste product URLs to monitor. The extension will open and watch these pages.</p>
+      <div class="url-input-row">
+        <input type="text" id="url-input" placeholder="https://www.pokemoncenter.com/product/...">
+        <button id="url-add">+</button>
+      </div>
+      <div id="url-list"></div>
+    </section>
+  </div>
 
   <script src="popup.js"></script>
 </body>
