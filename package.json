@@ -10,7 +10,8 @@
     "start": "node index.js",
     "psa": "node psa-report.js",
     "scan": "node scan.js",
-    "playwright-install": "playwright install chromium"
+    "playwright-install": "playwright install chromium",
+    "test": "sh test.sh"
   },
   "dependencies": {
     "axios": "^1.7.9",
