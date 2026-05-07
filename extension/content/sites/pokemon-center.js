@@ -1,4 +1,5 @@
 (() => {
+  console.log("[csb] pokemon-center.js loaded, frame:", window === window.top ? "main" : "iframe");
   // Pokemon Center uses Imperva/Incapsula waiting room.
   // Queue manifests as an iframe with src containing /_Incapsula_Resource.
   // Wait time lives in #ttw inside the iframe (format HH:MM:SS).
