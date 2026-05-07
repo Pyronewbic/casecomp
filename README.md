@@ -260,29 +260,30 @@ The `--condition` flag maps to SNKRDUNK's seller condition grades: **A** (Mint),
 
 ---
 
-## Chrome extension — Queue Auto-Join + Dashboard
+## Chrome Extension — Queue Auto-Join + Drop Intelligence
 
-The `extension/` directory contains a Chrome extension that auto-joins product drop queues on **Pokemon Center** (US + JP), **Walmart**, and **Costco**, monitors Discord channels for restock alerts, and detects new product listings. It uses your real browser session — no bots or spoofed requests.
-
-<!-- Replace extension-demo.gif with a screen recording of the popup + dashboard in action -->
-![Extension demo](extension-demo.gif)
+The `extension/` directory contains a Chrome extension for monitoring Pokemon TCG product drops. Paste a product URL, and it auto-opens the page, detects queue activation, joins automatically, and notifies you on status changes. Uses your real browser session — no bots or spoofed requests.
 
 ### Features
 
-- **Dashboard** — full-tab view with Workers (queue events) and News Monitor (Discord intel + new listings) tabs, collapsible per-site sections, grouped duplicate entries with count + time range
-- **Auto add-to-cart** — after passing through a queue, automatically clicks ATC on the product page (handles SPA navigation + React hydration)
-- **Discord monitoring** — watches configured channels for drop keywords, reports to dashboard feed
-- **Product listing monitor** — scans Pokemon Center category pages every 10s for new/restocked items
-- **Live ETA** — estimated wait time shown in popup badge and dashboard
-- **Popup** — Monitor tab (sites with status badges + activity log) and Settings tab (options + target URLs)
+- **Target-URL driven** — paste a product URL, the extension arms that site automatically. No manual site toggles.
+- **Queue detection** — Incapsula (Pokemon Center), Queue-it (Walmart), PerimeterX captcha detection
+- **Auto add-to-cart** — after queue clearance, clicks ATC on the product page
+- **News Monitor** — aggregates intel from three sources:
+  - **Discord** — watches configured channels for keyword matches
+  - **X.com** — scans tweets on your feed for PTCG keywords
+  - **Reddit** — polls `r/PKMNTCGDeals` and `r/PokemonTCG` every 3 minutes
+- **Dashboard** — full-page view with tabbed layout:
+  - Workers (live queue feed with KPIs), Targets (add/remove/pause URLs), News Monitor (intel cards with clickable links), History (archived entries), Logs (raw table)
+- **Product listing monitor** — scans Pokemon Center pages for new/restocked items
 
 ### Install
 
 1. Open `chrome://extensions` and enable **Developer mode**
-2. Click **Load unpacked** and select the `extension/` folder
-3. Pin the extension icon to your toolbar
-4. Click **Dashboard** in the popup to open the full monitoring view
-5. Configure Discord channels and keywords in the dashboard sidebar
+2. Click **Load unpacked** → `Cmd+Shift+G` → select the `extension/` folder
+3. Click the extension icon → paste a product URL → it's armed
+4. Click **Dashboard** for the full monitoring view
+5. Go to **News Monitor** tab to configure Discord channels, Reddit subs, and keywords
 
 ```mermaid
 flowchart TD
@@ -292,19 +293,22 @@ flowchart TD
   C -->|Walmart| E[Queue-it detection]
   C -->|Costco| F[Incapsula/virtual room]
   C -->|Discord| DC[MutationObserver on chat]
+  C -->|X.com| XC[Tweet scanning via data-testid]
   C -->|PC listings| PL[Scan product grid every 10s]
   D --> G{Status?}
   E --> G
   F --> G
   G -->|CAPTCHA| H[Urgent chime — manual solve]
-  G -->|Through| I[Auto-ATC if enabled\nfull pointer/mouse events\n2s delay for React hydration]
+  G -->|Through| I[Auto-ATC if enabled]
   G -->|In queue| J{autoJoin?}
   G -->|Waiting| K[Report position + ETA]
   J -->|yes| L[Click join button]
   J -->|no| K
   L --> K
   DC -->|Keyword match| N
+  XC -->|Keyword match| N
   PL -->|New product| N
+  R[Reddit poller · 3min] -->|Keyword match| N
   H --> N[Dashboard + popup + notification]
   I --> N
   K --> N
