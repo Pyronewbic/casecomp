@@ -307,6 +307,21 @@ node scan.js --source pokemon-center --limit 5
 
 ---
 
+## Terms of Use
+
+**This project is provided for personal, non-commercial use only.**
+
+You may **not** use this software, or any part of it, to:
+
+- Operate a commercial reselling, scalping, or bulk-purchasing service
+- Offer paid "cook groups", bots-as-a-service, or queue-bypass tools built on this code
+- Resell, sublicense, or redistribute this software (modified or unmodified) for profit
+- Run automated purchasing at scale across multiple accounts or sessions
+
+This tool is intended as a **personal research and collection aid** — one user, one session, one cart. If you use it to gain an unfair commercial advantage or at a scale that harms other buyers' access to products, you are misusing it.
+
+The author does not condone or support the use of this project for commercial scalping or any activity that violates retailer terms of service. **Use at your own risk.** The author assumes no liability for account bans, order cancellations, or other consequences arising from use of this software.
+
 ## Disclaimer
 
 AI "grades" are **rough estimates from photos**, not official PSA/CGC/etc. grades. Use them only as a screening hint. Respect eBay's [API terms](https://developer.ebay.com/join/api-license-agreement) and rate limits.
