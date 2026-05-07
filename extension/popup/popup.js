@@ -213,6 +213,15 @@ function escapeAttr(s) {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+document.querySelectorAll(".popup-tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".popup-tab").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".popup-tab-content").forEach((c) => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
 document.querySelectorAll("input[type='checkbox']").forEach((el) => el.addEventListener("change", save));
 
 $("#open-dashboard").addEventListener("click", () => {
