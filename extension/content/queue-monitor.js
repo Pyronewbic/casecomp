@@ -19,9 +19,17 @@
     });
   }
 
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new AudioContext();
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+    return audioCtx;
+  }
+
   function playChime() {
     try {
-      const ctx = new AudioContext();
+      const ctx = getAudioCtx();
       const notes = [523.25, 659.25, 783.99, 1046.50];
       notes.forEach((freq, i) => {
         const osc = ctx.createOscillator();
@@ -39,7 +47,7 @@
 
   function playUrgentChime() {
     try {
-      const ctx = new AudioContext();
+      const ctx = getAudioCtx();
       for (let rep = 0; rep < 3; rep++) {
         const offset = rep * 0.6;
         [880, 1108.73, 880].forEach((freq, i) => {
