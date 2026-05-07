@@ -312,6 +312,57 @@ flowchart TD
 
 ---
 
+## REST API (`yarn api`)
+
+Run `node api.js` or `yarn api` to start the API on port 3000. Swagger docs at [localhost:3000/docs](http://localhost:3000/docs).
+
+```bash
+yarn api   # starts on :3000
+```
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/search?q=Umbreon+ex&source=snkrdunk&condition=A` | Search card listings |
+| `GET` | `/api/sold?q=Umbreon+ex&source=ebay` | Recent sold comps |
+| `GET` | `/api/psa?q=Umbreon+ex` | PSA population signal |
+| `POST` | `/api/grade` | AI pre-grade from image URL(s) |
+| `GET` | `/api/grades?q=Mega+Greninja&limit=100` | Export stored grades (training data) |
+| `GET` | `/api/health` | Health check + Redis status |
+
+### Search params
+
+`q` (required), `source` (ebay/snkrdunk/magi/yahoo), `format` (raw/slab), `countries` (US,IN), `lang` (eng/jp/any), `results`, `sold`, `slab_provider`, `slab_grade`, `condition` (A-D), `grade` (true = AI pre-grade)
+
+### AI grading for training data
+
+```bash
+# Grade a single image
+curl -X POST localhost:3000/api/grade \
+  -H "Content-Type: application/json" \
+  -d '{"imageUrl":"https://cdn.snkrdunk.com/...","cardName":"Mega Greninja ex SAR"}'
+
+# Export all stored grades
+curl "localhost:3000/api/grades?limit=500"
+```
+
+Grade results are stored permanently in Redis for future model training. Each record includes card name, source, listing ID, price, condition, provider, model, and the full grade breakdown.
+
+### Redis caching
+
+Optional — falls back to file-based cache if Redis is unavailable. Set `REDIS_URL` in `.env` to enable.
+
+| Cache | TTL |
+|-------|-----|
+| eBay active listings | 6h |
+| eBay sold listings | 24h |
+| AI grades | 30d |
+| PSA population | 24h |
+| Grade training log | permanent |
+
+---
+
 ## Event & release scanner (`npm run scan`)
 
 The scanner checks upcoming Pokemon TCG events and product releases. It's available as a CLI command or the `/scan` slash command in Claude Code.
