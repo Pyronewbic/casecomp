@@ -19,6 +19,9 @@ const DEFAULT_CONFIG = {
   discordKeywords: [],
   monitorStatus: {},
   pcListings: {},
+  redditSeen: [],
+  redditSubs: ["PKMNTCGDeals", "PokemonTCG"],
+  logArchive: [],
 };
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -26,9 +29,14 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.set({ ...DEFAULT_CONFIG, ...existing });
   });
   chrome.alarms.create(ALARM_NAME, { periodInMinutes: POLL_INTERVAL_MINUTES });
+  chrome.alarms.create("csb-reddit-poll", { periodInMinutes: 3 });
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "csb-reddit-poll") {
+    pollReddit();
+    return;
+  }
   if (alarm.name !== ALARM_NAME) return;
   chrome.tabs.query({ url: ["https://*.queue-it.net/*", "https://www.pokemoncenter.com/*", "https://www.pokemoncenter-online.com/*", "https://pokemoncenter.pokemon.co.jp/*", "https://www.walmart.com/*", "https://www.costco.com/*", "https://discord.com/channels/*"] }, (tabs) => {
     for (const tab of tabs) {
@@ -67,7 +75,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "QUEUE_STATUS") {
-    appendLog(msg.site, msg.status, msg.detail);
+    const tabUrl = sender.tab?.url || "";
+    const tabId = sender.tab?.id || null;
+    appendLog(msg.site, msg.status, msg.detail, tabId, tabUrl);
     updateMonitorStatus(msg.site);
 
     if (msg.status === "through") {
@@ -90,7 +100,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "GET_CONFIG") {
     chrome.storage.local.get(
-      ["enabled", "sites", "autoJoin", "autoAddToCart", "soundAlerts", "notifications", "targetUrls", "discordChannels", "discordKeywords"],
+      ["enabled", "sites", "autoJoin", "autoAddToCart", "soundAlerts", "notifications", "targetUrls", "discordChannels", "discordKeywords", "redditSubs"],
       (data) => sendResponse(data),
     );
     return true;
@@ -110,9 +120,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "REMOVE_TARGET_URL") {
-    chrome.storage.local.get(["targetUrls"], (data) => {
+    chrome.storage.local.get(["targetUrls", "log", "logArchive"], (data) => {
       const urls = (data.targetUrls || []).filter((u) => u.url !== msg.url);
-      chrome.storage.local.set({ targetUrls: urls });
+      const removed = (data.targetUrls || []).find((u) => u.url === msg.url);
+      const label = removed?.label || "";
+      const keep = [];
+      const purged = [];
+      for (const e of (data.log || [])) {
+        let shouldPurge = false;
+        if (e.tabUrl === msg.url) shouldPurge = true;
+        if (e.site === "system" && e.detail) {
+          if (e.detail.includes(msg.url)) shouldPurge = true;
+          if (label && e.detail.includes(label)) shouldPurge = true;
+        }
+        if (shouldPurge) {
+          e.archivedAt = new Date().toISOString();
+          e.reason = `target removed: ${label || msg.url}`;
+          purged.push(e);
+        } else {
+          keep.push(e);
+        }
+      }
+      const archive = [...purged, ...(data.logArchive || [])].slice(0, 500);
+      chrome.storage.local.set({ targetUrls: urls, log: keep, logArchive: archive });
       sendResponse({ ok: true, urls });
     });
     return true;
@@ -162,15 +192,54 @@ function updateMonitorStatus(site) {
   });
 }
 
-function appendLog(site, status, detail) {
+async function pollReddit() {
+  const data = await new Promise((r) => chrome.storage.local.get(["enabled", "discordKeywords", "redditSeen", "redditSubs"], r));
+  if (data.enabled === false) return;
+  const keywords = data.discordKeywords || [];
+  const subs = data.redditSubs || ["PKMNTCGDeals", "PokemonTCG"];
+  const seen = new Set(data.redditSeen || []);
+  if (!subs.length) return;
+
+  for (const sub of subs) {
+    try {
+      const res = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=15`, {
+        headers: { "User-Agent": "Casecomp/0.4" },
+      });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const posts = json?.data?.children || [];
+
+      for (const post of posts) {
+        const d = post.data;
+        if (!d || seen.has(d.id)) continue;
+
+        const text = `${d.title} ${d.selftext || ""}`.toLowerCase();
+        const match = keywords.length === 0 || keywords.some((kw) => text.includes(kw.toLowerCase()));
+        if (!match) continue;
+
+        seen.add(d.id);
+        appendLog("Reddit", "discord-intel", `r/${sub}: ${d.title.slice(0, 200)}`);
+        notify(`Reddit · r/${sub}`, d.title.slice(0, 120));
+      }
+    } catch {}
+  }
+
+  const seenArr = [...seen].slice(-100);
+  chrome.storage.local.set({ redditSeen: seenArr });
+}
+
+function appendLog(site, status, detail, tabId, tabUrl) {
   chrome.storage.local.get(["log"], (data) => {
     const log = data.log || [];
-    log.unshift({
+    const entry = {
       ts: new Date().toISOString(),
       site,
       status,
       detail: detail || "",
-    });
+    };
+    if (tabId) entry.tabId = tabId;
+    if (tabUrl) entry.tabUrl = tabUrl;
+    log.unshift(entry);
     chrome.storage.local.set({ log: log.slice(0, 200) });
   });
 }
