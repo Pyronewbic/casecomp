@@ -93,7 +93,6 @@ function renderWorkerPanel(el, entries) {
         <span class="site-group-name">${esc(site)}</span>
         <span class="feed-badge ${badgeClass}">${esc(latest.status)}${countLabel}</span>
         ${etaHtml}
-        <span class="site-group-detail">${esc(latest.detail || "")}</span>
       </summary>
       <div class="site-group-entries">${rows}</div>
     </details>`;
