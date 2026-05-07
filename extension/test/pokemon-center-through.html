@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokemon Center — Product</title>
+  <style>
+    body { font-family: sans-serif; background: #fff; color: #333; margin: 0; padding: 40px; }
+    .product-details { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .price { font-size: 20px; font-weight: 700; color: #e3350d; margin-bottom: 16px; }
+    .desc { color: #666; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+    .img-placeholder {
+      width: 300px; height: 300px; background: #f0f0f0; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; color: #ccc;
+      font-size: 14px; margin-bottom: 24px;
+    }
+    button[data-testid="add-to-cart"] {
+      background: #e3350d; color: #fff; border: none; border-radius: 6px;
+      padding: 14px 40px; font-size: 16px; cursor: pointer;
+    }
+    button[data-testid="add-to-cart"]:hover { background: #c02a0a; }
+    .success { display: none; background: #4caf50; color: #fff; padding: 12px 20px; border-radius: 6px; margin-top: 16px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="product-details">
+    <div class="img-placeholder">[Product Image]</div>
+    <h1>Charizard ex Ultra Premium Collection</h1>
+    <div class="price">$119.99</div>
+    <p class="desc">The Pokemon TCG: Charizard ex Ultra Premium Collection includes 16 Pokemon TCG booster packs, a full-art promo card, and more.</p>
+    <button data-testid="add-to-cart" id="atc-btn">Add to Cart</button>
+    <div class="success" id="success-msg">Added to cart! Proceed to checkout.</div>
+  </div>
+
+  <script>
+    document.getElementById("atc-btn").addEventListener("click", () => {
+      document.getElementById("atc-btn").disabled = true;
+      document.getElementById("atc-btn").textContent = "Added!";
+      document.getElementById("success-msg").style.display = "block";
+    });
+  </script>
+</body>
+</html>
