@@ -190,3 +190,23 @@ input[type="checkbox"] {
 }
 .btn-dashboard:hover { background: #3a3a50; }
 .header-actions { display: flex; align-items: center; }
+
+.log-count { opacity: 0.7; font-size: 9px; margin-left: 2px; }
+
+.site-status {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: auto;
+  text-transform: uppercase;
+}
+.site-status-waiting { background: #3a3a10; color: #ffeb3b; }
+.site-status-detected { background: #102a3a; color: #2196f3; }
+.site-status-through { background: #1b3a1b; color: #4caf50; }
+.site-status-joined { background: #3a2a10; color: #ff9800; }
+.site-status-captcha { background: #3a1010; color: #ff5555; }
+.site-status-atc-success { background: #1b3a1b; color: #4caf50; }
+.site-status-atc-failed { background: #3a2a10; color: #ff9800; }
+.site-status-discord-intel { background: #2a1a3a; color: #bb86fc; }
+.site-status-new-listing { background: #3a3010; color: #ffd700; }
