@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy these entries into the main manifest.json to enable local testing on localhost:3099",
+  "host_permissions_append": "http://localhost:3099/*",
+  "content_scripts_append": {
+    "matches": ["http://localhost:3099/*"],
+    "js": ["content/sites/pokemon-center.js", "content/queue-monitor.js"],
+    "run_at": "document_idle"
+  }
+}
