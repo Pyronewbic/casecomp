@@ -593,8 +593,8 @@ body.engine-off .feed-kpis {
 
 .empty-sub {
   font-family: var(--font-body);
-  font-size: 13px;
-  color: var(--paper-dd);
+  font-size: 14px;
+  color: var(--paper-d);
   max-width: 360px;
   line-height: 1.5;
   margin-bottom: 20px;
@@ -661,8 +661,8 @@ body.engine-off .feed-kpis {
   gap: 10px;
   text-align: left;
   max-width: 200px;
-  font-size: 12px;
-  color: var(--paper-d);
+  font-size: 13px;
+  color: var(--paper);
   line-height: 1.4;
 }
 
@@ -694,11 +694,11 @@ body.engine-off .feed-kpis {
   gap: 8px;
   padding: 8px 14px;
   background: var(--ink-1);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   border-radius: 8px;
   font-family: var(--font-body);
-  font-size: 12px;
-  color: var(--paper-d);
+  font-size: 13px;
+  color: var(--paper);
   transition: border-color .15s;
 }
 .site-chip:hover { border-color: var(--line-2); }
@@ -726,28 +726,29 @@ body.engine-off .feed-kpis {
 .ticker-item:hover { border-color: var(--line-2); }
 .ticker-src {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: .12em;
   text-transform: uppercase;
-  padding: 2px 6px;
+  padding: 3px 8px;
   border-radius: 3px;
   background: var(--ink-3);
-  color: var(--paper-d);
+  color: var(--paper);
   border: 1px solid var(--line-2);
   flex-shrink: 0;
 }
 .ticker-text {
   flex: 1;
   color: var(--paper);
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .ticker-time {
   font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--paper-dd);
+  font-size: 10px;
+  color: var(--paper-d);
   flex-shrink: 0;
 }
 
