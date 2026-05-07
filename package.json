@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node index.js",
     "psa": "node psa-report.js",
+    "scan": "node scan.js",
     "playwright-install": "playwright install chromium"
   },
   "dependencies": {

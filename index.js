@@ -27,6 +27,7 @@ import { buildEbaySearchQuery, describeListingSearch } from "./lib/listingQuery.
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
 import { searchMagi } from "./lib/magi.js";
 import { searchYahooAuctions } from "./lib/yahooauctions.js";
+import { searchSnkrdunk } from "./lib/snkrdunk.js";
 import { getPsaGradingSignal } from "./lib/psa.js";
 
 export const CARDS = [
@@ -352,6 +353,8 @@ export async function main() {
     log("Source: magi.camp (skipping eBay auth)");
   } else if (config.source === "yahoo") {
     log("Source: Yahoo Auctions JP (skipping eBay auth)");
+  } else if (config.source === "snkrdunk") {
+    log("Source: SNKRDUNK (skipping eBay auth)");
   } else if (!noEbay) {
     try {
       await testEbayAuth(clientId, clientSecret);
@@ -398,6 +401,10 @@ export async function main() {
     if (cfg.source === "yahoo") {
       log(`[${idx + 1}/${total}] "${card}" (yahoo auctions, lang=jp)`);
       return searchYahooAuctions(card, cfg, { log });
+    }
+    if (cfg.source === "snkrdunk") {
+      log(`[${idx + 1}/${total}] "${card}" (snkrdunk)`);
+      return searchSnkrdunk(card, cfg, { log });
     }
 
     const ebayQuery = buildEbaySearchQuery(card, cfg);
