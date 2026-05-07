@@ -144,10 +144,20 @@ function notify(title, body) {
   });
 }
 
+const SITE_NAME_TO_ID = {
+  "Pokémon Center": "pokemon-center",
+  "Pokemon Center": "pokemon-center",
+  "PC Japan": "pokemon-center-jp",
+  "Walmart": "walmart",
+  "Costco": "costco",
+  "discord": "discord",
+};
+
 function updateMonitorStatus(site) {
+  const id = SITE_NAME_TO_ID[site] || site.toLowerCase().replace(/\s+/g, "-");
   chrome.storage.local.get(["monitorStatus"], (data) => {
     const status = data.monitorStatus || {};
-    status[site] = { lastSeen: new Date().toISOString(), active: true };
+    status[id] = { lastSeen: new Date().toISOString(), active: true };
     chrome.storage.local.set({ monitorStatus: status });
   });
 }
