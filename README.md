@@ -260,36 +260,49 @@ The `--condition` flag maps to SNKRDUNK's seller condition grades: **A** (Mint),
 
 ---
 
-## Chrome extension — Queue Auto-Join
+## Chrome extension — Queue Auto-Join + Dashboard
 
-The `extension/` directory contains a Chrome extension that auto-joins product drop queues on **Pokemon Center** (US + JP), **Walmart**, and **Costco**. It monitors queue pages and automatically enters when the queue opens, using your real browser session (no bots or spoofed requests).
+The `extension/` directory contains a Chrome extension that auto-joins product drop queues on **Pokemon Center** (US + JP), **Walmart**, and **Costco**, monitors Discord channels for restock alerts, and detects new product listings. It uses your real browser session — no bots or spoofed requests.
+
+### Features
+
+- **Dashboard** — full-tab view with Workers (queue events) and News Monitor (Discord intel + new listings) tabs, collapsible per-site sections, grouped duplicate entries with count + time range
+- **Auto add-to-cart** — after passing through a queue, automatically clicks ATC on the product page (handles SPA navigation + React hydration)
+- **Discord monitoring** — watches configured channels for drop keywords, reports to dashboard feed
+- **Product listing monitor** — scans Pokemon Center category pages every 10s for new/restocked items
+- **Live ETA** — estimated wait time shown in popup badge and dashboard
+- **Popup** — Monitor tab (sites with status badges + activity log) and Settings tab (options + target URLs)
 
 ### Install
 
 1. Open `chrome://extensions` and enable **Developer mode**
 2. Click **Load unpacked** and select the `extension/` folder
 3. Pin the extension icon to your toolbar
-
-The popup shows which sites are enabled and queue status. The extension runs entirely locally — no external servers or data collection.
+4. Click **Dashboard** in the popup to open the full monitoring view
+5. Configure Discord channels and keywords in the dashboard sidebar
 
 ```mermaid
 flowchart TD
-  A[Alarm fires every 30s] --> B[Poll all open tabs matching site URLs]
-  B --> C{Site handler detect}
-  C -->|Pokemon Center US/JP| D[Incapsula iframe poll\n+ lottery button check]
-  C -->|Walmart| E[Queue-it params\n+ hold-my-spot button]
-  C -->|Costco| F[Incapsula poll\n+ virtual waiting room]
+  A[Alarm fires every 30s] --> B[Poll all open tabs]
+  B --> C{Site handler}
+  C -->|Pokemon Center| D[Incapsula iframe poll]
+  C -->|Walmart| E[Queue-it detection]
+  C -->|Costco| F[Incapsula/virtual room]
+  C -->|Discord| DC[MutationObserver on chat]
+  C -->|PC listings| PL[Scan product grid every 10s]
   D --> G{Status?}
   E --> G
   F --> G
-  G -->|CAPTCHA| H[Urgent chime\nUser must solve manually]
-  G -->|Through| I[Success chime\n+ auto-add-to-cart if enabled]
-  G -->|In queue + joinable| J{autoJoin enabled?}
-  G -->|In queue + waiting| K[Report position]
-  J -->|yes| L[Click join/hold button]
+  G -->|CAPTCHA| H[Urgent chime — manual solve]
+  G -->|Through| I[Auto-ATC if enabled\nfull pointer/mouse events\n2s delay for React hydration]
+  G -->|In queue| J{autoJoin?}
+  G -->|Waiting| K[Report position + ETA]
+  J -->|yes| L[Click join button]
   J -->|no| K
   L --> K
-  H --> N[OS notification + activity log]
+  DC -->|Keyword match| N
+  PL -->|New product| N
+  H --> N[Dashboard + popup + notification]
   I --> N
   K --> N
 ```
