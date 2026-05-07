@@ -308,10 +308,15 @@ $("#url-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addU
 
 // Clear log
 $("#log-clear").addEventListener("click", () => {
-  chrome.storage.local.set({ log: [] });
-  logData = [];
-  renderLog();
-  renderStats();
+  chrome.storage.local.get(["logArchive"], (data) => {
+    const cleared = logData.map((e) => ({ ...e, archivedAt: new Date().toISOString(), reason: "manual clear" }));
+    const archive = [...cleared, ...(data.logArchive || [])].slice(0, 500);
+    chrome.storage.local.set({ log: [], logArchive: archive });
+    logData = [];
+    renderLog();
+    renderStats();
+    renderTargets();
+  });
 });
 
 load();

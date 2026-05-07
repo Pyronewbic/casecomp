@@ -24,12 +24,12 @@
             </linearGradient>
           </defs>
           <rect x="21" y="26.5" width="50" height="67" rx="4" ry="4"
-                fill="#14151c" stroke="url(#holo)" stroke-width="1.6"
+                fill="#14151c" stroke="#d9b676" stroke-width="1.6"
                 transform="rotate(-7.5,46,60)"/>
           <rect x="57" y="34.5" width="50" height="67" rx="4" ry="4"
-                fill="#1c1e27" stroke="url(#foil)" stroke-width="2.4"
+                fill="#1c1e27" stroke="#d9b676" stroke-width="2.4"
                 transform="rotate(7.5,82,68)"/>
-          <polyline fill="none" stroke="url(#foil)" stroke-width="4"
+          <polyline fill="none" stroke="#d9b676" stroke-width="4"
             stroke-linecap="round" stroke-linejoin="round"
             points="16,64 40,64 48,44 56,80 64,50 72,64 112,64"/>
         </svg>
@@ -112,7 +112,14 @@
         </div>
         <div id="news-feed"></div>
       </div>
-      <div id="feed-history" class="feed-panel"></div>
+      <div id="feed-history" class="feed-panel">
+        <div class="section-head">
+          <h2>Archived Entries</h2>
+          <span class="rule"></span>
+          <button class="meta-btn" id="clear-history">CLEAR HISTORY</button>
+        </div>
+        <div id="history-content"></div>
+      </div>
       <div id="feed-targets" class="feed-panel">
         <div class="section-head">
           <h2>Target URLs</h2>
