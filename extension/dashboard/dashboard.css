@@ -159,6 +159,12 @@ main {
 details[open] > .site-group-header::before { transform: rotate(90deg); }
 
 .site-group-name { font-weight: 700; color: #e0e0e0; font-size: 13px; }
+.site-group-eta {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffeb3b;
+  font-variant-numeric: tabular-nums;
+}
 .site-group-detail { color: #888; font-size: 12px; flex: 1; }
 
 .site-group-entries { padding: 0 8px 8px; }
@@ -195,6 +201,7 @@ details[open] > .site-group-header::before { transform: rotate(90deg); }
 .monitor-status { font-size: 10px; }
 .monitor-active { color: #4caf50; }
 .monitor-idle { color: #555; }
+.monitor-eta { color: #ffeb3b; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .tag {
   display: inline-flex;

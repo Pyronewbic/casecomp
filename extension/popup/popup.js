@@ -55,22 +55,32 @@ function save() {
   });
 }
 
-function getLatestStatus(siteId) {
+function getLatestStatusInfo(siteId) {
   for (const e of logData) {
     const id = SITE_NAME_TO_ID[e.site] || e.site.toLowerCase().replace(/\s+/g, "-");
-    if (id === siteId && e.status !== "target-opened") return e.status;
+    if (id === siteId && e.status !== "target-opened") {
+      const eta = extractEta(e.detail);
+      return { status: e.status, eta };
+    }
   }
   return null;
+}
+
+function extractEta(detail) {
+  if (!detail) return null;
+  const m = detail.match(/ETA:\s*(\d[\d:]+)/);
+  return m ? m[1] : null;
 }
 
 function renderSiteStatuses() {
   for (const id of SITE_IDS) {
     const badge = $(`#status-${id}`);
     if (!badge) continue;
-    const status = getLatestStatus(id);
-    if (status) {
-      badge.textContent = status;
-      badge.className = "site-status site-status-" + status.replace(/\s+/g, "-");
+    const info = getLatestStatusInfo(id);
+    if (info) {
+      const etaLabel = info.eta ? ` · ${info.eta}` : "";
+      badge.textContent = info.status + etaLabel;
+      badge.className = "site-status site-status-" + info.status.replace(/\s+/g, "-");
       badge.style.display = "";
     } else {
       badge.style.display = "none";
