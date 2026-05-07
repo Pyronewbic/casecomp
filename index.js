@@ -184,6 +184,9 @@ function applyArgvToConfig(cfg) {
   if (argv.source) {
     c.source = String(argv.source).toLowerCase().trim();
   }
+  if (argv.condition) {
+    c.condition = String(argv.condition).trim().toUpperCase();
+  }
   return c;
 }
 
