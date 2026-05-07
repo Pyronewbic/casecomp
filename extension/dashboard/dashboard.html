@@ -20,18 +20,15 @@
   </header>
 
   <main>
-    <section class="feed-panel">
-      <div class="feed-toolbar">
-        <div class="filter-buttons">
-          <button class="filter-btn active" data-filter="all">All</button>
-          <button class="filter-btn" data-filter="discord">Discord</button>
-          <button class="filter-btn" data-filter="sites">Sites</button>
-          <button class="filter-btn" data-filter="listings">Listings</button>
-        </div>
-        <input type="text" id="search" placeholder="Search feed...">
+    <div class="feed-panel">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="workers">Workers</button>
+        <button class="tab-btn" data-tab="news">News Monitor</button>
+        <input type="text" id="search" placeholder="Search...">
       </div>
-      <div id="feed"></div>
-    </section>
+      <div id="feed-workers" class="feed tab-content active"></div>
+      <div id="feed-news" class="feed tab-content"></div>
+    </div>
 
     <aside class="sidebar">
       <div class="sidebar-section">

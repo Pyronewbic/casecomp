@@ -16,33 +16,42 @@ const MONITORS = [
   { id: "discord", label: "Discord" },
 ];
 
-let currentFilter = "all";
+const WORKER_STATUSES = new Set([
+  "detected", "joined", "waiting", "through", "captcha",
+  "atc-success", "atc-failed", "target-opened",
+]);
+
+let currentTab = "workers";
 let currentSearch = "";
 let logData = [];
+
+function isWorkerEntry(e) {
+  return WORKER_STATUSES.has(e.status) || e.site === "system";
+}
 
 function load() {
   chrome.storage.local.get(STORAGE_KEYS, (data) => {
     $("#enabled").checked = data.enabled !== false;
     logData = data.log || [];
-    renderFeed();
+    renderFeeds();
     renderMonitors(data.sites || {}, data.monitorStatus || {});
     renderChannels(data.discordChannels || []);
     renderKeywords(data.discordKeywords || DEFAULT_KEYWORDS);
   });
 }
 
-function renderFeed() {
-  const el = $("#feed");
-  let entries = logData;
+function renderFeeds() {
+  renderFeedPanel(
+    $("#feed-workers"),
+    logData.filter((e) => isWorkerEntry(e)),
+  );
+  renderFeedPanel(
+    $("#feed-news"),
+    logData.filter((e) => !isWorkerEntry(e)),
+  );
+}
 
-  if (currentFilter === "discord") {
-    entries = entries.filter((e) => e.site === "discord");
-  } else if (currentFilter === "sites") {
-    entries = entries.filter((e) => e.site !== "discord" && e.status !== "new-listing" && e.site !== "system");
-  } else if (currentFilter === "listings") {
-    entries = entries.filter((e) => e.status === "new-listing");
-  }
-
+function renderFeedPanel(el, entries) {
   if (currentSearch) {
     const q = currentSearch.toLowerCase();
     entries = entries.filter((e) =>
@@ -57,14 +66,19 @@ function renderFeed() {
     return;
   }
 
+  const grouped = groupConsecutive(entries.slice(0, 200));
+
   el.scrollTop = 0;
-  el.innerHTML = entries.slice(0, 200).map((e) => {
-    const time = new Date(e.ts).toLocaleTimeString();
-    const badgeClass = "badge-" + e.status.replace(/\s+/g, "-");
+  el.innerHTML = grouped.map((g) => {
+    const badgeClass = "badge-" + g.status.replace(/\s+/g, "-");
+    const startTime = new Date(g.startTs).toLocaleTimeString();
+    const endTime = new Date(g.endTs).toLocaleTimeString();
+    const timeLabel = g.count > 1 ? `${endTime} – ${startTime}` : startTime;
+    const countLabel = g.count > 1 ? ` <span class="feed-count">x${g.count}</span>` : "";
     return `<div class="feed-entry">
-      <span class="feed-ts">${time}</span>
-      <span class="feed-badge ${badgeClass}">${esc(e.status)}</span>
-      <span class="feed-detail"><strong>${esc(e.site)}</strong> ${esc(e.detail || "")}</span>
+      <span class="feed-ts">${timeLabel}</span>
+      <span class="feed-badge ${badgeClass}">${esc(g.status)}${countLabel}</span>
+      <span class="feed-detail"><strong>${esc(g.site)}</strong> ${esc(g.detail || "")}</span>
     </div>`;
   }).join("");
 }
@@ -126,24 +140,39 @@ function renderKeywords(keywords) {
   });
 }
 
+function groupConsecutive(entries) {
+  const groups = [];
+  for (const e of entries) {
+    const last = groups[groups.length - 1];
+    if (last && last.site === e.site && last.status === e.status) {
+      last.count++;
+      last.startTs = e.ts;
+    } else {
+      groups.push({ site: e.site, status: e.status, detail: e.detail || "", endTs: e.ts, startTs: e.ts, count: 1 });
+    }
+  }
+  return groups;
+}
+
 function esc(s) {
   const d = document.createElement("div");
   d.textContent = s;
   return d.innerHTML;
 }
 
-$$(".filter-btn").forEach((btn) => {
+$$(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    $$(".filter-btn").forEach((b) => b.classList.remove("active"));
+    $$(".tab-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    currentFilter = btn.dataset.filter;
-    renderFeed();
+    currentTab = btn.dataset.tab;
+    $$(".tab-content").forEach((el) => el.classList.remove("active"));
+    $(`#feed-${currentTab}`).classList.add("active");
   });
 });
 
 $("#search").addEventListener("input", (e) => {
   currentSearch = e.target.value;
-  renderFeed();
+  renderFeeds();
 });
 
 $("#enabled").addEventListener("change", () => {
@@ -183,7 +212,7 @@ load();
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.log) {
     logData = changes.log.newValue || [];
-    renderFeed();
+    renderFeeds();
   }
   if (changes.monitorStatus || changes.sites) {
     chrome.storage.local.get(["sites", "monitorStatus"], (data) => {
