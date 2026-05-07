@@ -34,33 +34,71 @@ function load() {
     $("#enabled").checked = data.enabled !== false;
     logData = data.log || [];
     renderFeeds();
-    renderMonitors(data.sites || {}, data.monitorStatus || {});
+    renderMonitors(data.sites || {});
     renderChannels(data.discordChannels || []);
     renderKeywords(data.discordKeywords || DEFAULT_KEYWORDS);
   });
 }
 
 function renderFeeds() {
-  renderFeedPanel(
-    $("#feed-workers"),
-    logData.filter((e) => isWorkerEntry(e)),
-  );
-  renderFeedPanel(
-    $("#feed-news"),
-    logData.filter((e) => !isWorkerEntry(e)),
+  renderWorkerPanel($("#feed-workers"), logData.filter((e) => isWorkerEntry(e)));
+  renderFlatPanel($("#feed-news"), logData.filter((e) => !isWorkerEntry(e)));
+}
+
+function filterBySearch(entries) {
+  if (!currentSearch) return entries;
+  const q = currentSearch.toLowerCase();
+  return entries.filter((e) =>
+    (e.detail || "").toLowerCase().includes(q) ||
+    e.site.toLowerCase().includes(q) ||
+    e.status.toLowerCase().includes(q)
   );
 }
 
-function renderFeedPanel(el, entries) {
-  if (currentSearch) {
-    const q = currentSearch.toLowerCase();
-    entries = entries.filter((e) =>
-      (e.detail || "").toLowerCase().includes(q) ||
-      e.site.toLowerCase().includes(q) ||
-      e.status.toLowerCase().includes(q)
-    );
+function renderWorkerPanel(el, entries) {
+  entries = filterBySearch(entries);
+  if (!entries.length) {
+    el.innerHTML = '<div style="color:#555;padding:20px;text-align:center">No activity yet.</div>';
+    return;
   }
 
+  const bySite = new Map();
+  for (const e of entries) {
+    if (!bySite.has(e.site)) bySite.set(e.site, []);
+    bySite.get(e.site).push(e);
+  }
+
+  el.scrollTop = 0;
+  el.innerHTML = [...bySite.entries()].map(([site, siteEntries]) => {
+    const grouped = groupConsecutive(siteEntries.slice(0, 100));
+    const latest = grouped[0];
+    const badgeClass = "badge-" + latest.status.replace(/\s+/g, "-");
+    const countLabel = latest.count > 1 ? ` x${latest.count}` : "";
+    const rows = grouped.map((g) => {
+      const bc = "badge-" + g.status.replace(/\s+/g, "-");
+      const startTime = new Date(g.startTs).toLocaleTimeString();
+      const endTime = new Date(g.endTs).toLocaleTimeString();
+      const timeLabel = g.count > 1 ? `${endTime} – ${startTime}` : startTime;
+      const cl = g.count > 1 ? ` <span class="feed-count">x${g.count}</span>` : "";
+      return `<div class="feed-entry site-entry">
+        <span class="feed-ts">${timeLabel}</span>
+        <span class="feed-badge ${bc}">${esc(g.status)}${cl}</span>
+        <span class="feed-detail">${esc(g.detail || "")}</span>
+      </div>`;
+    }).join("");
+    return `<details class="site-group" open>
+      <summary class="site-group-header">
+        <span class="site-group-name">${esc(site)}</span>
+        <span class="feed-badge ${badgeClass}">${esc(latest.status)}${countLabel}</span>
+        <span class="site-group-detail">${esc(latest.detail || "")}</span>
+      </summary>
+      <div class="site-group-entries">${rows}</div>
+    </details>`;
+  }).join("");
+}
+
+function renderFlatPanel(el, entries) {
+  entries = filterBySearch(entries);
   if (!entries.length) {
     el.innerHTML = '<div style="color:#555;padding:20px;text-align:center">No activity yet.</div>';
     return;
@@ -83,20 +121,43 @@ function renderFeedPanel(el, entries) {
   }).join("");
 }
 
-function renderMonitors(sites, status) {
+const SITE_NAME_TO_ID = {
+  "Pokémon Center": "pokemon-center",
+  "Pokemon Center": "pokemon-center",
+  "PC Japan": "pokemon-center-jp",
+  "Walmart": "walmart",
+  "Costco": "costco",
+  "discord": "discord",
+};
+
+function getActiveFromLog() {
+  const active = {};
+  for (const e of logData) {
+    const id = SITE_NAME_TO_ID[e.site] || e.site.toLowerCase().replace(/\s+/g, "-");
+    if (!active[id]) active[id] = e.ts;
+  }
+  return active;
+}
+
+function renderMonitors(sites) {
   const el = $("#monitors");
   const now = Date.now();
+  const lastActive = getActiveFromLog();
   el.innerHTML = MONITORS.map((m) => {
     const enabled = m.id === "discord" ? (sites.discord !== false) : (sites[m.id] !== false);
-    const lastSeen = status[m.id]?.lastSeen;
-    const ago = lastSeen ? Math.round((now - new Date(lastSeen).getTime()) / 1000) : null;
+    const lastTs = lastActive[m.id];
+    const ago = lastTs ? Math.round((now - new Date(lastTs).getTime()) / 1000) : null;
     let stateLabel, stateClass;
     if (!enabled) {
       stateLabel = "off";
       stateClass = "monitor-idle";
-    } else if (ago !== null && ago < 120) {
+    } else if (ago !== null && ago < 300) {
       stateLabel = "active";
       stateClass = "monitor-active";
+    } else if (ago !== null) {
+      const mins = Math.round(ago / 60);
+      stateLabel = `${mins}m ago`;
+      stateClass = "monitor-idle";
     } else {
       stateLabel = "idle";
       stateClass = "monitor-idle";
@@ -215,8 +276,8 @@ chrome.storage.onChanged.addListener((changes) => {
     renderFeeds();
   }
   if (changes.monitorStatus || changes.sites) {
-    chrome.storage.local.get(["sites", "monitorStatus"], (data) => {
-      renderMonitors(data.sites || {}, data.monitorStatus || {});
+    chrome.storage.local.get(["sites"], (data) => {
+      renderMonitors(data.sites || {});
     });
   }
   if (changes.discordChannels) renderChannels(changes.discordChannels.newValue || []);
