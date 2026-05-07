@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Walmart — Queue</title>
+  <style>
+    body { font-family: "Bogle", sans-serif; background: #fff; color: #333; margin: 0; }
+    .queue-page {
+      max-width: 500px; margin: 80px auto; text-align: center; padding: 40px;
+    }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    p { color: #666; font-size: 14px; margin-bottom: 20px; }
+    .ticket-info { font-size: 14px; color: #0071dc; margin-bottom: 16px; }
+    .ticket-info .label { font-weight: 600; }
+    .spinner {
+      width: 40px; height: 40px; border: 4px solid #eee; border-top-color: #0071dc;
+      border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    button {
+      background: #0071dc; color: #fff; border: none; border-radius: 20px;
+      padding: 10px 28px; font-size: 14px; cursor: pointer;
+    }
+    button:hover { background: #004c91; }
+    .status { font-size: 12px; color: #999; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="queue-page">
+    <div class="spinner"></div>
+    <h1>Hold my spot</h1>
+    <p>You're in line for this item. Please wait — you'll be redirected when it's your turn.</p>
+    <div class="ticket-info">
+      <div><span class="label">Item:</span> <span id="item-name">Pokemon TCG: Prismatic Evolutions ETB</span></div>
+      <div><span class="label">Ticket:</span> <span id="ticket-num">WMT-2026-8A3F</span></div>
+      <div><span class="label">Expected turn:</span> <span id="turn-time"></span></div>
+      <div><span class="label">Likelihood:</span> <span id="likelihood">high</span></div>
+    </div>
+    <button id="hold-btn">Hold my spot</button>
+    <p class="status" id="status">Don't close this window</p>
+  </div>
+
+  <script>
+    // Simulate Queue-it qpdata in URL
+    const turnTime = Date.now() + 8000;
+    const qpdata = {
+      ticket: "WMT-2026-8A3F",
+      expectedTurnTimeUnixTimestamp: turnTime,
+      customMetadata: {
+        admissionLikelihood: "high",
+        item: { name: "Pokemon TCG: Prismatic Evolutions ETB" }
+      }
+    };
+
+    // Set qpdata URL param (simulating what Queue-it does)
+    const url = new URL(window.location.href);
+    if (!url.searchParams.get("qpdata")) {
+      url.searchParams.set("qpdata", encodeURIComponent(JSON.stringify(qpdata)));
+      history.replaceState(null, "", url.toString());
+    }
+
+    document.getElementById("turn-time").textContent = new Date(turnTime).toLocaleTimeString();
+
+    let secs = 8;
+    const statusEl = document.getElementById("status");
+
+    document.getElementById("hold-btn").addEventListener("click", () => {
+      statusEl.textContent = "Spot held! Waiting...";
+    });
+
+    const timer = setInterval(() => {
+      secs--;
+      if (secs > 0) {
+        statusEl.textContent = `Estimated: ~${secs}s remaining`;
+      } else {
+        clearInterval(timer);
+        statusEl.textContent = "Redirecting...";
+        setTimeout(() => { window.location.href = "/walmart/through"; }, 1000);
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
