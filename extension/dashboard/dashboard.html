@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Casecomp Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <img src="../icons/icon48.png" alt="" class="header-icon">
+      <h1>Casecomp Dashboard</h1>
+    </div>
+    <div class="header-right">
+      <label class="toggle">
+        <input type="checkbox" id="enabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </header>
+
+  <main>
+    <section class="feed-panel">
+      <div class="feed-toolbar">
+        <div class="filter-buttons">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="discord">Discord</button>
+          <button class="filter-btn" data-filter="sites">Sites</button>
+          <button class="filter-btn" data-filter="listings">Listings</button>
+        </div>
+        <input type="text" id="search" placeholder="Search feed...">
+      </div>
+      <div id="feed"></div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <h2>Active Monitors</h2>
+        <div id="monitors"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2>Discord Channels</h2>
+        <div id="discord-channels"></div>
+        <div class="channel-add-row">
+          <input type="text" id="channel-input" placeholder="channel-name">
+          <button id="channel-add">+</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2>Keywords</h2>
+        <div id="keywords"></div>
+        <div class="keyword-add-row">
+          <input type="text" id="keyword-input" placeholder="new keyword">
+          <button id="keyword-add">+</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
