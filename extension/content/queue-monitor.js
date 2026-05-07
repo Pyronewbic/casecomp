@@ -101,6 +101,7 @@
     if (!config.sites?.[SITE_HANDLER.id]) return;
 
     const state = SITE_HANDLER.detect();
+    console.log("[csb]", SITE_HANDLER.id, state.inQueue ? "inQueue" : state.through ? "through" : "idle", state.detail || "", "lastStatus=" + lastStatus);
 
     if (state.captcha) {
       report("captcha", state.detail || "CAPTCHA detected — manual solve needed!");
