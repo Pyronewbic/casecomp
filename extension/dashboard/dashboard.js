@@ -68,6 +68,7 @@ function isWorkerEntry(e) {
 function load() {
   chrome.storage.local.get(STORAGE_KEYS, (data) => {
     $("#enabled").checked = data.enabled !== false;
+    syncEngineState();
     logData = data.log || [];
     archiveData = data.logArchive || [];
     renderFeeds();
@@ -84,9 +85,11 @@ function renderFeeds() {
   const news = logData.filter((e) => !isWorkerEntry(e));
   renderWorkerPanel($("#feed-workers"), workers);
   renderFlatPanel($("#news-feed"), news);
-  renderHistory($("#feed-history"));
+  renderHistory($("#history-content"));
   renderRawLog($("#feed-logs"));
   renderFeedKPIs(workers);
+  const feedHead = $(".section-head:has(#feed-meta)") || $("#feed-meta")?.closest(".section-head");
+  if (feedHead) feedHead.style.display = workers.length ? "" : "none";
   $("#workers-count").textContent = workers.length ? new Set(workers.map((e) => e.site)).size : 0;
   $("#news-count").textContent = news.length;
   $("#history-count").textContent = archiveData.length;
@@ -118,6 +121,12 @@ function renderFeedKPIs(workers) {
   }
   const fastLabel = fastest !== null ? `${Math.floor(fastest / 60000)}m ${Math.round((fastest % 60000) / 1000)}s` : "—";
 
+  const hasData = sites > 0 || queued > 0 || cleared > 0 || blocked > 0 || atc > 0 || fastest !== null;
+  if (!hasData) {
+    el.style.display = "none";
+    return;
+  }
+  el.style.display = "";
   el.innerHTML = `
     <div class="feed-kpi"><span class="fk-val">${sites}</span><span class="fk-lbl">Active Sites</span></div>
     <div class="feed-kpi"><span class="fk-val">${queued}</span><span class="fk-lbl">In Queue</span></div>
@@ -205,36 +214,68 @@ function filterBySearch(entries) {
 function renderWorkerPanel(el, entries) {
   entries = filterBySearch(entries);
   if (!entries.length) {
+    const newsEntries = logData.filter((e) => !isWorkerEntry(e)).slice(0, 5);
+    const tickerHtml = newsEntries.length ? newsEntries.map((e) => {
+      const time = new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return `<div class="ticker-item"><span class="ticker-src">${esc(e.site)}</span><span class="ticker-text">${esc((e.detail || "").slice(0, 120))}</span><span class="ticker-time">${time}</span></div>`;
+    }).join("") : "";
+
+    const tickerSection = tickerHtml ? `
+      <div class="empty-ticker">
+        <div class="section-head"><h2>Latest Intel</h2><span class="rule"></span></div>
+        ${tickerHtml}
+      </div>` : "";
+
+    const supportedSites = `
+      <div class="empty-sites">
+        <div class="section-head"><h2>Supported Sites</h2><span class="rule"></span></div>
+        <div class="site-chips">
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["pokemon-center"]}</span><span>Pokemon Center US</span></div>
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["pokemon-center-jp"]}</span><span>Pokemon Center JP</span></div>
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["walmart"]}</span><span>Walmart</span></div>
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["costco"]}</span><span>Costco</span></div>
+        </div>
+      </div>`;
+
     el.innerHTML = `<div class="empty-state">
-      <div class="empty-logo">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-          <defs>
-            <linearGradient id="e-foil" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#8a6d3a"/><stop offset=".45" stop-color="#d9b676"/>
-              <stop offset=".55" stop-color="#f1d79a"/><stop offset="1" stop-color="#8a6d3a"/>
-            </linearGradient>
-            <linearGradient id="e-holo" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#6ee7ff"/><stop offset=".5" stop-color="#c084fc"/>
-              <stop offset="1" stop-color="#fde68a"/>
-            </linearGradient>
-          </defs>
-          <rect x="21" y="26.5" width="50" height="67" rx="4" ry="4" fill="#14151c" stroke="url(#e-holo)" stroke-width="1.6" transform="rotate(-7.5,46,60)" opacity=".5"/>
-          <rect x="57" y="34.5" width="50" height="67" rx="4" ry="4" fill="#1c1e27" stroke="url(#e-foil)" stroke-width="2.4" transform="rotate(7.5,82,68)" opacity=".5"/>
-          <polyline fill="none" stroke="url(#e-foil)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="16,64 40,64 48,44 56,80 64,50 72,64 112,64" opacity=".4"/>
-        </svg>
+      <div class="empty-hero">
+        <div class="empty-logo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+            <rect x="21" y="26.5" width="50" height="67" rx="4" ry="4" fill="#14151c" stroke="#d9b676" stroke-width="1.6" transform="rotate(-7.5,46,60)" opacity=".5"/>
+            <rect x="57" y="34.5" width="50" height="67" rx="4" ry="4" fill="#1c1e27" stroke="#d9b676" stroke-width="2.4" transform="rotate(7.5,82,68)" opacity=".5"/>
+            <polyline fill="none" stroke="#d9b676" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="16,64 40,64 48,44 56,80 64,50 72,64 112,64" opacity=".4"/>
+          </svg>
+        </div>
+        <div class="empty-title">No activity yet</div>
+        <div class="empty-sub">Paste a product URL to start monitoring drops and queue events.</div>
+        <div class="empty-quick-add">
+          <input type="text" id="empty-url-input" placeholder="https://www.pokemoncenter.com/product/...">
+          <button id="empty-url-add">+ Add Target</button>
+        </div>
       </div>
-      <div class="empty-title">No activity yet</div>
-      <div class="empty-sub">Add a target URL to start monitoring product drops and queue events.</div>
-      <div class="empty-actions">
-        <button class="empty-btn" onclick="document.querySelector('[data-tab=targets]').click()">+ Add Target</button>
-        <button class="empty-btn secondary" onclick="document.querySelector('[data-tab=news]').click()">Set Up News</button>
-      </div>
-      <div class="empty-hints">
-        <div class="empty-hint"><span class="eh-num">1</span>Paste a product URL in the Targets tab</div>
-        <div class="empty-hint"><span class="eh-num">2</span>The extension opens and watches the page</div>
-        <div class="empty-hint"><span class="eh-num">3</span>When a queue activates, it auto-joins</div>
+      <div class="empty-bottom">
+        <div class="empty-hints">
+          <div class="empty-hint"><span class="eh-num">1</span>Paste a product URL above</div>
+          <div class="empty-hint"><span class="eh-num">2</span>Extension opens and watches the page</div>
+          <div class="empty-hint"><span class="eh-num">3</span>Queue activates — auto-joins for you</div>
+        </div>
+        ${supportedSites}
+        ${tickerSection}
       </div>
     </div>`;
+    const addBtn = el.querySelector("#empty-url-add");
+    const urlInput = el.querySelector("#empty-url-input");
+    if (addBtn) addBtn.addEventListener("click", () => {
+      const raw = urlInput.value.trim();
+      if (!raw) return;
+      const label = slugFromUrl(raw);
+      chrome.runtime.sendMessage({ type: "ADD_TARGET_URL", url: raw, label }, () => {
+        $('[data-tab="targets"]').click();
+      });
+    });
+    if (urlInput) urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addBtn.click(); });
+    const newsBtn = el.querySelector("#empty-setup-news");
+    if (newsBtn) newsBtn.addEventListener("click", () => $('[data-tab="news"]').click());
     return;
   }
 
@@ -532,8 +573,21 @@ $$(".feed-tab").forEach((btn) => {
 
 // Clear feed
 $("#dash-log-clear").addEventListener("click", () => {
-  chrome.storage.local.set({ log: [] });
+  const cleared = logData.map((e) => ({ ...e, archivedAt: new Date().toISOString(), reason: "manual clear" }));
+  const newArchive = [...cleared, ...archiveData].slice(0, 500);
+  chrome.storage.local.set({ log: [], logArchive: newArchive });
   logData = [];
+  archiveData = newArchive;
+  chrome.storage.local.get(["targetUrls"], (data) => {
+    renderTargets(data.targetUrls || []);
+  });
+  renderFeeds();
+});
+
+// Clear history
+$("#clear-history").addEventListener("click", () => {
+  chrome.storage.local.set({ logArchive: [] });
+  archiveData = [];
   renderFeeds();
 });
 
@@ -544,8 +598,13 @@ $("#search").addEventListener("input", (e) => {
 });
 
 // Master toggle
+function syncEngineState() {
+  document.body.classList.toggle("engine-off", !$("#enabled").checked);
+}
+
 $("#enabled").addEventListener("change", () => {
   chrome.storage.local.set({ enabled: $("#enabled").checked });
+  syncEngineState();
 });
 
 // Add channel
@@ -601,16 +660,28 @@ $("#dash-url-add").addEventListener("click", dashAddUrl);
 $("#dash-url-input").addEventListener("keydown", (e) => { if (e.key === "Enter") dashAddUrl(); });
 
 load();
+setInterval(() => {
+  chrome.storage.local.get(["log", "logArchive", "targetUrls"], (data) => {
+    logData = data.log || [];
+    archiveData = data.logArchive || [];
+    renderFeeds();
+    renderTargets(data.targetUrls || []);
+  });
+}, 5000);
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.log || changes.logArchive) {
     if (changes.log) logData = changes.log.newValue || [];
     if (changes.logArchive) archiveData = changes.logArchive.newValue || [];
     renderFeeds();
+    chrome.storage.local.get(["targetUrls"], (data) => renderTargets(data.targetUrls || []));
   }
   if (changes.targetUrls) renderTargets(changes.targetUrls.newValue || []);
   if (changes.discordChannels) renderChannels(changes.discordChannels.newValue || []);
   if (changes.redditSubs) renderSubs(changes.redditSubs.newValue || []);
   if (changes.discordKeywords) renderKeywords(changes.discordKeywords.newValue || []);
-  if (changes.enabled) $("#enabled").checked = changes.enabled.newValue !== false;
+  if (changes.enabled) {
+    $("#enabled").checked = changes.enabled.newValue !== false;
+    syncEngineState();
+  }
 });
