@@ -1,5 +1,21 @@
 const $ = (s) => document.querySelector(s);
 
+const SITE_NAME_TO_ID = {
+  "Pokémon Center": "pokemon-center",
+  "Pokemon Center": "pokemon-center",
+  "PC Japan": "pokemon-center-jp",
+  "Walmart": "walmart",
+  "Costco": "costco",
+  "discord": "discord",
+  "system": "system",
+};
+
+const SITE_IDS = [
+  "pokemon-center", "pokemon-center-jp", "walmart", "costco", "discord",
+];
+
+let logData = [];
+
 function load() {
   chrome.storage.local.get(
     ["enabled", "sites", "autoJoin", "autoAddToCart", "soundAlerts", "notifications", "targetUrls", "log"],
@@ -15,7 +31,9 @@ function load() {
       $("#sound-alerts").checked = data.soundAlerts !== false;
       $("#notifications").checked = data.notifications !== false;
       renderUrls(data.targetUrls || []);
-      renderLog(data.log || []);
+      logData = data.log || [];
+      renderLog();
+      renderSiteStatuses();
     },
   );
 }
@@ -35,6 +53,60 @@ function save() {
     soundAlerts: $("#sound-alerts").checked,
     notifications: $("#notifications").checked,
   });
+}
+
+function getLatestStatus(siteId) {
+  for (const e of logData) {
+    const id = SITE_NAME_TO_ID[e.site] || e.site.toLowerCase().replace(/\s+/g, "-");
+    if (id === siteId && e.status !== "target-opened") return e.status;
+  }
+  return null;
+}
+
+function renderSiteStatuses() {
+  for (const id of SITE_IDS) {
+    const badge = $(`#status-${id}`);
+    if (!badge) continue;
+    const status = getLatestStatus(id);
+    if (status) {
+      badge.textContent = status;
+      badge.className = "site-status site-status-" + status.replace(/\s+/g, "-");
+      badge.style.display = "";
+    } else {
+      badge.style.display = "none";
+    }
+  }
+}
+
+function groupConsecutive(entries) {
+  const groups = [];
+  for (const e of entries) {
+    const last = groups[groups.length - 1];
+    if (last && last.site === e.site && last.status === e.status) {
+      last.count++;
+      last.startTs = e.ts;
+    } else {
+      groups.push({ site: e.site, status: e.status, detail: e.detail || "", endTs: e.ts, startTs: e.ts, count: 1 });
+    }
+  }
+  return groups;
+}
+
+function renderLog() {
+  const el = $("#log");
+  if (!logData.length) {
+    el.textContent = "No activity yet.";
+    return;
+  }
+  const grouped = groupConsecutive(logData.slice(0, 100));
+  el.innerHTML = grouped.map((g) => {
+    const statusClass = g.status.replace(/\s+/g, "-");
+    const startTime = new Date(g.startTs).toLocaleTimeString();
+    const endTime = new Date(g.endTs).toLocaleTimeString();
+    const timeLabel = g.count > 1 ? `${endTime} – ${startTime}` : startTime;
+    const countLabel = g.count > 1 ? ` <span class="log-count">x${g.count}</span>` : "";
+    return `<div class="log-entry"><span class="log-ts">${timeLabel}</span> <span class="log-site">${escapeHtml(g.site)}</span> <span class="log-status-${statusClass}">${escapeHtml(g.status)}${countLabel}</span> ${escapeHtml(g.detail || "")}</div>`;
+  }).join("");
 }
 
 function renderUrls(urls) {
@@ -121,19 +193,6 @@ function truncateUrl(url) {
   }
 }
 
-function renderLog(entries) {
-  const el = $("#log");
-  if (!entries.length) {
-    el.textContent = "No activity yet.";
-    return;
-  }
-  el.innerHTML = entries.slice(0, 50).map((e) => {
-    const time = new Date(e.ts).toLocaleTimeString();
-    const statusClass = e.status.replace(/\s+/g, "-");
-    return `<div class="log-entry"><span class="log-ts">${time}</span><span class="log-site">${escapeHtml(e.site)}</span><span class="log-status-${statusClass}">${escapeHtml(e.status)}</span> ${escapeHtml(e.detail || "")}</div>`;
-  }).join("");
-}
-
 function escapeHtml(s) {
   const d = document.createElement("div");
   d.textContent = s;
@@ -156,12 +215,17 @@ $("#url-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addU
 
 $("#log-clear").addEventListener("click", () => {
   chrome.storage.local.set({ log: [] });
-  renderLog([]);
+  logData = [];
+  renderLog();
 });
 
 load();
 
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.log) renderLog(changes.log.newValue || []);
+  if (changes.log) {
+    logData = changes.log.newValue || [];
+    renderLog();
+    renderSiteStatuses();
+  }
   if (changes.targetUrls) renderUrls(changes.targetUrls.newValue || []);
 });
