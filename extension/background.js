@@ -1,5 +1,5 @@
-const ALARM_NAME = "csb-queue-keepalive";
-const POLL_INTERVAL_MINUTES = 0.5;
+const TARGET_POLL_MS = 5000;
+const tabUrlMap = new Map();
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -28,23 +28,85 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(null, (existing) => {
     chrome.storage.local.set({ ...DEFAULT_CONFIG, ...existing });
   });
-  chrome.alarms.create(ALARM_NAME, { periodInMinutes: POLL_INTERVAL_MINUTES });
   chrome.alarms.create("csb-reddit-poll", { periodInMinutes: 3 });
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "csb-reddit-poll") {
-    pollReddit();
-    return;
-  }
-  if (alarm.name !== ALARM_NAME) return;
-  chrome.tabs.query({ url: ["https://*.queue-it.net/*", "https://www.pokemoncenter.com/*", "https://www.pokemoncenter-online.com/*", "https://pokemoncenter.pokemon.co.jp/*", "https://www.walmart.com/*", "https://www.costco.com/*", "https://discord.com/channels/*"] }, (tabs) => {
-    for (const tab of tabs) {
+  if (alarm.name === "csb-reddit-poll") pollReddit();
+});
+
+function pollTargets() {
+  chrome.tabs.query({}, (allTabs) => {
+    const liveTabIds = new Set(allTabs.map((t) => t.id));
+    const monitoredTabs = allTabs.filter((t) => t.url && /queue-it\.net|pokemoncenter\.com|pokemoncenter-online|pokemon\.co\.jp|walmart\.com|costco\.com|discord\.com\/channels|x\.com/.test(t.url));
+    for (const tab of monitoredTabs) {
+      tabUrlMap.set(tab.id, tab.url);
       chrome.tabs.sendMessage(tab.id, { type: "POLL_QUEUE" }).catch(() => {});
     }
+    cleanStaleLogs(liveTabIds);
   });
-
   autoOpenTargets();
+}
+
+function cleanStaleLogs(liveTabIds) {
+  chrome.storage.local.get(["log", "logArchive"], (data) => {
+    const log = data.log || [];
+    const keep = [];
+    const purged = [];
+    for (const e of log) {
+      if (e.tabId && !liveTabIds.has(e.tabId)) {
+        e.archivedAt = new Date().toISOString();
+        e.reason = "tab closed";
+        purged.push(e);
+      } else {
+        keep.push(e);
+      }
+    }
+    if (!purged.length) return;
+    const archive = [...purged, ...(data.logArchive || [])].slice(0, 500);
+    chrome.storage.local.set({ log: keep, logArchive: archive });
+  });
+}
+
+setInterval(pollTargets, TARGET_POLL_MS);
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  const closedUrl = tabUrlMap.get(tabId);
+  tabUrlMap.delete(tabId);
+
+  chrome.storage.local.get(["log", "logArchive", "targetUrls"], (data) => {
+    const log = data.log || [];
+    const keep = [];
+    const purged = [];
+    for (const e of log) {
+      const match = e.tabId === tabId || (closedUrl && e.tabUrl === closedUrl);
+      if (match) {
+        e.archivedAt = new Date().toISOString();
+        e.reason = "tab closed";
+        purged.push(e);
+      } else {
+        keep.push(e);
+      }
+    }
+
+    const updates = { log: keep };
+
+    if (purged.length) {
+      updates.logArchive = [...purged, ...(data.logArchive || [])].slice(0, 500);
+    }
+
+    if (closedUrl) {
+      const targets = (data.targetUrls || []).map((u) => {
+        if (u.url === closedUrl || closedUrl.startsWith(u.url) || u.url.startsWith(closedUrl)) {
+          return { ...u, active: false };
+        }
+        return u;
+      });
+      updates.targetUrls = targets;
+    }
+
+    chrome.storage.local.set(updates);
+  });
 });
 
 function autoOpenTargets() {
@@ -59,7 +121,9 @@ function autoOpenTargets() {
         if (!entry.active) continue;
         const alreadyOpen = allTabs.some((t) => t.url && t.url.startsWith(entry.url));
         if (!alreadyOpen) {
-          chrome.tabs.create({ url: entry.url, active: false });
+          chrome.tabs.create({ url: entry.url, active: false }, (tab) => {
+            if (tab) tabUrlMap.set(tab.id, entry.url);
+          });
           appendLog("system", "target-opened", `Opened ${entry.label || entry.url}`);
         }
       }
@@ -77,6 +141,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "QUEUE_STATUS") {
     const tabUrl = sender.tab?.url || "";
     const tabId = sender.tab?.id || null;
+    if (tabId && tabUrl) tabUrlMap.set(tabId, tabUrl);
     appendLog(msg.site, msg.status, msg.detail, tabId, tabUrl);
     updateMonitorStatus(msg.site);
 
