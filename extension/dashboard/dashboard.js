@@ -74,6 +74,8 @@ function renderWorkerPanel(el, entries) {
     const latest = grouped[0];
     const badgeClass = "badge-" + latest.status.replace(/\s+/g, "-");
     const countLabel = latest.count > 1 ? ` x${latest.count}` : "";
+    const eta = extractEta(latest.detail);
+    const etaHtml = eta ? `<span class="site-group-eta">ETA ${eta}</span>` : "";
     const rows = grouped.map((g) => {
       const bc = "badge-" + g.status.replace(/\s+/g, "-");
       const startTime = new Date(g.startTs).toLocaleTimeString();
@@ -90,6 +92,7 @@ function renderWorkerPanel(el, entries) {
       <summary class="site-group-header">
         <span class="site-group-name">${esc(site)}</span>
         <span class="feed-badge ${badgeClass}">${esc(latest.status)}${countLabel}</span>
+        ${etaHtml}
         <span class="site-group-detail">${esc(latest.detail || "")}</span>
       </summary>
       <div class="site-group-entries">${rows}</div>
@@ -134,7 +137,7 @@ function getActiveFromLog() {
   const active = {};
   for (const e of logData) {
     const id = SITE_NAME_TO_ID[e.site] || e.site.toLowerCase().replace(/\s+/g, "-");
-    if (!active[id]) active[id] = e.ts;
+    if (!active[id]) active[id] = { ts: e.ts, status: e.status, eta: extractEta(e.detail) };
   }
   return active;
 }
@@ -145,15 +148,16 @@ function renderMonitors(sites) {
   const lastActive = getActiveFromLog();
   el.innerHTML = MONITORS.map((m) => {
     const enabled = m.id === "discord" ? (sites.discord !== false) : (sites[m.id] !== false);
-    const lastTs = lastActive[m.id];
-    const ago = lastTs ? Math.round((now - new Date(lastTs).getTime()) / 1000) : null;
-    let stateLabel, stateClass;
+    const info = lastActive[m.id];
+    const ago = info ? Math.round((now - new Date(info.ts).getTime()) / 1000) : null;
+    let stateLabel, stateClass, etaLabel = "";
     if (!enabled) {
       stateLabel = "off";
       stateClass = "monitor-idle";
     } else if (ago !== null && ago < 300) {
-      stateLabel = "active";
+      stateLabel = info.status;
       stateClass = "monitor-active";
+      if (info.eta) etaLabel = `<span class="monitor-eta">${info.eta}</span>`;
     } else if (ago !== null) {
       const mins = Math.round(ago / 60);
       stateLabel = `${mins}m ago`;
@@ -164,6 +168,7 @@ function renderMonitors(sites) {
     }
     return `<div class="monitor-row">
       <span class="monitor-name">${m.label}</span>
+      ${etaLabel}
       <span class="monitor-status ${stateClass}">${stateLabel}</span>
     </div>`;
   }).join("");
@@ -199,6 +204,12 @@ function renderKeywords(keywords) {
       });
     });
   });
+}
+
+function extractEta(detail) {
+  if (!detail) return null;
+  const m = detail.match(/ETA:\s*(\d[\d:]+)/);
+  return m ? m[1] : null;
 }
 
 function groupConsecutive(entries) {
