@@ -1,10 +1,9 @@
 (() => {
-  console.log("[csb] queue-monitor.js loaded, frame:", window === window.top ? "main" : "iframe", "handler:", !!window.__csbSiteHandler);
   if (window.__csbQueueMonitorLoaded) return;
   window.__csbQueueMonitorLoaded = true;
 
   const SITE_HANDLER = window.__csbSiteHandler;
-  if (!SITE_HANDLER) { console.log("[csb] no site handler — exiting"); return; }
+  if (!SITE_HANDLER) return;
 
   let lastStatus = null;
   let chimePlayedForThrough = false;
@@ -84,6 +83,19 @@
     } catch {}
   }
 
+  let lastUrl = window.location.href;
+  let urlChangedAt = 0;
+
+  function checkUrlChange() {
+    const current = window.location.href;
+    if (current !== lastUrl) {
+      lastUrl = current;
+      lastStatus = null;
+      chimePlayedForThrough = false;
+      urlChangedAt = Date.now();
+    }
+  }
+
   function isTargetUrl(config) {
     const targets = config.targetUrls || [];
     if (!targets.length) return true;
@@ -92,6 +104,7 @@
   }
 
   async function tick() {
+    checkUrlChange();
     let config;
     try {
       config = await chrome.runtime.sendMessage({ type: "GET_CONFIG" });
@@ -102,7 +115,6 @@
     if (!config.sites?.[SITE_HANDLER.id]) return;
 
     const state = SITE_HANDLER.detect();
-    console.log("[csb]", SITE_HANDLER.id, state.inQueue ? "inQueue" : state.through ? "through" : "idle", state.detail || "", "lastStatus=" + lastStatus);
 
     if (state.captcha) {
       report("captcha", state.detail || "CAPTCHA detected — manual solve needed!");
@@ -118,13 +130,13 @@
           playChime();
         }
 
-        if (config.autoAddToCart && SITE_HANDLER.addToCart) {
+        if (config.autoAddToCart && SITE_HANDLER.addToCart && lastStatus !== "atc-success") {
+          const sincNav = Date.now() - urlChangedAt;
+          if (urlChangedAt && sincNav < 2000) return;
           const atcOk = SITE_HANDLER.addToCart();
           if (atcOk) {
             report("atc-success", "Auto-added to cart!");
             if (config.soundAlerts) playChime();
-          } else {
-            report("atc-failed", "ATC button not found or not ready");
           }
         }
       }

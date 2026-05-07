@@ -1,5 +1,4 @@
 (() => {
-  console.log("[csb] pokemon-center.js loaded, frame:", window === window.top ? "main" : "iframe");
   // Pokemon Center uses Imperva/Incapsula waiting room.
   // Queue manifests as an iframe with src containing /_Incapsula_Resource.
   // Wait time lives in #ttw inside the iframe (format HH:MM:SS).
@@ -11,6 +10,7 @@
 
   const ATC_SELECTORS = [
     'button[data-testid="add-to-cart"]',
+    'button[class*="add-to-cart"]',
     ".add-to-cart button",
     'button.add-to-cart',
     'input[value*="Add to Cart" i]',
@@ -112,8 +112,6 @@
 
     const ready = document.readyState === "complete" || document.readyState === "interactive";
     const queueFound = hasQueueIndicators();
-    console.log("[csb] detect: no iframe, readyState=" + document.readyState, "queueIndicators=" + queueFound);
-
     if (!queueFound && ready) {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       return { inQueue: false, through: true, detail: "No queue detected — site loaded" };
@@ -141,7 +139,7 @@
   function isVisible(el) {
     if (!el) return false;
     const style = getComputedStyle(el);
-    return style.display !== "none" && style.visibility !== "hidden" && el.offsetParent !== null;
+    return style.display !== "none" && style.visibility !== "hidden";
   }
 
   function join() {
@@ -152,7 +150,11 @@
   function addToCart() {
     const btn = findAtcButton();
     if (!btn) return false;
-    btn.click();
+    btn.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     return true;
   }
 
