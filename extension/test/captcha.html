@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Verification Required</title>
+  <style>
+    body { font-family: sans-serif; background: #fff; color: #333; margin: 0; }
+    .container {
+      max-width: 500px; margin: 100px auto; text-align: center; padding: 40px;
+    }
+    h2 { font-size: 20px; margin-bottom: 12px; }
+    p { color: #666; font-size: 14px; margin-bottom: 20px; }
+
+    /* Simulates PerimeterX press-and-hold CAPTCHA */
+    #px-captcha {
+      display: inline-block; background: #f9f9f9; border: 2px solid #d3d3d3; border-radius: 4px;
+      padding: 24px 40px; margin: 20px 0; cursor: pointer; user-select: none;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    #px-captcha:hover { border-color: #4285f4; }
+    #px-captcha.holding { background: #e3f2fd; border-color: #2196f3; }
+    #px-captcha.done { background: #e8f5e9; border-color: #4caf50; }
+    .px-label { font-size: 14px; color: #333; }
+    .px-sub { font-size: 11px; color: #999; margin-top: 8px; }
+    .proceed { display: none; margin-top: 20px; }
+    .proceed a {
+      display: inline-block; padding: 10px 24px; background: #0071dc; color: #fff;
+      text-decoration: none; border-radius: 20px; font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Please verify you're human</h2>
+    <p>Press & hold the button below to continue.</p>
+
+    <div id="px-captcha">
+      <div class="px-label">Press & Hold</div>
+      <div class="px-sub">Human verification powered by HUMAN Security</div>
+    </div>
+
+    <div class="proceed" id="proceed">
+      <p style="color: #4caf50; font-weight: 600;">Verified!</p>
+      <a href="/walmart">Continue to Walmart</a>
+    </div>
+  </div>
+
+  <script>
+    const cap = document.getElementById("px-captcha");
+    let holdTimer = null;
+
+    cap.addEventListener("mousedown", () => {
+      cap.classList.add("holding");
+      holdTimer = setTimeout(() => {
+        cap.classList.remove("holding");
+        cap.classList.add("done");
+        cap.innerHTML = '<div class="px-label" style="color:#4caf50;">Verified</div>';
+        document.getElementById("proceed").style.display = "block";
+      }, 2000);
+    });
+
+    cap.addEventListener("mouseup", () => {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      cap.classList.remove("holding");
+    });
+  </script>
+</body>
+</html>

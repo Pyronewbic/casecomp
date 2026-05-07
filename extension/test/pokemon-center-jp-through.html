@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ポケモンセンターオンライン — 商品</title>
+  <style>
+    body { font-family: "Hiragino Sans", "Yu Gothic", sans-serif; background: #fff; color: #333; margin: 0; padding: 40px; }
+    .product { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    .price { font-size: 22px; font-weight: 700; color: #e3350d; margin-bottom: 16px; }
+    .desc { color: #666; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+    .img-placeholder {
+      width: 300px; height: 300px; background: #f5f5f5; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; color: #ccc;
+      font-size: 14px; margin-bottom: 24px;
+    }
+    .cart-btn {
+      background: #e3350d; color: #fff; border: none; border-radius: 6px;
+      padding: 14px 40px; font-size: 16px; cursor: pointer;
+    }
+    .cart-btn:hover { background: #c02a0a; }
+    .success { display: none; background: #4caf50; color: #fff; padding: 12px 20px; border-radius: 6px; margin-top: 16px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="product">
+    <div class="img-placeholder">[商品画像]</div>
+    <h1>ポケモンカードゲーム 拡張パック「メガ進化」BOX</h1>
+    <div class="price">¥5,400（税込）</div>
+    <p class="desc">ポケモンカードゲーム スカーレット＆バイオレット 拡張パック「メガ進化」1BOX（30パック入り）。</p>
+    <button class="cart-btn" id="atc-btn">カートに入れる</button>
+    <div class="success" id="success-msg">カートに追加しました！</div>
+  </div>
+
+  <script>
+    document.getElementById("atc-btn").addEventListener("click", () => {
+      document.getElementById("atc-btn").disabled = true;
+      document.getElementById("atc-btn").textContent = "追加済み";
+      document.getElementById("success-msg").style.display = "block";
+    });
+  </script>
+</body>
+</html>

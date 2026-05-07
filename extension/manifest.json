@@ -1,0 +1,111 @@
+{
+  "manifest_version": 3,
+  "name": "CardScrapeBot – Queue Auto-Join",
+  "version": "0.2.0",
+  "description": "Auto-join product drop queues on Pokémon Center, Walmart, and Costco using your real browser session.",
+  "permissions": [
+    "notifications",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://www.pokemoncenter.com/*",
+    "https://pokemoncenter.com/*",
+    "https://*.queue-it.net/*",
+    "https://www.walmart.com/*",
+    "https://www.costco.com/*",
+    "https://www.pokemoncenter-online.com/*",
+    "https://pokemoncenter-online.com/*",
+    "https://pokemoncenter.pokemon.co.jp/*",
+    "http://localhost:3099/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.pokemoncenter.com/*",
+        "https://pokemoncenter.com/*"
+      ],
+      "js": [
+        "content/sites/pokemon-center.js",
+        "content/queue-monitor.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.walmart.com/*",
+        "https://*.queue-it.net/*"
+      ],
+      "js": [
+        "content/sites/walmart-inject.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.walmart.com/*",
+        "https://*.queue-it.net/*"
+      ],
+      "js": [
+        "content/sites/walmart.js",
+        "content/queue-monitor.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.costco.com/*"
+      ],
+      "js": [
+        "content/sites/costco.js",
+        "content/queue-monitor.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.pokemoncenter-online.com/*",
+        "https://pokemoncenter-online.com/*",
+        "https://pokemoncenter.pokemon.co.jp/*"
+      ],
+      "js": [
+        "content/sites/pokemon-center-jp.js",
+        "content/queue-monitor.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:3099/*"
+      ],
+      "js": [
+        "content/sites/pokemon-center.js",
+        "content/sites/pokemon-center-jp.js",
+        "content/sites/walmart.js",
+        "content/sites/costco.js",
+        "content/queue-monitor.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
