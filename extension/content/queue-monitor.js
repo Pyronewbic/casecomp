@@ -1,9 +1,10 @@
 (() => {
+  console.log("[csb] queue-monitor.js loaded, frame:", window === window.top ? "main" : "iframe", "handler:", !!window.__csbSiteHandler);
   if (window.__csbQueueMonitorLoaded) return;
   window.__csbQueueMonitorLoaded = true;
 
   const SITE_HANDLER = window.__csbSiteHandler;
-  if (!SITE_HANDLER) return;
+  if (!SITE_HANDLER) { console.log("[csb] no site handler — exiting"); return; }
 
   let lastStatus = null;
   let chimePlayedForThrough = false;
