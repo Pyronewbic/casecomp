@@ -9,6 +9,7 @@ function load() {
       $("#site-pokemon-center-jp").checked = data.sites?.["pokemon-center-jp"] !== false;
       $("#site-walmart").checked = data.sites?.walmart !== false;
       $("#site-costco").checked = data.sites?.costco !== false;
+      $("#site-discord").checked = data.sites?.discord !== false;
       $("#auto-join").checked = data.autoJoin !== false;
       $("#auto-atc").checked = data.autoAddToCart === true;
       $("#sound-alerts").checked = data.soundAlerts !== false;
@@ -27,6 +28,7 @@ function save() {
       "pokemon-center-jp": $("#site-pokemon-center-jp").checked,
       walmart: $("#site-walmart").checked,
       costco: $("#site-costco").checked,
+      discord: $("#site-discord").checked,
     },
     autoJoin: $("#auto-join").checked,
     autoAddToCart: $("#auto-atc").checked,
@@ -143,6 +145,11 @@ function escapeAttr(s) {
 }
 
 document.querySelectorAll("input[type='checkbox']").forEach((el) => el.addEventListener("change", save));
+
+$("#open-dashboard").addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "OPEN_DASHBOARD" });
+  window.close();
+});
 
 $("#url-add").addEventListener("click", addUrl);
 $("#url-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addUrl(); });
