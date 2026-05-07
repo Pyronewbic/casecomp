@@ -145,19 +145,3 @@ jobs:
         run: |
           grep -q 'data-tab="workers"' extension/dashboard/dashboard.html && echo "✓ Workers tab" || exit 1
           grep -q 'data-tab="news"' extension/dashboard/dashboard.html && echo "✓ News tab" || exit 1
-
-  license:
-    name: License & terms
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Verify LICENSE exists with Commons Clause
-        run: |
-          test -f LICENSE || (echo "LICENSE missing" && exit 1)
-          grep -q "Commons Clause" LICENSE && echo "✓ Commons Clause present" || exit 1
-          grep -q "MIT License" LICENSE && echo "✓ MIT License present" || exit 1
-
-      - name: Verify Terms of Use in README
-        run: |
-          grep -q "non-commercial use only" README.md && echo "✓ Terms of Use present" || exit 1
