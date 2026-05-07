@@ -46,7 +46,6 @@
     const ttwEl = document.getElementById("ttw") || document.querySelector('[class*="estimatedWait"], [class*="wait-time"], [class*="waitTime"]');
     if (ttwEl) return ttwEl.textContent?.trim() || null;
     return null;
-    }
   }
 
   async function pollPosition() {
