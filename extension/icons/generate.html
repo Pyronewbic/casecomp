@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head><title>Generate Icons</title></head>
+<body style="background:#222;color:#fff;font-family:monospace;padding:20px;">
+<h2>Right-click each → Save Image As</h2>
+<div id="out"></div>
+<script>
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#0c0d12"/>
+  <rect x="21" y="26.5" width="50" height="67" rx="4" ry="4" fill="#14151c" stroke="#d9b676" stroke-width="1.6" transform="rotate(-7.5,46,60)"/>
+  <rect x="57" y="34.5" width="50" height="67" rx="4" ry="4" fill="#1c1e27" stroke="#d9b676" stroke-width="2.4" transform="rotate(7.5,82,68)"/>
+  <polyline fill="none" stroke="#d9b676" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="16,64 40,64 48,44 56,80 64,50 72,64 112,64"/>
+</svg>`;
+
+[16, 48, 128].forEach(size => {
+  const canvas = document.createElement("canvas");
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, size, size);
+    const png = document.createElement("img");
+    png.src = canvas.toDataURL("image/png");
+    png.style.margin = "10px";
+    const label = document.createElement("div");
+    label.textContent = `icon${size}.png`;
+    label.style.textAlign = "center";
+    const wrap = document.createElement("div");
+    wrap.style.display = "inline-block";
+    wrap.appendChild(png);
+    wrap.appendChild(label);
+    document.getElementById("out").appendChild(wrap);
+  };
+  img.src = "data:image/svg+xml;base64," + btoa(svg);
+});
+</script>
+</body>
+</html>
