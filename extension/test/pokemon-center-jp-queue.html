@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ポケモンセンターオンライン</title>
+  <style>
+    body { font-family: "Hiragino Sans", "Yu Gothic", sans-serif; background: #fff; color: #333; margin: 0; }
+    .page-bg { padding: 40px; text-align: center; opacity: 0.3; }
+    .queue-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center; z-index: 9999;
+    }
+    .queue-box {
+      background: #fff; border-radius: 12px; padding: 32px 48px; text-align: center; max-width: 460px;
+    }
+    .queue-box h2 { font-size: 18px; margin-bottom: 12px; color: #e3350d; }
+    .queue-box p { color: #666; font-size: 14px; margin-bottom: 16px; line-height: 1.6; }
+    .ttw-display { font-size: 36px; font-weight: 700; color: #e3350d; margin: 16px 0; font-family: monospace; }
+    .bar { height: 6px; background: #eee; border-radius: 3px; margin: 12px 0; overflow: hidden; }
+    .bar-fill { height: 100%; background: #e3350d; width: 10%; transition: width 1s; border-radius: 3px; }
+    .status-label { font-size: 12px; color: #999; margin-top: 8px; }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid #eee; border-top-color: #e3350d;
+      border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="page-bg">
+    <h1>ポケモンセンターオンライン</h1>
+    <p>商品ページ（待機列の後ろ）</p>
+  </div>
+
+  <!-- Simulates Incapsula waiting room iframe -->
+  <iframe id="incapsula-iframe" src="/_Incapsula_Resource" style="display:none;"></iframe>
+
+  <div class="queue-overlay" id="overlay">
+    <div class="queue-box">
+      <div class="spinner"></div>
+      <h2>ただいまアクセスが集中しております</h2>
+      <p>順番にご案内しておりますので、このままお待ちください。<br>ページを更新しないでください。</p>
+      <div class="ttw-display"><span id="ttw">00:01:30</span></div>
+      <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
+      <p class="status-label" id="status">このタブを閉じないでください</p>
+    </div>
+  </div>
+
+  <script>
+    let secs = 90;
+    const ttwEl = document.getElementById("ttw");
+    const barFill = document.getElementById("bar-fill");
+    const status = document.getElementById("status");
+
+    const timer = setInterval(() => {
+      secs = Math.max(0, secs - Math.floor(Math.random() * 15 + 5));
+      const pct = Math.min(100, ((90 - secs) / 90) * 100);
+      const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+      const ss = String(secs % 60).padStart(2, "0");
+      ttwEl.textContent = `00:${mm}:${ss}`;
+      barFill.style.width = pct + "%";
+
+      if (secs <= 0) {
+        clearInterval(timer);
+        status.textContent = "商品ページへ移動します...";
+        document.getElementById("incapsula-iframe")?.remove();
+        setTimeout(() => { window.location.href = "/pokemon-center-jp/through"; }, 1500);
+      }
+    }, 2000);
+  </script>
+</body>
+</html>
