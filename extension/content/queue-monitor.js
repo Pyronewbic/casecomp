@@ -33,16 +33,19 @@
   document.addEventListener("click", onUserGesture, true);
   document.addEventListener("keydown", onUserGesture, true);
 
-  function getAudioCtx() {
+  async function getReadyCtx() {
     if (!userGestured) return null;
     if (!audioCtx) audioCtx = new AudioContext();
-    if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+    if (audioCtx.state === "suspended") {
+      try { await audioCtx.resume(); } catch { return null; }
+    }
+    if (audioCtx.state !== "running") return null;
     return audioCtx;
   }
 
-  function playChime() {
+  async function playChime() {
     try {
-      const ctx = getAudioCtx();
+      const ctx = await getReadyCtx();
       if (!ctx) return;
       const notes = [523.25, 659.25, 783.99, 1046.50];
       notes.forEach((freq, i) => {
@@ -59,9 +62,9 @@
     } catch {}
   }
 
-  function playUrgentChime() {
+  async function playUrgentChime() {
     try {
-      const ctx = getAudioCtx();
+      const ctx = await getReadyCtx();
       if (!ctx) return;
       for (let rep = 0; rep < 3; rep++) {
         const offset = rep * 0.6;
