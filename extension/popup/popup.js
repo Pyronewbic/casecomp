@@ -257,11 +257,13 @@ function groupConsecutive(entries) {
 function renderLog() {
   const el = $("#log");
   if (!el) return;
-  if (!logData.length) {
+  const WORKER_STATUSES = new Set(["detected", "joined", "waiting", "through", "captcha", "atc-success", "atc-failed", "target-opened"]);
+  const workerLog = logData.filter((e) => WORKER_STATUSES.has(e.status) || e.site === "system");
+  if (!workerLog.length) {
     el.innerHTML = '<div class="log-row" style="justify-content:center;color:var(--paper-dd);">No activity yet.</div>';
     return;
   }
-  const grouped = groupConsecutive(logData.slice(0, 50));
+  const grouped = groupConsecutive(workerLog.slice(0, 50));
   el.innerHTML = grouped.map((g) => {
     const siteId = SITE_NAME_TO_ID[g.site] || g.site.toLowerCase().replace(/\s+/g, "-");
     const src = STATUS_TO_SRC[siteId] || g.site;
