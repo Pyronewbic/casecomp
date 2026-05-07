@@ -110,7 +110,11 @@
       };
     }
 
-    if (!hasQueueIndicators() && document.readyState === "complete") {
+    const ready = document.readyState === "complete" || document.readyState === "interactive";
+    const queueFound = hasQueueIndicators();
+    console.log("[csb] detect: no iframe, readyState=" + document.readyState, "queueIndicators=" + queueFound);
+
+    if (!queueFound && ready) {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       return { inQueue: false, through: true, detail: "No queue detected — site loaded" };
     }
