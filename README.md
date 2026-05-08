@@ -319,54 +319,22 @@ flowchart TD
 
 ---
 
-## REST API (`yarn api`)
+## REST API
 
-Run `node api.js` or `yarn api` to start the API on port 3000. Swagger docs at [localhost:3000/docs](http://localhost:3000/docs).
+**Hosted:** [api.casecomp.xyz](https://casecomp.xyz/developers) — aggregated drop data, managed infra, webhook delivery. Get an API key and go.
 
-```bash
-yarn api   # starts on :3000
-```
+**Self-hosted:** `yarn api` — runs on port 3000 with your own eBay keys and optional Redis. Only sees your own drops.
 
-### Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/search?q=Umbreon+ex&source=snkrdunk&condition=A` | Search card listings |
-| `GET` | `/api/sold?q=Umbreon+ex&source=ebay` | Recent sold comps |
-| `GET` | `/api/psa?q=Umbreon+ex` | PSA population signal |
-| `POST` | `/api/grade` | AI pre-grade from image URL(s) |
-| `GET` | `/api/grades?q=Mega+Greninja&limit=100` | Export stored grades (training data) |
-| `GET` | `/api/health` | Health check + Redis status |
-
-### Search params
-
-`q` (required), `source` (ebay/snkrdunk/magi/yahoo), `format` (raw/slab), `countries` (US,IN), `lang` (eng/jp/any), `results`, `sold`, `slab_provider`, `slab_grade`, `condition` (A-D), `grade` (true = AI pre-grade)
-
-### AI grading for training data
+Full endpoint reference with schemas and try-it-out: **[Swagger docs](http://localhost:3000/docs)** (self-hosted) or **[casecomp.xyz/developers](https://casecomp.xyz/developers)** (hosted).
 
 ```bash
-# Grade a single image
-curl -X POST localhost:3000/api/grade \
-  -H "Content-Type: application/json" \
-  -d '{"imageUrl":"https://cdn.snkrdunk.com/...","cardName":"Mega Greninja ex SAR"}'
+# Hosted — drop intelligence
+curl https://api.casecomp.xyz/v1/drops?limit=20 \
+  -H "Authorization: Bearer $CASECOMP_KEY"
 
-# Export all stored grades
-curl "localhost:3000/api/grades?limit=500"
+# Self-hosted — card search
+curl "localhost:3000/api/search?q=Umbreon+ex&source=snkrdunk&condition=A"
 ```
-
-Grade results are stored permanently in Redis for future model training. Each record includes card name, source, listing ID, price, condition, provider, model, and the full grade breakdown.
-
-### Redis caching
-
-Optional — falls back to file-based cache if Redis is unavailable. Set `REDIS_URL` in `.env` to enable.
-
-| Cache | TTL |
-|-------|-----|
-| eBay active listings | 6h |
-| eBay sold listings | 24h |
-| AI grades | 30d |
-| PSA population | 24h |
-| Grade training log | permanent |
 
 ---
 

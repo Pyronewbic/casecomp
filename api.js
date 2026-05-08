@@ -272,6 +272,159 @@ app.get("/api/health", async (req, res) => {
   });
 });
 
+// ============ V1 API — Drop Intelligence ============
+
+function authMiddleware(req, res, next) {
+  const auth = req.headers.authorization;
+  const key = process.env.CASECOMP_API_KEY;
+  if (!key) return next();
+  if (!auth || !auth.startsWith("Bearer ") || auth.slice(7) !== key) {
+    return res.status(401).json({ error: "Invalid or missing API key" });
+  }
+  next();
+}
+
+const v1 = express.Router();
+v1.use(authMiddleware);
+
+// GET /v1/drops — list recent drop events
+v1.get("/drops", async (req, res) => {
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  const site = req.query.site;
+  const status = req.query.status;
+  try {
+    let records = await cacheReadByPattern("casecomp:drop:*", limit * 3);
+    if (site) records = records.filter(r => (r.site || "").toLowerCase().includes(site.toLowerCase()));
+    if (status) records = records.filter(r => r.status === status);
+    records = records.slice(0, limit);
+    res.json({ drops: records, count: records.length, limit });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /v1/drops/:id — single drop with queue metrics
+v1.get("/drops/:id", async (req, res) => {
+  try {
+    const records = await cacheReadByPattern(`casecomp:drop:*${req.params.id}*`, 1);
+    if (!records.length) return res.status(404).json({ error: "Drop not found" });
+    res.json(records[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /v1/comps — sold and listed prices
+v1.get("/comps", async (req, res) => {
+  const { sku, q } = req.query;
+  const query = sku || q;
+  if (!query) return res.status(400).json({ error: "Missing required parameter: sku or q" });
+  try {
+    const config = buildConfig(req.query);
+    const source = config.source || "ebay";
+    let active = [], sold = [];
+
+    if (source === "snkrdunk") {
+      const r = await searchSnkrdunk(query, config);
+      active = r.items || r.active || [];
+      sold = r.sold || [];
+    } else if (source === "magi") {
+      const r = await searchMagi(query, config);
+      active = r.items || r.active || [];
+      sold = r.sold || [];
+    } else if (source === "yahoo") {
+      const r = await searchYahooAuctions(query, config);
+      active = r.items || r.active || [];
+      sold = r.sold || [];
+    } else {
+      const ebayQuery = buildEbaySearchQuery(query, config);
+      const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: query, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
+      const soldRes = await searchSold({ query: ebayQuery, relevanceQuery: query, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false });
+      for (const items of Object.values(activeRes.itemsByCountry || {})) active.push(...items);
+      sold = soldRes.items || [];
+    }
+
+    res.json({
+      query,
+      source,
+      active: { items: active, count: active.length },
+      sold: { items: sold, count: sold.length },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /v1/webhooks — register webhook
+const webhooks = [];
+
+v1.post("/webhooks", async (req, res) => {
+  const { url, events } = req.body;
+  if (!url) return res.status(400).json({ error: "Missing required field: url" });
+  const validEvents = ["drop.opened", "drop.closed", "queue.joined", "queue.advanced", "queue.through", "checkout.cleared", "captcha.detected", "listing.new"];
+  const selectedEvents = (events || []).filter(e => validEvents.includes(e));
+  if (!selectedEvents.length) return res.status(400).json({ error: `No valid events. Valid: ${validEvents.join(", ")}` });
+
+  const webhook = {
+    id: `wh_${Date.now().toString(36)}`,
+    url,
+    events: selectedEvents,
+    createdAt: new Date().toISOString(),
+    active: true,
+  };
+  webhooks.push(webhook);
+
+  try {
+    await cacheWritePermanent(`casecomp:webhook:${webhook.id}`, webhook);
+  } catch {}
+
+  res.status(201).json(webhook);
+});
+
+// GET /v1/webhooks — list registered webhooks
+v1.get("/webhooks", async (req, res) => {
+  try {
+    const stored = await cacheReadByPattern("casecomp:webhook:*", 50);
+    res.json({ webhooks: stored, count: stored.length });
+  } catch (e) {
+    res.json({ webhooks, count: webhooks.length });
+  }
+});
+
+// DELETE /v1/webhooks/:id — remove webhook
+v1.delete("/webhooks/:id", async (req, res) => {
+  const idx = webhooks.findIndex(w => w.id === req.params.id);
+  if (idx !== -1) webhooks.splice(idx, 1);
+  res.json({ ok: true, id: req.params.id });
+});
+
+app.use("/v1", v1);
+
+// Helper: log a drop event (called from extension sync or internal)
+app.post("/api/drop-event", async (req, res) => {
+  const { site, status, detail, url, tabId } = req.body;
+  if (!site || !status) return res.status(400).json({ error: "Missing site or status" });
+  const drop = {
+    id: `drp_${Date.now().toString(36)}`,
+    ts: new Date().toISOString(),
+    site, status, detail: detail || "", url: url || "", tabId: tabId || null,
+  };
+  try {
+    await cacheWritePermanent(`casecomp:drop:${drop.id}`, drop);
+    // fire webhooks
+    for (const wh of webhooks) {
+      const eventMap = { detected: "drop.opened", through: "queue.through", joined: "queue.joined", waiting: "queue.advanced", captcha: "captcha.detected", "atc-success": "checkout.cleared", "new-listing": "listing.new" };
+      const event = eventMap[status];
+      if (event && wh.active && wh.events.includes(event)) {
+        fetch(wh.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event, drop }) }).catch(() => {});
+      }
+    }
+    res.json(drop);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const PORT = process.env.API_PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Casecomp API listening on http://localhost:${PORT}`);
