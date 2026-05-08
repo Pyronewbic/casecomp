@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Casecomp – Queue Auto-Join",
-  "version": "0.3.1",
-  "description": "Auto-join product drop queues on Pokémon Center, Walmart, and Costco using your real browser session.",
+  "version": "0.4.2",
+  "description": "Auto-join Pokemon Center drop queues — detects waiting rooms, joins automatically, with live ETA and auto-checkout.",
   "permissions": [
     "notifications",
     "storage",

@@ -97,6 +97,7 @@ function renderFeeds() {
 
 function renderFeedKPIs(workers) {
   const el = $("#feed-kpis");
+  if (!el) return;
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
   const recent = workers.filter((e) => now - new Date(e.ts).getTime() < day);
@@ -193,12 +194,11 @@ function renderRawLog(el) {
   const rows = entries.slice(0, 500).map((e, i) => {
     const ts = new Date(e.ts).toISOString().replace("T", " ").replace("Z", "");
     const siteId = SITE_NAME_TO_ID[e.site] || e.site.toLowerCase().replace(/\s+/g, "-");
-    const tab = e.tabId ? `t${e.tabId}` : "—";
     const slug = slugFromUrl(e.tabUrl);
     const srcTag = e._src === "archive" ? `<span class="raw-archived">ARC</span> ` : "";
-    return `<div class="raw-row${i % 2 === 0 ? "" : " alt"}${e._src === "archive" ? " archived" : ""}"><span class="raw-idx">${i}</span><span class="raw-ts">${ts}</span><span class="raw-site">${esc(siteId)}</span><span class="raw-tab">${tab}</span><span class="raw-status">${esc(e.status)}</span><span class="raw-detail">${srcTag}${slug ? `<span class="raw-slug">${esc(slug)}</span> ` : ""}${esc(e.detail || "—")}</span></div>`;
+    return `<div class="raw-row${i % 2 === 0 ? "" : " alt"}${e._src === "archive" ? " archived" : ""}"><span class="raw-idx">${i}</span><span class="raw-ts">${ts}</span><span class="raw-site">${esc(siteId)}</span><span class="raw-status">${esc(e.status)}</span><span class="raw-detail">${srcTag}${slug ? `<span class="raw-slug">${esc(slug)}</span> ` : ""}${esc(e.detail || "—")}</span></div>`;
   }).join("");
-  el.innerHTML = `<div class="raw-header"><span class="raw-idx">#</span><span class="raw-ts">TIMESTAMP</span><span class="raw-site">SITE</span><span class="raw-tab">TAB</span><span class="raw-status">STATUS</span><span class="raw-detail">DETAIL</span></div>${rows}`;
+  el.innerHTML = `<div class="raw-header"><span class="raw-idx">#</span><span class="raw-ts">TIMESTAMP</span><span class="raw-site">SITE</span><span class="raw-status">STATUS</span><span class="raw-detail">DETAIL</span></div>${rows}`;
 }
 
 function filterBySearch(entries) {
@@ -257,7 +257,7 @@ function renderWorkerPanel(el, entries) {
         <div class="empty-hints">
           <div class="empty-hint"><span class="eh-num">1</span>Paste a product URL above</div>
           <div class="empty-hint"><span class="eh-num">2</span>Extension opens and watches the page</div>
-          <div class="empty-hint"><span class="eh-num">3</span>Queue activates — auto-joins for you</div>
+          <div class="empty-hint"><span class="eh-num">3</span>Queue activates, auto-joins and checks out for you</div>
         </div>
         ${supportedSites}
         ${tickerSection}
@@ -407,6 +407,7 @@ function siteIdFromUrl(url) {
 
 function renderTargets(urls) {
   const el = $("#dash-url-list");
+  if (!el) return;
   const active = urls.filter((u) => u.active).length;
   $("#targets-meta").textContent = `${active} active · ${urls.length} total`;
   const tc = $("#targets-count");
@@ -480,6 +481,7 @@ function dashAddUrl() {
 
 function renderChannels(channels) {
   const el = $("#discord-channels");
+  if (!el) return;
   $("#channel-count").textContent = channels.length;
   el.innerHTML = channels.map((ch) =>
     `<span class="tag">#${esc(ch)}<button class="x" data-channel="${esc(ch)}">×</button></span>`
@@ -497,6 +499,7 @@ function renderChannels(channels) {
 
 function renderSubs(subs) {
   const el = $("#reddit-subs");
+  if (!el) return;
   $("#sub-count").textContent = subs.length;
   el.innerHTML = subs.map((s) =>
     `<span class="tag">r/${esc(s)}<button class="x" data-sub="${esc(s)}">×</button></span>`
@@ -514,6 +517,7 @@ function renderSubs(subs) {
 
 function renderKeywords(keywords) {
   const el = $("#keywords");
+  if (!el) return;
   $("#keyword-count").textContent = keywords.length;
   el.innerHTML = keywords.map((kw) =>
     `<span class="tag">${esc(kw)}<button class="x" data-keyword="${esc(kw)}">×</button></span>`
@@ -572,7 +576,7 @@ $$(".feed-tab").forEach((btn) => {
 });
 
 // Clear feed
-$("#dash-log-clear").addEventListener("click", () => {
+$("#dash-log-clear")?.addEventListener("click", () => {
   const cleared = logData.map((e) => ({ ...e, archivedAt: new Date().toISOString(), reason: "manual clear" }));
   const newArchive = [...cleared, ...archiveData].slice(0, 500);
   chrome.storage.local.set({ log: [], logArchive: newArchive });
@@ -585,32 +589,33 @@ $("#dash-log-clear").addEventListener("click", () => {
 });
 
 // Clear history
-$("#clear-history").addEventListener("click", () => {
+$("#clear-history")?.addEventListener("click", () => {
   chrome.storage.local.set({ logArchive: [] });
   archiveData = [];
   renderFeeds();
 });
 
 // Search
-$("#search").addEventListener("input", (e) => {
+$("#search")?.addEventListener("input", (e) => {
   currentSearch = e.target.value;
   renderFeeds();
 });
 
 // Master toggle
 function syncEngineState() {
-  document.body.classList.toggle("engine-off", !$("#enabled").checked);
+  const el = $("#enabled");
+  if (el) document.body.classList.toggle("engine-off", !el.checked);
 }
 
-$("#enabled").addEventListener("change", () => {
+$("#enabled")?.addEventListener("change", () => {
   chrome.storage.local.set({ enabled: $("#enabled").checked });
   syncEngineState();
 });
 
 // Add channel
-$("#channel-add").addEventListener("click", () => {
+$("#channel-add")?.addEventListener("click", () => {
   const input = $("#channel-input");
-  const val = input.value.trim().replace(/^#/, "");
+  const val = input?.value.trim().replace(/^#/, "");
   if (!val) return;
   chrome.storage.local.get(["discordChannels"], (data) => {
     const arr = data.discordChannels || [];
@@ -621,12 +626,12 @@ $("#channel-add").addEventListener("click", () => {
   });
   input.value = "";
 });
-$("#channel-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#channel-add").click(); });
+$("#channel-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#channel-add")?.click(); });
 
 // Add keyword
-$("#keyword-add").addEventListener("click", () => {
+$("#keyword-add")?.addEventListener("click", () => {
   const input = $("#keyword-input");
-  const val = input.value.trim().toLowerCase();
+  const val = input?.value.trim().toLowerCase();
   if (!val) return;
   chrome.storage.local.get(["discordKeywords"], (data) => {
     const arr = data.discordKeywords || [];
@@ -637,12 +642,12 @@ $("#keyword-add").addEventListener("click", () => {
   });
   input.value = "";
 });
-$("#keyword-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#keyword-add").click(); });
+$("#keyword-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#keyword-add")?.click(); });
 
 // Add subreddit
-$("#sub-add").addEventListener("click", () => {
+$("#sub-add")?.addEventListener("click", () => {
   const input = $("#sub-input");
-  const val = input.value.trim().replace(/^r\//, "").replace(/^\/r\//, "");
+  const val = input?.value.trim().replace(/^r\//, "").replace(/^\/r\//, "");
   if (!val) return;
   chrome.storage.local.get(["redditSubs"], (data) => {
     const arr = data.redditSubs || [];
@@ -653,11 +658,11 @@ $("#sub-add").addEventListener("click", () => {
   });
   input.value = "";
 });
-$("#sub-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#sub-add").click(); });
+$("#sub-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#sub-add")?.click(); });
 
 // Add target URL
-$("#dash-url-add").addEventListener("click", dashAddUrl);
-$("#dash-url-input").addEventListener("keydown", (e) => { if (e.key === "Enter") dashAddUrl(); });
+$("#dash-url-add")?.addEventListener("click", dashAddUrl);
+$("#dash-url-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") dashAddUrl(); });
 
 load();
 setInterval(() => {
