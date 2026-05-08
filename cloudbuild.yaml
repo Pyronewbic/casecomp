@@ -19,7 +19,7 @@ steps:
       - '--port'
       - '3000'
       - '--memory'
-      - '512Mi'
+      - '1Gi'
       - '--max-instances'
       - '3'
       - '--min-instances'
