@@ -6,134 +6,138 @@
   <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-  <header class="top">
-    <div class="brand-row">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
       <div class="brand-mark">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-          <defs>
-            <linearGradient id="foil" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#8a6d3a"/>
-              <stop offset=".45" stop-color="#d9b676"/>
-              <stop offset=".55" stop-color="#f1d79a"/>
-              <stop offset="1" stop-color="#8a6d3a"/>
-            </linearGradient>
-            <linearGradient id="holo" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#6ee7ff"/>
-              <stop offset=".5" stop-color="#c084fc"/>
-              <stop offset="1" stop-color="#fde68a"/>
-            </linearGradient>
-          </defs>
-          <rect x="21" y="26.5" width="50" height="67" rx="4" ry="4"
-                fill="#14151c" stroke="#d9b676" stroke-width="1.6"
-                transform="rotate(-7.5,46,60)"/>
-          <rect x="57" y="34.5" width="50" height="67" rx="4" ry="4"
-                fill="#1c1e27" stroke="#d9b676" stroke-width="2.4"
-                transform="rotate(7.5,82,68)"/>
-          <polyline fill="none" stroke="#d9b676" stroke-width="4"
-            stroke-linecap="round" stroke-linejoin="round"
-            points="16,64 40,64 48,44 56,80 64,50 72,64 112,64"/>
+          <rect x="21" y="26.5" width="50" height="67" rx="4" ry="4" fill="#14151c" stroke="#d9b676" stroke-width="1.6" transform="rotate(-7.5,46,60)"/>
+          <rect x="57" y="34.5" width="50" height="67" rx="4" ry="4" fill="#1c1e27" stroke="#d9b676" stroke-width="2.4" transform="rotate(7.5,82,68)"/>
+          <polyline fill="none" stroke="#d9b676" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="16,64 40,64 48,44 56,80 64,50 72,64 112,64"/>
         </svg>
       </div>
       <div class="brand-text">
-        <span class="eyebrow">Queue Intelligence Terminal · v0.4.2</span>
-        <h1>Case<span class="accent">comp</span></h1>
-      </div>
-      <div class="spacer"></div>
-      <div class="search">
-        <input type="text" id="search" placeholder="search sites, skus, channels…">
-        <span class="kbd">⌘ K</span>
-      </div>
-      <div class="master-toggle">
-        <span class="lbl">Engine</span>
-        <label class="toggle"><input type="checkbox" id="enabled" checked><span class="slider"></span></label>
+        <span class="brand-name">CASECOMP</span>
+        <span class="brand-tagline">PRECISION. TIMING. EDGE.</span>
       </div>
     </div>
 
-  </header>
+    <nav class="sidebar-nav">
+      <button class="feed-tab active" data-tab="workers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Workers</span>
+        <span class="count" id="workers-count">0</span>
+      </button>
+      <button class="feed-tab" data-tab="targets">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        <span>Targets</span>
+        <span class="count" id="targets-count">0</span>
+      </button>
+      <button class="feed-tab" data-tab="news">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg>
+        <span>News Monitor</span>
+        <span class="count" id="news-count">0</span>
+      </button>
+      <button class="feed-tab" data-tab="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>History</span>
+        <span class="count" id="history-count">0</span>
+      </button>
+      <button class="feed-tab" data-tab="logs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Logs</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <label class="toggle"><input type="checkbox" id="enabled" checked><span class="slider"></span></label>
+      <span class="engine-label">ENGINE</span>
+      <div class="system-status">
+        <span class="status-dot"></span>
+        <span>SYSTEM OPERATIONAL</span>
+      </div>
+      <span class="version">v0.4.2</span>
+    </div>
+  </aside>
 
   <main>
-    <section>
-      <nav class="feed-tabs">
-        <button class="feed-tab active" data-tab="workers">Workers <span class="count" id="workers-count">0</span></button>
-        <button class="feed-tab" data-tab="targets">Targets <span class="count" id="targets-count">0</span></button>
-        <button class="feed-tab" data-tab="news">News Monitor <span class="count" id="news-count">0</span></button>
-        <button class="feed-tab" data-tab="history">History <span class="count" id="history-count">0</span></button>
-        <button class="feed-tab" data-tab="logs">Logs <span class="count nerd">for nerds</span></button>
-      </nav>
+    <header class="top-bar">
+      <div class="search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search" placeholder="Search workers, targets, sites...">
+      </div>
+      <span class="meta" id="feed-meta"></span>
+    </header>
 
+    <div class="feed-kpis" id="feed-kpis"></div>
+
+    <div id="feed-workers" class="feed-panel active"></div>
+
+    <div id="feed-news" class="feed-panel">
+      <div class="news-config">
+        <div class="news-config-col">
+          <div class="section-head">
+            <h2>Discord Channels</h2>
+            <span class="rule"></span>
+            <span class="meta" id="channel-count">0</span>
+          </div>
+          <div class="tag-cloud" id="discord-channels"></div>
+          <div class="add-row">
+            <input type="text" id="channel-input" placeholder="channel-name">
+            <button id="channel-add">+</button>
+          </div>
+        </div>
+        <div class="news-config-col">
+          <div class="section-head">
+            <h2>Reddit Subs</h2>
+            <span class="rule"></span>
+            <span class="meta" id="sub-count">0</span>
+          </div>
+          <div class="tag-cloud" id="reddit-subs"></div>
+          <div class="add-row">
+            <input type="text" id="sub-input" placeholder="subreddit name">
+            <button id="sub-add">+</button>
+          </div>
+        </div>
+        <div class="news-config-col">
+          <div class="section-head">
+            <h2>Keywords</h2>
+            <span class="rule"></span>
+            <span class="meta" id="keyword-count">0</span>
+          </div>
+          <div class="tag-cloud" id="keywords"></div>
+          <div class="add-row">
+            <input type="text" id="keyword-input" placeholder="new keyword">
+            <button id="keyword-add">+</button>
+          </div>
+        </div>
+      </div>
+      <div id="news-feed"></div>
+    </div>
+
+    <div id="feed-history" class="feed-panel">
       <div class="section-head">
-        <h2>Live Site Feed</h2>
+        <h2>Archived Entries</h2>
         <span class="rule"></span>
-        <span class="meta" id="feed-meta">0 ARMED</span>
-        <button class="meta-btn" id="dash-log-clear">CLEAR</button>
+        <button class="meta-btn" id="clear-history">CLEAR HISTORY</button>
       </div>
+      <div id="history-content"></div>
+    </div>
 
-      <div class="feed-kpis" id="feed-kpis"></div>
+    <div id="feed-targets" class="feed-panel">
+      <div class="section-head">
+        <h2>Target URLs</h2>
+        <span class="rule"></span>
+        <span class="meta" id="targets-meta">0 active</span>
+      </div>
+      <div class="add-row targets-add">
+        <input type="text" id="dash-url-input" placeholder="https://www.pokemoncenter.com/product/...">
+        <button id="dash-url-add">+ Add Target</button>
+      </div>
+      <div id="dash-url-list"></div>
+    </div>
 
-      <div id="feed-workers" class="feed-panel active"></div>
-      <div id="feed-news" class="feed-panel">
-        <div class="news-config">
-          <div class="news-config-col">
-            <div class="section-head">
-              <h2>Discord Channels</h2>
-              <span class="rule"></span>
-              <span class="meta" id="channel-count">0</span>
-            </div>
-            <div class="tag-cloud" id="discord-channels"></div>
-            <div class="add-row">
-              <input type="text" id="channel-input" placeholder="channel-name">
-              <button id="channel-add">+</button>
-            </div>
-          </div>
-          <div class="news-config-col">
-            <div class="section-head">
-              <h2>Reddit Subs</h2>
-              <span class="rule"></span>
-              <span class="meta" id="sub-count">0</span>
-            </div>
-            <div class="tag-cloud" id="reddit-subs"></div>
-            <div class="add-row">
-              <input type="text" id="sub-input" placeholder="subreddit name">
-              <button id="sub-add">+</button>
-            </div>
-          </div>
-          <div class="news-config-col">
-            <div class="section-head">
-              <h2>Keywords</h2>
-              <span class="rule"></span>
-              <span class="meta" id="keyword-count">0</span>
-            </div>
-            <div class="tag-cloud" id="keywords"></div>
-            <div class="add-row">
-              <input type="text" id="keyword-input" placeholder="new keyword">
-              <button id="keyword-add">+</button>
-            </div>
-          </div>
-        </div>
-        <div id="news-feed"></div>
-      </div>
-      <div id="feed-history" class="feed-panel">
-        <div class="section-head">
-          <h2>Archived Entries</h2>
-          <span class="rule"></span>
-          <button class="meta-btn" id="clear-history">CLEAR HISTORY</button>
-        </div>
-        <div id="history-content"></div>
-      </div>
-      <div id="feed-targets" class="feed-panel">
-        <div class="section-head">
-          <h2>Target URLs</h2>
-          <span class="rule"></span>
-          <span class="meta" id="targets-meta">0 active</span>
-        </div>
-        <div class="add-row targets-add">
-          <input type="text" id="dash-url-input" placeholder="https://www.pokemoncenter.com/product/...">
-          <button id="dash-url-add">+ Add Target</button>
-        </div>
-        <div id="dash-url-list"></div>
-      </div>
-      <div id="feed-logs" class="feed-panel"></div>
-    </section>
+    <div id="feed-logs" class="feed-panel"></div>
   </main>
 
   <script src="dashboard.js"></script>
