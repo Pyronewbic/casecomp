@@ -269,7 +269,7 @@ The `extension/` directory contains a Chrome extension for monitoring Pokemon TC
 ### Features
 
 - **Target-URL driven** — paste a product URL, the extension arms that site automatically. No manual site toggles.
-- **Queue detection** — Incapsula (Pokemon Center), Queue-it (Walmart), PerimeterX captcha detection
+- **Queue detection** — Incapsula (Pokemon Center), Queue-it (Walmart), PerimeterX captcha detection, Target waiting room
 - **Auto add-to-cart** — after queue clearance, clicks ATC on the product page
 - **News Monitor** — aggregates intel from three sources:
   - **Discord** — watches configured channels for keyword matches
@@ -295,12 +295,14 @@ flowchart TD
   C -->|Pokemon Center| D[Incapsula iframe poll]
   C -->|Walmart| E[Queue-it detection]
   C -->|Costco| F[Incapsula/virtual room]
+  C -->|Target| T[Waiting room + ATC detection]
   C -->|Discord| DC[MutationObserver on chat]
   C -->|X.com| XC[Tweet scanning via data-testid]
   C -->|PC listings| PL[Scan product grid every 10s]
   D --> G{Status?}
   E --> G
   F --> G
+  T --> G
   G -->|CAPTCHA| H[Urgent chime — manual solve]
   G -->|Through| I[Auto-ATC if enabled]
   G -->|In queue| J{autoJoin?}
@@ -335,6 +337,17 @@ curl https://api.casecomp.xyz/v1/drops?limit=20 \
 # Self-hosted — card search
 curl "localhost:3000/api/search?q=Umbreon+ex&source=snkrdunk&condition=A"
 ```
+
+---
+
+## Tests
+
+```bash
+npm test                    # syntax checks, manifest validation, secrets scan + API integration tests
+node test/api-test.js       # API tests only (requires server on :3000)
+```
+
+The API test suite seeds 10 drop events across all supported sites (Pokemon Center, Walmart, Costco, Target), then exercises every endpoint: drops with filtering, webhook CRUD, comps via live eBay, search, sold comps, PSA signals, and grade validation. Skips gracefully if the API server isn't running.
 
 ---
 

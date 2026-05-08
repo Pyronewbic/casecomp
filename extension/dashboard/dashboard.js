@@ -4,7 +4,7 @@ const $$ = (s) => document.querySelectorAll(s);
 const STORAGE_KEYS = [
   "enabled", "sites", "log", "monitorStatus",
   "discordChannels", "discordKeywords", "redditSubs", "targetUrls", "logArchive",
-  "checkoutLog", "autoCheckout", "imapConfig", "proxyConfig",
+  "checkoutLog", "autoCheckout", "imapConfig", "proxyConfig", "profiles",
 ];
 
 const SITE_ICONS = {
@@ -12,6 +12,7 @@ const SITE_ICONS = {
   "pokemon-center-jp": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="3"/><path d="M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20" stroke-width="1" opacity=".4"/></svg>',
   "walmart":           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2.9" y1="7" x2="7.2" y2="9.5"/><line x1="16.8" y1="14.5" x2="21.1" y2="17"/><line x1="2.9" y1="17" x2="7.2" y2="14.5"/><line x1="16.8" y1="9.5" x2="21.1" y2="7"/></svg>',
   "costco":            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/><line x1="12" y1="12" x2="12" y2="16"/></svg>',
+  "target":            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
   "discord":           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 9.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2zM14.5 9.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill="currentColor" stroke="none"/><path d="M5.5 16s1.5 2 6.5 2 6.5-2 6.5-2"/><path d="M20 7.5c-1.5-1-3.2-1.7-5-2l-.5 1.2M4 7.5c1.5-1 3.2-1.7 5-2l.5 1.2"/><path d="M3 12c0 4 2 7.5 4.5 9l1-2M21 12c0 4-2 7.5-4.5 9l-1-2"/></svg>',
 };
 
@@ -20,6 +21,7 @@ const MONITORS = [
   { id: "pokemon-center-jp", label: "Pokémon Center JP", letter: "P" },
   { id: "walmart",           label: "Walmart",           letter: "W" },
   { id: "costco",            label: "Costco",            letter: "C" },
+  { id: "target",            label: "Target",            letter: "T" },
 ];
 
 const SITE_NAME_TO_ID = {
@@ -28,6 +30,7 @@ const SITE_NAME_TO_ID = {
   "PC Japan": "pokemon-center-jp",
   "Walmart": "walmart",
   "Costco": "costco",
+  "Target": "target",
   "discord": "discord",
 };
 
@@ -180,7 +183,7 @@ function renderAnalytics(period) {
   `;
 
   // Site breakdown
-  const siteNameMap = { "pokemon-center": "Pokémon Center US", "pokemon-center-jp": "Pokémon Center JP", "walmart": "Walmart", "costco": "Costco" };
+  const siteNameMap = { "pokemon-center": "Pokémon Center US", "pokemon-center-jp": "Pokémon Center JP", "walmart": "Walmart", "costco": "Costco", "target": "Target" };
   const siteCounts = {};
   for (const e of periodEntries) {
     const id = SITE_NAME_TO_ID[e.site] || e.site?.toLowerCase().replace(/\s+/g, "-") || "other";
@@ -310,6 +313,162 @@ function collectProxyConfig() {
   };
 }
 
+const ACCOUNT_SITE_LABELS = {
+  "pokemon-center": "Pokemon Center",
+  "walmart": "Walmart",
+  "costco": "Costco",
+  "target": "Target",
+};
+
+function maskEmail(email) {
+  if (!email) return "";
+  const parts = email.split("@");
+  if (parts.length !== 2) return email;
+  const name = parts[0];
+  if (name.length <= 1) return email;
+  return name[0] + "***@" + parts[1];
+}
+
+function renderAccounts() {
+  chrome.storage.local.get(["profiles"], (data) => {
+    const accounts = data.profiles || [];
+    const listEl = $("#accounts-list");
+    if (!listEl) return;
+
+    const searchVal = ($("#account-search")?.value || "").toLowerCase();
+    const filterVal = $("#account-filter")?.value || "all";
+
+    let filtered = accounts;
+    if (searchVal) filtered = filtered.filter(a => (a.account?.email || "").toLowerCase().includes(searchVal) || (a.name || "").toLowerCase().includes(searchVal));
+    if (filterVal !== "all") filtered = filtered.filter(a => a.account?.site === filterVal);
+
+    if (!filtered.length) {
+      listEl.innerHTML = `<div style="color:var(--paper-dd);padding:30px;text-align:center;font-family:var(--font-mono);font-size:11px;">${accounts.length ? "No matching accounts." : "No accounts yet. Click + Add Account."}</div>`;
+      return;
+    }
+
+    listEl.innerHTML = filtered.map(a => {
+      const siteLabel = ACCOUNT_SITE_LABELS[a.account?.site] || a.account?.site || "—";
+      const proxy = a.proxy || "—";
+      const status = a.status || "Idle";
+      const statusCls = status === "Active" ? "acct-active" : status === "Blocked" ? "acct-blocked" : "acct-idle";
+      const defaultBadge = a.isDefault ? ' <span class="acct-default">DEFAULT</span>' : "";
+      return `<div class="acct-row" data-acct-id="${esc(a.id)}">
+        <span class="acct-email">${esc(a.account?.email || "—")}${defaultBadge}</span>
+        <span class="acct-site">${esc(siteLabel)}</span>
+        <span class="acct-proxy">${esc(proxy)}</span>
+        <span class="acct-status ${statusCls}">${esc(status)}</span>
+        <div class="acct-actions">
+          <button class="acct-edit" data-acct-id="${esc(a.id)}">Edit</button>
+          <button class="acct-delete" data-acct-id="${esc(a.id)}">×</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    listEl.querySelectorAll(".acct-edit").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.acctId;
+        chrome.storage.local.get(["profiles"], d => {
+          const acct = (d.profiles || []).find(a => a.id === id);
+          if (acct) showAccountModal(acct);
+        });
+      });
+    });
+
+    listEl.querySelectorAll(".acct-delete").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.acctId;
+        chrome.storage.local.get(["profiles"], d => {
+          const arr = (d.profiles || []).filter(a => a.id !== id);
+          chrome.storage.local.set({ profiles: arr }, () => renderAccounts());
+        });
+      });
+    });
+  });
+}
+
+function showAccountModal(account) {
+  const modal = $("#account-modal");
+  const content = $("#account-modal-content");
+  if (!modal || !content) return;
+
+  const isNew = !account;
+  const a = account || {
+    id: "acct_" + Date.now().toString(36),
+    name: "",
+    account: { email: "", password: "", site: "pokemon-center" },
+    proxy: "",
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+  };
+
+  modal.style.display = "flex";
+  content.innerHTML = `
+    <div class="modal-header">
+      <h3>${isNew ? "Add Account" : "Update Account"}</h3>
+      <button class="modal-close" id="acct-modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="editor-field">
+        <label>Site</label>
+        <select id="acct-site">
+          <option value="pokemon-center"${(a.account?.site || "pokemon-center") === "pokemon-center" ? " selected" : ""}>Pokemon Center</option>
+          <option value="walmart"${a.account?.site === "walmart" ? " selected" : ""}>Walmart</option>
+          <option value="costco"${a.account?.site === "costco" ? " selected" : ""}>Costco</option>
+          <option value="target"${a.account?.site === "target" ? " selected" : ""}>Target</option>
+        </select>
+      </div>
+      <div class="editor-field">
+        <label>Login</label>
+        <input type="text" id="acct-email" placeholder="email@example.com" value="${esc(a.account?.email || "")}">
+      </div>
+      <div class="editor-field">
+        <label>Password</label>
+        <input type="password" id="acct-pass" placeholder="password" value="${esc(a.account?.password || "")}">
+      </div>
+      <div class="editor-field">
+        <label>Proxy</label>
+        <input type="text" id="acct-proxy" placeholder="host:port:user:pass or leave empty" value="${esc(a.proxy || "")}">
+      </div>
+      <label class="editor-checkbox">
+        <input type="checkbox" id="acct-default"${a.isDefault ? " checked" : ""}> Set as default
+      </label>
+    </div>
+    <button class="modal-save" id="acct-save">${isNew ? "Add Account" : "Update"}</button>
+  `;
+
+  content.querySelector("#acct-modal-close")?.addEventListener("click", () => { modal.style.display = "none"; });
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.style.display = "none"; });
+
+  content.querySelector("#acct-save")?.addEventListener("click", () => {
+    const updated = {
+      id: a.id,
+      name: a.name || $("#acct-email")?.value?.split("@")[0] || "Account",
+      account: {
+        email: $("#acct-email")?.value || "",
+        password: $("#acct-pass")?.value || "",
+        site: $("#acct-site")?.value || "pokemon-center",
+      },
+      proxy: $("#acct-proxy")?.value || "",
+      isDefault: $("#acct-default")?.checked || false,
+      status: "Idle",
+      createdAt: a.createdAt || new Date().toISOString(),
+    };
+
+    chrome.storage.local.get(["profiles"], data => {
+      let arr = data.profiles || [];
+      if (updated.isDefault) arr = arr.map(p => ({ ...p, isDefault: false }));
+      const idx = arr.findIndex(p => p.id === updated.id);
+      if (idx >= 0) arr[idx] = { ...arr[idx], ...updated };
+      else arr.push(updated);
+      chrome.storage.local.set({ profiles: arr }, () => {
+        modal.style.display = "none";
+        renderAccounts();
+      });
+    });
+  });
+}
+
 function load() {
   chrome.storage.local.get(STORAGE_KEYS, (data) => {
     $("#enabled").checked = data.enabled !== false;
@@ -322,6 +481,7 @@ function load() {
     renderKeywords(data.discordKeywords || []);
     renderTargets(data.targetUrls || []);
     loadSettings(data);
+    renderAccounts();
   });
 }
 
@@ -582,6 +742,7 @@ function renderWorkerPanel(el, entries) {
           <div class="site-chip"><span class="sc-icon">${SITE_ICONS["pokemon-center-jp"]}</span><span>Pokémon Center JP</span></div>
           <div class="site-chip"><span class="sc-icon">${SITE_ICONS["walmart"]}</span><span>Walmart</span></div>
           <div class="site-chip"><span class="sc-icon">${SITE_ICONS["costco"]}</span><span>Costco</span></div>
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["target"]}</span><span>Target</span></div>
         </div>
       </div>
     </div>`;
@@ -722,6 +883,7 @@ function siteIdFromUrl(url) {
     if (h.includes("pokemoncenter-online") || h.includes("pokemon.co.jp")) return "pokemon-center-jp";
     if (h.includes("walmart")) return "walmart";
     if (h.includes("costco")) return "costco";
+    if (h.includes("target.com")) return "target";
     if (h.includes("pokemon.com")) return "pokemon-center";
   } catch {}
   return null;
@@ -796,7 +958,7 @@ function dashAddUrl() {
   if (!raw) return;
   try {
     const parsed = new URL(raw);
-    const allowed = ["www.pokemoncenter.com", "pokemoncenter.com", "www.pokemoncenter-online.com", "pokemoncenter-online.com", "pokemoncenter.pokemon.co.jp", "www.walmart.com", "www.costco.com", "www.pokemon.com", "tcg.pokemon.com"];
+    const allowed = ["www.pokemoncenter.com", "pokemoncenter.com", "www.pokemoncenter-online.com", "pokemoncenter-online.com", "pokemoncenter.pokemon.co.jp", "www.walmart.com", "www.costco.com", "www.target.com", "www.pokemon.com", "tcg.pokemon.com"];
     if (!allowed.some((h) => parsed.hostname === h || parsed.hostname.endsWith(".queue-it.net") || parsed.hostname.endsWith(".pokemon.com"))) {
       input.style.borderColor = "var(--pulse)";
       setTimeout(() => { input.style.borderColor = ""; }, 1500);
@@ -1021,6 +1183,11 @@ $("#sub-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") $("
 $("#dash-url-add")?.addEventListener("click", dashAddUrl);
 $("#dash-url-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") dashAddUrl(); });
 
+// Add profile
+$("#add-account")?.addEventListener("click", () => showAccountModal(null));
+$("#account-search")?.addEventListener("input", () => renderAccounts());
+$("#account-filter")?.addEventListener("change", () => renderAccounts());
+
 // Settings: Auto-Checkout toggle
 $("#setting-auto-checkout")?.addEventListener("change", () => {
   saveSettingsField("autoCheckout", $("#setting-auto-checkout").checked);
@@ -1080,4 +1247,5 @@ chrome.storage.onChanged.addListener((changes) => {
       loadSettings(data);
     });
   }
+  if (changes.profiles) renderAccounts();
 });
