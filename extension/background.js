@@ -133,9 +133,16 @@ function autoOpenTargets() {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "OPEN_DASHBOARD") {
-    chrome.tabs.create({ url: chrome.runtime.getURL("dashboard/dashboard.html") });
+    const dashUrl = chrome.runtime.getURL("dashboard/dashboard.html");
+    chrome.tabs.query({ url: dashUrl }, (tabs) => {
+      if (tabs.length > 0) {
+        chrome.tabs.update(tabs[0].id, { active: true });
+      } else {
+        chrome.tabs.create({ url: dashUrl });
+      }
+    });
     sendResponse({ ok: true });
-    return;
+    return true;
   }
 
   if (msg.type === "QUEUE_STATUS") {
