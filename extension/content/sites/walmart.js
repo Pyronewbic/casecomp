@@ -169,7 +169,117 @@
     const btn = findAtcButton();
     if (!btn) return false;
     btn.click();
+    setTimeout(() => {
+      if (window.location.hostname.includes("walmart")) {
+        window.location.href = "https://www.walmart.com/checkout";
+      }
+    }, 1500);
     return true;
+  }
+
+  const CHECKOUT_SELECTORS = {
+    cartCheckoutBtn: ['[data-testid="checkout-btn"]', 'button[data-automation-id="checkout"]', '.checkout-btn'],
+    continueBtn: ['[data-testid="continue-btn"]', 'button[data-testid="shipping-continue"]'],
+    placeOrderBtn: ['[data-testid="place-order-btn"]', 'button[data-automation-id="place-order"]'],
+    orderConfirmation: ['.order-confirmation', '[data-testid="order-confirmation"]'],
+  };
+
+  function findBySelectors(selectors) {
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el && isVisible(el)) return el;
+    }
+    return null;
+  }
+
+  function findByText(text) {
+    const allBtns = document.querySelectorAll("button, a.btn, input[type='submit']");
+    const re = new RegExp(text, "i");
+    for (const btn of allBtns) {
+      const txt = (btn.textContent || btn.value || "").trim();
+      if (re.test(txt) && isVisible(btn) && !btn.disabled) return btn;
+    }
+    return null;
+  }
+
+  function sendCheckoutStatus(status, detail) {
+    chrome.runtime.sendMessage({
+      type: "QUEUE_STATUS",
+      site: "Walmart",
+      status: status,
+      detail: detail || "",
+    });
+  }
+
+  function waitForElement(selectors, textFallback, timeoutMs) {
+    return new Promise((resolve) => {
+      const deadline = Date.now() + (timeoutMs || 15000);
+      const check = () => {
+        const el = findBySelectors(selectors) || (textFallback ? findByText(textFallback) : null);
+        if (el) return resolve(el);
+        if (Date.now() > deadline) return resolve(null);
+        setTimeout(check, 500);
+      };
+      check();
+    });
+  }
+
+  async function checkout() {
+    try {
+      // Step 1: Navigate to cart if not already there
+      if (!window.location.pathname.startsWith("/cart")) {
+        window.location.href = "/cart";
+        return;
+      }
+
+      // Step 2: Click checkout button from cart
+      const cartBtn = await waitForElement(CHECKOUT_SELECTORS.cartCheckoutBtn, "Check out", 10000);
+      if (!cartBtn) {
+        sendCheckoutStatus("checkout-failed", "Could not find checkout button in cart");
+        return false;
+      }
+      cartBtn.click();
+      sendCheckoutStatus("checkout-shipping", "Proceeding to shipping...");
+
+      // Step 3: Shipping — wait for continue button
+      const shipBtn = await waitForElement(CHECKOUT_SELECTORS.continueBtn, "Continue", 20000);
+      if (!shipBtn) {
+        sendCheckoutStatus("checkout-failed", "Could not find continue button on shipping page");
+        return false;
+      }
+      shipBtn.click();
+      sendCheckoutStatus("checkout-payment", "Proceeding to payment...");
+
+      // Step 4: Payment — wait for continue button
+      const payBtn = await waitForElement(CHECKOUT_SELECTORS.continueBtn, "Continue", 20000);
+      if (!payBtn) {
+        sendCheckoutStatus("checkout-failed", "Could not find continue button on payment page");
+        return false;
+      }
+      payBtn.click();
+      sendCheckoutStatus("checkout-review", "Reviewing order...");
+
+      // Step 5: Place order
+      const placeBtn = await waitForElement(CHECKOUT_SELECTORS.placeOrderBtn, "Place order", 20000);
+      if (!placeBtn) {
+        sendCheckoutStatus("checkout-failed", "Could not find place order button");
+        return false;
+      }
+      placeBtn.click();
+
+      // Step 6: Confirm order placed
+      const confirm = await waitForElement(CHECKOUT_SELECTORS.orderConfirmation, "Order placed", 30000);
+      if (confirm) {
+        sendCheckoutStatus("checkout-success", "Order placed successfully!");
+        return true;
+      } else {
+        sendCheckoutStatus("checkout-failed", "Order confirmation not detected");
+        return false;
+      }
+    } catch (err) {
+      sendCheckoutStatus("checkout-failed", "Checkout error: " + (err?.message || "unknown"));
+      return false;
+    }
   }
 
   window.__csbSiteHandler = {
@@ -178,5 +288,6 @@
     detect,
     join,
     addToCart,
+    checkout,
   };
 })();
