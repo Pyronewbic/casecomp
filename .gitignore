@@ -1,10 +1,8 @@
 .env
 node_modules/
-ebay-active-cache.json
-ebay-sold-cache.json
-ai-grade-cache.json
+output/
+
+*-cache.json
 ebay-usage.json
-psa-pop-cache.json
 results.json
 results.md
-output/
