@@ -15,6 +15,7 @@
     "api": "node api.js"
   },
   "dependencies": {
+    "@google-cloud/firestore": "^8.5.0",
     "axios": "^1.7.9",
     "axios-cookiejar-support": "^5.0.5",
     "cheerio": "^1.0.0",
