@@ -194,12 +194,11 @@ function renderRawLog(el) {
   const rows = entries.slice(0, 500).map((e, i) => {
     const ts = new Date(e.ts).toISOString().replace("T", " ").replace("Z", "");
     const siteId = SITE_NAME_TO_ID[e.site] || e.site.toLowerCase().replace(/\s+/g, "-");
-    const tab = e.tabId ? `t${e.tabId}` : "—";
     const slug = slugFromUrl(e.tabUrl);
     const srcTag = e._src === "archive" ? `<span class="raw-archived">ARC</span> ` : "";
-    return `<div class="raw-row${i % 2 === 0 ? "" : " alt"}${e._src === "archive" ? " archived" : ""}"><span class="raw-idx">${i}</span><span class="raw-ts">${ts}</span><span class="raw-site">${esc(siteId)}</span><span class="raw-tab">${tab}</span><span class="raw-status">${esc(e.status)}</span><span class="raw-detail">${srcTag}${slug ? `<span class="raw-slug">${esc(slug)}</span> ` : ""}${esc(e.detail || "—")}</span></div>`;
+    return `<div class="raw-row${i % 2 === 0 ? "" : " alt"}${e._src === "archive" ? " archived" : ""}"><span class="raw-idx">${i}</span><span class="raw-ts">${ts}</span><span class="raw-site">${esc(siteId)}</span><span class="raw-status">${esc(e.status)}</span><span class="raw-detail">${srcTag}${slug ? `<span class="raw-slug">${esc(slug)}</span> ` : ""}${esc(e.detail || "—")}</span></div>`;
   }).join("");
-  el.innerHTML = `<div class="raw-header"><span class="raw-idx">#</span><span class="raw-ts">TIMESTAMP</span><span class="raw-site">SITE</span><span class="raw-tab">TAB</span><span class="raw-status">STATUS</span><span class="raw-detail">DETAIL</span></div>${rows}`;
+  el.innerHTML = `<div class="raw-header"><span class="raw-idx">#</span><span class="raw-ts">TIMESTAMP</span><span class="raw-site">SITE</span><span class="raw-status">STATUS</span><span class="raw-detail">DETAIL</span></div>${rows}`;
 }
 
 function filterBySearch(entries) {
@@ -258,7 +257,7 @@ function renderWorkerPanel(el, entries) {
         <div class="empty-hints">
           <div class="empty-hint"><span class="eh-num">1</span>Paste a product URL above</div>
           <div class="empty-hint"><span class="eh-num">2</span>Extension opens and watches the page</div>
-          <div class="empty-hint"><span class="eh-num">3</span>Queue activates — auto-joins for you</div>
+          <div class="empty-hint"><span class="eh-num">3</span>Queue activates, auto-joins and checks out for you</div>
         </div>
         ${supportedSites}
         ${tickerSection}
