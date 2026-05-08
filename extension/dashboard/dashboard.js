@@ -88,25 +88,79 @@ function renderFeeds() {
   renderHistory($("#history-content"));
   renderRawLog($("#feed-logs"));
   renderFeedKPIs(workers);
-  const feedHead = $(".section-head:has(#feed-meta)") || $("#feed-meta")?.closest(".section-head");
-  if (feedHead) feedHead.style.display = workers.length ? "" : "none";
+  const totalEvents = logData.length;
+  const lastEntry = logData[0];
+  const lastTs = lastEntry ? new Date(lastEntry.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+  const feedMeta = $("#feed-meta");
+  if (feedMeta) feedMeta.textContent = totalEvents ? `${totalEvents} EVENTS · LAST ${lastTs}` : "";
   $("#workers-count").textContent = workers.length ? new Set(workers.map((e) => e.site)).size : 0;
   $("#news-count").textContent = news.length;
   $("#history-count").textContent = archiveData.length;
 }
 
+function _sparkPoints(arr, w, h) {
+  w = w || 120;
+  h = h || 28;
+  if (!arr.length) return "";
+  const max = Math.max(...arr, 1);
+  const step = w / Math.max(arr.length - 1, 1);
+  return arr.map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`).join(" ");
+}
+
+function _bucketBy(entries, bucketMs, count) {
+  const now = Date.now();
+  const buckets = new Array(count).fill(0);
+  for (const e of entries) {
+    const age = now - new Date(e.ts).getTime();
+    const idx = count - 1 - Math.min(Math.floor(age / bucketMs), count - 1);
+    buckets[idx]++;
+  }
+  return buckets;
+}
+
+function _ensureSvgDefs() {
+  if (document.getElementById("__kpi-svg-defs")) return;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "0");
+  svg.setAttribute("height", "0");
+  svg.setAttribute("id", "__kpi-svg-defs");
+  svg.style.position = "absolute";
+  svg.innerHTML = `<defs>
+    <linearGradient id="holoGrad" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="var(--holo-c)"/>
+      <stop offset=".5" stop-color="var(--holo-m)"/>
+      <stop offset="1" stop-color="var(--holo-y)"/>
+    </linearGradient>
+    <linearGradient id="sgFoil" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="var(--foil-hi)"/>
+      <stop offset="1" stop-color="var(--foil-lo)"/>
+    </linearGradient>
+  </defs>`;
+  document.body.appendChild(svg);
+}
+
 function renderFeedKPIs(workers) {
   const el = $("#feed-kpis");
   if (!el) return;
+
+  _ensureSvgDefs();
+
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
   const recent = workers.filter((e) => now - new Date(e.ts).getTime() < day);
 
-  const sites = new Set(workers.map((e) => e.site)).size;
+  const armed = workers.filter((e) => e.status !== "through").length;
   const queued = recent.filter((e) => e.status === "waiting" || e.status === "joined").length;
-  const cleared = recent.filter((e) => e.status === "through").length;
-  const blocked = recent.filter((e) => e.status === "captcha").length;
-  const atc = recent.filter((e) => e.status === "atc-success").length;
+
+  let bestPos = null;
+  for (const e of recent) {
+    const m = (e.detail || "").match(/pos(?:ition)?[\s:]*#?(\d+)/i);
+    if (m) {
+      const p = parseInt(m[1], 10);
+      if (bestPos === null || p < bestPos) bestPos = p;
+    }
+  }
+  const bestPosLabel = bestPos !== null ? String(bestPos) : "—";
 
   let fastest = null;
   const joinMap = new Map();
@@ -120,61 +174,88 @@ function renderFeedKPIs(workers) {
       joinMap.delete(id);
     }
   }
-  const fastLabel = fastest !== null ? `${Math.floor(fastest / 60000)}m ${Math.round((fastest % 60000) / 1000)}s` : "—";
+  const etaLabel = fastest !== null ? `${Math.floor(fastest / 60000)}m ${Math.round((fastest % 60000) / 1000)}s` : "—";
 
-  const hasData = sites > 0 || queued > 0 || cleared > 0 || blocked > 0 || atc > 0 || fastest !== null;
-  if (!hasData) {
-    el.style.display = "none";
-    return;
-  }
-  el.style.display = "";
+  const todayCount = logData.length;
+
+  const bucketMs = day / 12;
+  const armedBuckets = _bucketBy(workers.filter((e) => e.status !== "through"), bucketMs, 12);
+  const queueBuckets = _bucketBy(recent.filter((e) => e.status === "waiting" || e.status === "joined"), bucketMs, 12);
+  const posBuckets = _bucketBy(recent, bucketMs, 12);
+  const etaBuckets = _bucketBy(workers, bucketMs, 12);
+  const todayBuckets = _bucketBy(recent, bucketMs, 12);
+
+  el.classList.add("kpi-bar");
   el.innerHTML = `
-    <div class="feed-kpi"><span class="fk-val">${sites}</span><span class="fk-lbl">Active Sites</span></div>
-    <div class="feed-kpi"><span class="fk-val">${queued}</span><span class="fk-lbl">In Queue</span></div>
-    <div class="feed-kpi"><span class="fk-val holo">${cleared}</span><span class="fk-lbl">Cleared · 24h</span></div>
-    <div class="feed-kpi"><span class="fk-val">${blocked}</span><span class="fk-lbl">Captchas</span></div>
-    <div class="feed-kpi"><span class="fk-val holo">${atc}</span><span class="fk-lbl">ATC Hits</span></div>
-    <div class="feed-kpi"><span class="fk-val">${fastLabel}</span><span class="fk-lbl">Best Clear</span></div>
+    <div class="kpi-card">
+      <div class="kpi-head"><span class="lbl">Armed</span><span class="hint">active</span></div>
+      <div class="val">${armed}</div>
+      <svg class="kpi-spark" viewBox="0 0 120 28"><polyline points="${_sparkPoints(armedBuckets)}"/></svg>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-head"><span class="lbl">In Queue</span><span class="hint">24h</span></div>
+      <div class="val">${queued}</div>
+      <svg class="kpi-spark" viewBox="0 0 120 28"><polyline points="${_sparkPoints(queueBuckets)}"/></svg>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-head"><span class="lbl">Best Pos</span><span class="hint">24h low</span></div>
+      <div class="val holo">${bestPosLabel}</div>
+      <svg class="kpi-spark holo" viewBox="0 0 120 28"><polyline points="${_sparkPoints(posBuckets)}" stroke="url(#holoGrad)"/></svg>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-head"><span class="lbl">ETA</span><span class="hint">best clear</span></div>
+      <div class="val">${etaLabel}</div>
+      <svg class="kpi-spark" viewBox="0 0 120 28"><polyline points="${_sparkPoints(etaBuckets)}"/></svg>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-head"><span class="lbl">Today</span><span class="hint">events</span></div>
+      <div class="val">${todayCount}</div>
+      <svg class="kpi-spark" viewBox="0 0 120 28"><polyline points="${_sparkPoints(todayBuckets)}"/></svg>
+    </div>
   `;
 }
 
 function renderHistory(el) {
-  const entries = filterBySearch(archiveData);
+  const workerOnly = archiveData.filter((e) => WORKER_STATUSES.has(e.status) || e.site === "system");
+  const entries = filterBySearch(workerOnly);
   if (!entries.length) {
-    el.innerHTML = '<div style="color:var(--paper-dd);padding:40px;text-align:center;">No archived entries yet.</div>';
+    el.innerHTML = '<div style="color:var(--paper-dd);padding:40px;text-align:center;">No archived worker runs yet.</div>';
     return;
   }
 
-  const byReason = new Map();
+  const byTarget = new Map();
   for (const e of entries) {
-    const key = e.reason || "manual clear";
-    if (!byReason.has(key)) byReason.set(key, []);
-    byReason.get(key).push(e);
+    const slug = slugFromUrl(e.tabUrl);
+    const key = slug || e.reason || "unknown";
+    if (!byTarget.has(key)) byTarget.set(key, { entries: [], archivedAt: e.archivedAt, reason: e.reason });
+    byTarget.get(key).entries.push(e);
   }
 
-  el.innerHTML = [...byReason.entries()].map(([reason, items]) => {
-    const first = items[0];
-    const archivedTs = first.archivedAt ? new Date(first.archivedAt).toLocaleString() : "—";
+  el.innerHTML = [...byTarget.entries()].map(([target, group]) => {
+    const { entries: items, archivedAt, reason } = group;
+    const ts = archivedAt ? new Date(archivedAt).toLocaleString() : "—";
+    const siteId = SITE_NAME_TO_ID[items[0]?.site] || "";
+    const icon = SITE_ICONS[siteId] || "";
+    const siteName = items[0]?.site || "system";
+    const reasonLabel = reason || "tab closed";
+
     const rows = items.map((e) => {
       const pillClass = STATUS_TO_PILL[e.status] || "pill-idle";
       const time = new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      const siteId = SITE_NAME_TO_ID[e.site] || e.site.toLowerCase().replace(/\s+/g, "-");
-      const slug = slugFromUrl(e.tabUrl);
-      const slugHtml = slug ? `<span class="entry-slug">${esc(slug)}</span>` : "";
       return `<div class="entry">
         <span class="ts">${time}</span>
         <span class="pill ${pillClass}">${esc(e.status.replace(/-/g, " "))}</span>
-        <span class="msg">${slugHtml}${esc(e.detail || "")}</span>
+        <span class="msg">${esc(e.detail || "")}</span>
         <span class="qty">—</span>
       </div>`;
     }).join("");
 
     return `<details class="site-group" data-status="intel">
       <summary>
-        <div class="sg-icon">⌫</div>
+        <div class="sg-icon">${icon || "⌫"}</div>
         <div class="sg-body">
-          <div class="sg-name">${esc(reason)}</div>
-          <div class="sg-detail">${items.length} entries · archived ${archivedTs}</div>
+          <div class="sg-name">${esc(siteName)} · ${esc(target)}</div>
+          <div class="sg-detail">${items.length} events · ${esc(reasonLabel)} · ${ts}</div>
         </div>
         <span class="pill pill-idle">${items.length}</span>
       </summary>
@@ -214,28 +295,6 @@ function filterBySearch(entries) {
 function renderWorkerPanel(el, entries) {
   entries = filterBySearch(entries);
   if (!entries.length) {
-    const newsEntries = logData.filter((e) => !isWorkerEntry(e)).slice(0, 5);
-    const tickerHtml = newsEntries.length ? newsEntries.map((e) => {
-      const time = new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      return `<div class="ticker-item"><span class="ticker-src">${esc(e.site)}</span><span class="ticker-text">${esc((e.detail || "").slice(0, 120))}</span><span class="ticker-time">${time}</span></div>`;
-    }).join("") : "";
-
-    const tickerSection = tickerHtml ? `
-      <div class="empty-ticker">
-        <div class="section-head"><h2>Latest Intel</h2><span class="rule"></span></div>
-        ${tickerHtml}
-      </div>` : "";
-
-    const supportedSites = `
-      <div class="empty-sites">
-        <div class="section-head"><h2>Supported Sites</h2><span class="rule"></span></div>
-        <div class="site-chips">
-          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["pokemon-center"]}</span><span>Pokemon Center US</span></div>
-          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["pokemon-center-jp"]}</span><span>Pokemon Center JP</span></div>
-          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["walmart"]}</span><span>Walmart</span></div>
-          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["costco"]}</span><span>Costco</span></div>
-        </div>
-      </div>`;
 
     el.innerHTML = `<div class="empty-state">
       <div class="empty-hero">
@@ -246,21 +305,25 @@ function renderWorkerPanel(el, entries) {
             <polyline fill="none" stroke="#d9b676" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="16,64 40,64 48,44 56,80 64,50 72,64 112,64" opacity=".4"/>
           </svg>
         </div>
-        <div class="empty-title">No activity yet</div>
-        <div class="empty-sub">Paste a product URL to start monitoring drops and queue events.</div>
+        <div class="empty-title" style="color:var(--foil)">No activity yet</div>
+        <div class="empty-sub">Drop a target URL below or open a supported site to deploy your first worker.</div>
         <div class="empty-quick-add">
           <input type="text" id="empty-url-input" placeholder="https://www.pokemoncenter.com/product/...">
           <button id="empty-url-add">+ Add Target</button>
         </div>
       </div>
       <div class="empty-bottom">
-        <div class="empty-hints">
-          <div class="empty-hint"><span class="eh-num">1</span>Paste a product URL above</div>
-          <div class="empty-hint"><span class="eh-num">2</span>Extension opens and watches the page</div>
-          <div class="empty-hint"><span class="eh-num">3</span>Queue activates, auto-joins and checks out for you</div>
+        <div class="step-cards">
+          <div class="step-card"><div class="step-num">STEP 01</div><div class="step-title">Add Targets</div><div class="step-desc">Paste product URLs you want monitored.</div></div>
+          <div class="step-card"><div class="step-num">STEP 02</div><div class="step-title">Arm Engine</div><div class="step-desc">Toggle the engine on; workers deploy on supported pages.</div></div>
+          <div class="step-card"><div class="step-num">STEP 03</div><div class="step-title">Watch the Queue</div><div class="step-desc">Position, ETA, and queue movement update live.</div></div>
         </div>
-        ${supportedSites}
-        ${tickerSection}
+        <div class="site-chips">
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["pokemon-center"]}</span><span>Pokémon Center</span></div>
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["pokemon-center-jp"]}</span><span>Pokémon Center JP</span></div>
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["walmart"]}</span><span>Walmart</span></div>
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["costco"]}</span><span>Costco</span></div>
+        </div>
       </div>
     </div>`;
     const addBtn = el.querySelector("#empty-url-add");
