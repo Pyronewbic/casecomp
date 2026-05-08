@@ -4,6 +4,7 @@ const $$ = (s) => document.querySelectorAll(s);
 const STORAGE_KEYS = [
   "enabled", "sites", "log", "monitorStatus",
   "discordChannels", "discordKeywords", "redditSubs", "targetUrls", "logArchive",
+  "checkoutLog", "autoCheckout", "imapConfig", "proxyConfig",
 ];
 
 const SITE_ICONS = {
@@ -33,19 +34,27 @@ const SITE_NAME_TO_ID = {
 const WORKER_STATUSES = new Set([
   "detected", "joined", "waiting", "through", "captcha",
   "atc-success", "atc-failed", "target-opened",
+  "checkout-shipping", "checkout-payment", "checkout-review",
+  "checkout-success", "checkout-failed", "verification-filled",
 ]);
 
 const STATUS_TO_PILL = {
-  through:        "pill-through",
-  detected:       "pill-detected",
-  joined:         "pill-joined",
-  waiting:        "pill-waiting",
-  captcha:        "pill-captcha",
-  "atc-success":  "pill-atc",
-  "atc-failed":   "pill-detected",
-  "target-opened":"pill-detected",
-  "discord-intel":"pill-intel",
-  "new-listing":  "pill-new",
+  through:              "pill-through",
+  detected:             "pill-detected",
+  joined:               "pill-joined",
+  waiting:              "pill-waiting",
+  captcha:              "pill-captcha",
+  "atc-success":        "pill-atc",
+  "atc-failed":         "pill-detected",
+  "target-opened":      "pill-detected",
+  "discord-intel":      "pill-intel",
+  "new-listing":        "pill-new",
+  "checkout-shipping":  "pill-joined",
+  "checkout-payment":   "pill-joined",
+  "checkout-review":    "pill-waiting",
+  "checkout-success":   "pill-through",
+  "checkout-failed":    "pill-captcha",
+  "verification-filled":"pill-intel",
 };
 
 const STATUS_TO_DATA = {
@@ -60,9 +69,185 @@ let currentTab = "workers";
 let currentSearch = "";
 let logData = [];
 let archiveData = [];
+let _lastTargets = [];
 
 function isWorkerEntry(e) {
   return WORKER_STATUSES.has(e.status) || e.site === "system";
+}
+
+function renderAnalytics(period) {
+  period = period || "day";
+  const el = $("#analytics-cards");
+  const chartEl = $("#analytics-chart");
+  const tableEl = $("#analytics-checkouts");
+  if (!el) return;
+
+  // Compute stats from logData
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const periodMs = period === "month" ? 30 * day : period === "week" ? 7 * day : day;
+  const periodEntries = logData.filter(e => now - new Date(e.ts).getTime() < periodMs);
+
+  const checkouts = periodEntries.filter(e => e.status === "atc-success" || e.status === "through");
+  const failures = periodEntries.filter(e => e.status === "atc-failed" || e.status === "captcha");
+  const totalEvents = periodEntries.length;
+
+  // Cards
+  el.innerHTML = `
+    <div class="a-card highlight">
+      <div class="a-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+      <div class="a-card-body"><div class="a-card-label">Events</div><div class="a-card-value">${totalEvents}</div></div>
+    </div>
+    <div class="a-card">
+      <div class="a-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="a-card-body"><div class="a-card-label">Checkouts</div><div class="a-card-value">${checkouts.length}</div></div>
+    </div>
+    <div class="a-card">
+      <div class="a-card-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <div class="a-card-body"><div class="a-card-label">Queues Joined</div><div class="a-card-value">${periodEntries.filter(e => e.status === "joined").length}</div></div>
+    </div>
+    <div class="a-card">
+      <div class="a-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="a-card-body"><div class="a-card-label">Failures</div><div class="a-card-value">${failures.length}</div></div>
+    </div>
+  `;
+
+  // Chart - bucket events by time
+  const bucketCount = period === "month" ? 12 : period === "week" ? 7 : 24;
+  const bucketMs = periodMs / bucketCount;
+  const buckets = new Array(bucketCount).fill(0);
+  for (const e of periodEntries) {
+    const age = now - new Date(e.ts).getTime();
+    const idx = bucketCount - 1 - Math.floor(age / bucketMs);
+    if (idx >= 0 && idx < bucketCount) buckets[idx]++;
+  }
+
+  const max = Math.max(...buckets, 1);
+  const chartW = 600;
+  const chartH = 140;
+  const points = buckets.map((v, i) => {
+    const x = bucketCount > 1 ? (i / (bucketCount - 1)) * chartW : 0;
+    const y = chartH - (v / max) * (chartH - 10) - 5;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const areaPoints = `0,${chartH} ${points} ${chartW},${chartH}`;
+
+  const yLabels = [max, Math.round(max * 0.75), Math.round(max * 0.5), Math.round(max * 0.25), 0];
+
+  let xLabels;
+  if (period === "day") {
+    xLabels = Array.from({length: 6}, (_, i) => {
+      const h = new Date(now - (24 - i * 4) * 3600000).getHours();
+      return `${h}:00`;
+    });
+  } else if (period === "week") {
+    const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    xLabels = Array.from({length: 7}, (_, i) => days[new Date(now - (6-i) * day).getDay()]);
+  } else {
+    xLabels = Array.from({length: 6}, (_, i) => {
+      const d = new Date(now - (30 - i * 6) * day);
+      return `${d.getMonth()+1}/${d.getDate()}`;
+    });
+  }
+
+  chartEl.innerHTML = `
+    <div class="chart-y-axis">${yLabels.map(v => `<span>${v}</span>`).join("")}</div>
+    <svg class="chart-svg" viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="none">
+      <defs><linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--foil)"/><stop offset="1" stop-color="transparent"/></linearGradient></defs>
+      <polygon class="chart-area" points="${areaPoints}"/>
+      <polyline points="${points}"/>
+    </svg>
+    <div class="chart-x-axis">${xLabels.map(l => `<span>${l}</span>`).join("")}</div>
+  `;
+
+  // Recent checkouts table
+  const recentCheckouts = logData
+    .filter(e => e.status === "through" || e.status === "atc-success")
+    .slice(0, 10);
+
+  if (!recentCheckouts.length) {
+    tableEl.innerHTML = '<div style="color:var(--paper-dd);padding:20px;text-align:center;">No checkouts yet.</div>';
+    return;
+  }
+
+  const siteNameMap = { "pokemon-center": "Pokemon Center", "walmart": "Walmart", "costco": "Costco", "pokemon-center-jp": "Pokemon Center JP" };
+
+  tableEl.innerHTML = `
+    <div class="checkout-table">
+      <div class="checkout-header">
+        <span>Product</span><span>Price</span><span>Retailer</span><span>Date</span>
+      </div>
+      ${recentCheckouts.map(e => {
+        const slug = slugFromUrl(e.tabUrl) || e.detail || "Unknown product";
+        const siteId = SITE_NAME_TO_ID[e.site] || e.site;
+        const retailer = siteNameMap[siteId] || e.site || "—";
+        const date = new Date(e.ts).toLocaleString([], { month: "numeric", day: "numeric", year: "2-digit", hour: "numeric", minute: "2-digit" });
+        const link = e.tabUrl ? `<a class="checkout-product-link" href="${esc(e.tabUrl)}" target="_blank">↗</a>` : "";
+        return `<div class="checkout-row">
+          <div class="checkout-product"><span class="checkout-product-name">${esc(slug)}</span>${link}</div>
+          <span class="checkout-price">—</span>
+          <span class="checkout-retailer">${esc(retailer)}</span>
+          <span class="checkout-date">${date}</span>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+function loadSettings(data) {
+  const ac = $("#setting-auto-checkout");
+  if (ac) ac.checked = data.autoCheckout === true;
+
+  const imap = data.imapConfig || {};
+  const ih = $("#setting-imap-host");
+  const ip = $("#setting-imap-port");
+  const iu = $("#setting-imap-user");
+  const ipw = $("#setting-imap-pass");
+  const it = $("#setting-imap-tls");
+  if (ih) ih.value = imap.host || "";
+  if (ip) ip.value = imap.port || 993;
+  if (iu) iu.value = imap.user || "";
+  if (ipw) ipw.value = imap.pass || "";
+  if (it) it.checked = imap.tls !== false;
+
+  const proxy = data.proxyConfig || {};
+  const pe = $("#setting-proxy-enabled");
+  const ph = $("#setting-proxy-host");
+  const pp = $("#setting-proxy-port");
+  const pu = $("#setting-proxy-user");
+  const ppw = $("#setting-proxy-pass");
+  const pt = $("#setting-proxy-type");
+  if (pe) pe.checked = proxy.enabled === true;
+  if (ph) ph.value = proxy.host || "";
+  if (pp) pp.value = proxy.port || "";
+  if (pu) pu.value = proxy.user || "";
+  if (ppw) ppw.value = proxy.pass || "";
+  if (pt) pt.value = proxy.type || "http";
+}
+
+function saveSettingsField(key, value) {
+  chrome.storage.local.set({ [key]: value });
+}
+
+function collectImapConfig() {
+  return {
+    host: $("#setting-imap-host")?.value || "",
+    port: parseInt($("#setting-imap-port")?.value) || 993,
+    user: $("#setting-imap-user")?.value || "",
+    pass: $("#setting-imap-pass")?.value || "",
+    tls: $("#setting-imap-tls")?.checked !== false,
+  };
+}
+
+function collectProxyConfig() {
+  return {
+    enabled: $("#setting-proxy-enabled")?.checked === true,
+    host: $("#setting-proxy-host")?.value || "",
+    port: $("#setting-proxy-port")?.value || "",
+    user: $("#setting-proxy-user")?.value || "",
+    pass: $("#setting-proxy-pass")?.value || "",
+    type: $("#setting-proxy-type")?.value || "http",
+  };
 }
 
 function load() {
@@ -76,17 +261,41 @@ function load() {
     renderSubs(data.redditSubs || ["PKMNTCGDeals", "PokemonTCG"]);
     renderKeywords(data.discordKeywords || []);
     renderTargets(data.targetUrls || []);
+    loadSettings(data);
   });
 }
 
 
 function renderFeeds() {
-  const workers = logData.filter((e) => isWorkerEntry(e));
-  const news = logData.filter((e) => !isWorkerEntry(e));
+  const workers = logData.filter((e) => WORKER_STATUSES.has(e.status) && e.site !== "system");
+
+  // Inject placeholder for armed targets with no worker log
+  const cachedTargets = _lastTargets || [];
+  const siteNames = { "pokemon-center": "Pokémon Center", "pokemon-center-jp": "Pokémon Center JP", "walmart": "Walmart", "costco": "Costco" };
+  for (const t of cachedTargets) {
+    if (!t.active) continue;
+    const hasWorker = workers.some((e) => {
+      if (e.tabUrl === t.url) return true;
+      try { return new URL(e.tabUrl).hostname === new URL(t.url).hostname; } catch { return false; }
+    });
+    if (!hasWorker) {
+      const siteId = siteIdFromUrl(t.url);
+      workers.push({
+        ts: t.addedAt || new Date().toISOString(),
+        site: siteNames[siteId] || "Unknown",
+        status: "detected",
+        detail: "Armed — waiting for page to load",
+        tabUrl: t.url,
+      });
+    }
+  }
+
   renderWorkerPanel($("#feed-workers"), workers);
+  const news = logData.filter((e) => !isWorkerEntry(e));
   renderFlatPanel($("#news-feed"), news);
   renderHistory($("#history-content"));
   renderRawLog($("#feed-logs"));
+  renderAnalytics();
   renderFeedKPIs(workers);
   const totalEvents = logData.length;
   const lastEntry = logData[0];
@@ -295,6 +504,8 @@ function filterBySearch(entries) {
 function renderWorkerPanel(el, entries) {
   entries = filterBySearch(entries);
   if (!entries.length) {
+    const existingInput = el.querySelector("#empty-url-input");
+    if (existingInput && document.activeElement === existingInput) return;
 
     el.innerHTML = `<div class="empty-state">
       <div class="empty-hero">
@@ -374,8 +585,8 @@ function renderWorkerPanel(el, entries) {
       return `<div class="entry">
         <span class="ts">${time}</span>
         <span class="pill ${bc}">${esc(g.status.replace(/-/g, " "))}${cl}</span>
-        <span class="msg">${rowSlugHtml}${esc(g.detail || "")}</span>
-        <span class="qty">—</span>
+        <span class="msg">${esc(g.detail || "")}</span>
+        <span class="qty">${rowSlugHtml}</span>
       </div>`;
     }).join("");
 
@@ -383,8 +594,8 @@ function renderWorkerPanel(el, entries) {
       <summary>
         <div class="sg-icon">${iconSvg}</div>
         <div class="sg-body">
-          <div class="sg-name">${esc(site)} <span class="sg-region">${esc(region)}</span></div>
-          <div class="sg-detail">${slugHtml}${esc(detailText)}</div>
+          <div class="sg-name">${esc(site)} <span class="sg-region">${esc(region)}</span> ${slugHtml}</div>
+          <div class="sg-detail">${esc(detailText)}</div>
         </div>
         <span class="pill ${pillClass}">${esc(latest.status.replace(/-/g, " "))}</span>
         ${etaHtml}
@@ -469,6 +680,7 @@ function siteIdFromUrl(url) {
 }
 
 function renderTargets(urls) {
+  _lastTargets = urls;
   const el = $("#dash-url-list");
   if (!el) return;
   const active = urls.filter((u) => u.active).length;
@@ -487,19 +699,31 @@ function renderTargets(urls) {
     const sId = siteIdFromUrl(u.url);
     const icon = sId && SITE_ICONS[sId] ? SITE_ICONS[sId] : "";
     const statusLabel = u.active ? "armed" : "paused";
+    const toggleIcon = u.active
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="1" y1="1" x2="23" y2="23"/><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>';
     return `<div class="${cls}" data-url="${esc(u.url)}">
-      <button class="t-check"><span class="t-box"></span></button>
+      <button class="t-check" title="Click to ${u.active ? 'pause' : 'activate'}"><span class="t-box"></span></button>
       <div class="t-icon">${icon}</div>
       <div class="t-body">
         <div class="t-label">${esc(label)}</div>
         <div class="t-url">${esc(u.url)}</div>
       </div>
-      <span class="t-status">${statusLabel}</span>
-      <button class="t-remove">×</button>
+      <button class="t-toggle-status" title="Click to ${u.active ? 'pause' : 'activate'}">${toggleIcon} ${statusLabel}</button>
+      <button class="t-remove" title="Remove target">×</button>
     </div>`;
   }).join("");
 
   el.querySelectorAll(".t-check").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const url = btn.closest(".target-row").dataset.url;
+      chrome.runtime.sendMessage({ type: "TOGGLE_TARGET_URL", url }, (res) => {
+        if (res?.urls) renderTargets(res.urls);
+      });
+    });
+  });
+
+  el.querySelectorAll(".t-toggle-status").forEach((btn) => {
     btn.addEventListener("click", () => {
       const url = btn.closest(".target-row").dataset.url;
       chrome.runtime.sendMessage({ type: "TOGGLE_TARGET_URL", url }, (res) => {
@@ -628,14 +852,36 @@ function esc(s) {
 }
 
 // Tabs
+function switchTab(tab) {
+  $$(".feed-tab").forEach((b) => b.classList.remove("active"));
+  $$(".feed-panel").forEach((el) => el.classList.remove("active"));
+  const btn = $(`.feed-tab[data-tab="${tab}"]`);
+  const panel = $(`#feed-${tab}`);
+  if (btn) btn.classList.add("active");
+  if (panel) panel.classList.add("active");
+  currentTab = tab;
+  chrome.storage.local.set({ dashboardTab: tab });
+}
+
 $$(".feed-tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    $$(".feed-tab").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentTab = btn.dataset.tab;
-    $$(".feed-panel").forEach((el) => el.classList.remove("active"));
-    $(`#feed-${currentTab}`).classList.add("active");
-  });
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+let tabRestored = false;
+chrome.storage.local.get(["dashboardTab"], (data) => {
+  if (data.dashboardTab && !tabRestored) {
+    tabRestored = true;
+    switchTab(data.dashboardTab);
+  }
+});
+
+// Period toggle (analytics) — use delegation for reliability
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".period-btn");
+  if (!btn) return;
+  $$(".period-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderAnalytics(btn.dataset.period);
 });
 
 // Clear feed
@@ -727,15 +973,44 @@ $("#sub-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") $("
 $("#dash-url-add")?.addEventListener("click", dashAddUrl);
 $("#dash-url-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") dashAddUrl(); });
 
+// Settings: Auto-Checkout toggle
+$("#setting-auto-checkout")?.addEventListener("change", () => {
+  saveSettingsField("autoCheckout", $("#setting-auto-checkout").checked);
+});
+
+// Settings: IMAP fields
+["setting-imap-host", "setting-imap-port", "setting-imap-user", "setting-imap-pass"].forEach((id) => {
+  $("#" + id)?.addEventListener("change", () => {
+    saveSettingsField("imapConfig", collectImapConfig());
+  });
+});
+$("#setting-imap-tls")?.addEventListener("change", () => {
+  saveSettingsField("imapConfig", collectImapConfig());
+});
+
+// Settings: Proxy fields
+["setting-proxy-host", "setting-proxy-port", "setting-proxy-user", "setting-proxy-pass"].forEach((id) => {
+  $("#" + id)?.addEventListener("change", () => {
+    saveSettingsField("proxyConfig", collectProxyConfig());
+  });
+});
+$("#setting-proxy-enabled")?.addEventListener("change", () => {
+  saveSettingsField("proxyConfig", collectProxyConfig());
+});
+$("#setting-proxy-type")?.addEventListener("change", () => {
+  saveSettingsField("proxyConfig", collectProxyConfig());
+});
+
 load();
 setInterval(() => {
   chrome.storage.local.get(["log", "logArchive", "targetUrls"], (data) => {
     logData = data.log || [];
     archiveData = data.logArchive || [];
     renderFeeds();
+    renderAnalytics();
     renderTargets(data.targetUrls || []);
   });
-}, 5000);
+}, 2000);
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.log || changes.logArchive) {
@@ -751,5 +1026,10 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.enabled) {
     $("#enabled").checked = changes.enabled.newValue !== false;
     syncEngineState();
+  }
+  if (changes.autoCheckout || changes.imapConfig || changes.proxyConfig) {
+    chrome.storage.local.get(["autoCheckout", "imapConfig", "proxyConfig"], (data) => {
+      loadSettings(data);
+    });
   }
 });

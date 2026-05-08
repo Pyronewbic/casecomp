@@ -330,14 +330,33 @@ body::before {
 }
 
 .target-toggle {
-  background: none; border: none;
-  color: var(--paper-d);
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
   cursor: pointer;
-  font-size: 10px;
-  padding: 2px;
-  transition: color .15s;
+  transition: all .15s;
+  background: none;
+  border: 1px solid transparent;
 }
-.target-toggle:hover { color: var(--foil); }
+.target-toggle.armed {
+  color: var(--ok);
+  background: rgba(124,224,168,.08);
+  border-color: rgba(124,224,168,.2);
+}
+.target-toggle.paused {
+  color: var(--paper-dd);
+  background: var(--ink-3);
+  border-color: var(--line-2);
+}
+.target-toggle:hover {
+  border-color: var(--foil);
+  color: var(--foil);
+}
 
 .target-remove {
   background: none; border: none;

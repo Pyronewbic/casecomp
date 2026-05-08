@@ -130,13 +130,20 @@
           playChime();
         }
 
-        if (config.autoAddToCart && SITE_HANDLER.addToCart && lastStatus !== "atc-success") {
+        if (config.autoAddToCart && SITE_HANDLER.addToCart && lastStatus !== "atc-success" && lastStatus !== "checkout-shipping" && lastStatus !== "checkout-payment" && lastStatus !== "checkout-review" && lastStatus !== "checkout-success") {
           const sincNav = Date.now() - urlChangedAt;
-          if (urlChangedAt && sincNav < 2000) return;
+          if (urlChangedAt && sincNav < 1000) return;
           const atcOk = SITE_HANDLER.addToCart();
           if (atcOk) {
             report("atc-success", "Auto-added to cart!");
             if (config.soundAlerts) playChime();
+
+            // Auto-checkout after ATC if enabled
+            if (config.autoCheckout && SITE_HANDLER.checkout) {
+              setTimeout(() => {
+                SITE_HANDLER.checkout();
+              }, 1000);
+            }
           }
         }
       }
@@ -162,6 +169,9 @@
     if (msg.type === "POLL_QUEUE") tick();
   });
 
+  const isPokemonCenter = /pokemoncenter/i.test(window.location.hostname);
+  const TICK_MS = isPokemonCenter ? 5000 : 2000;
+
   tick();
-  setInterval(tick, 3000);
+  setInterval(tick, TICK_MS);
 })();

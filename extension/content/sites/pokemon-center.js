@@ -77,7 +77,19 @@
       !/add to cart/i.test(bodyText);
   }
 
+  function detectAccessDenied() {
+    const bodyText = (document.body?.innerText || "").slice(0, 2000);
+    if (/access denied|error 17|blocked by our security/i.test(bodyText)) return true;
+    const title = document.title || "";
+    if (/access denied/i.test(title)) return true;
+    return false;
+  }
+
   function detect() {
+    if (detectAccessDenied()) {
+      return { inQueue: true, captcha: true, joinable: false, detail: "Access denied (Error 17) — IP may be rate-limited. Wait and refresh." };
+    }
+
     if (detectCaptcha()) {
       return { inQueue: true, captcha: true, joinable: false, detail: "CAPTCHA detected — solve manually!" };
     }
@@ -155,6 +167,11 @@
     btn.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, cancelable: true }));
     btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
     btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    setTimeout(() => {
+      if (window.location.hostname.includes("pokemoncenter")) {
+        window.location.href = "https://www.pokemoncenter.com/checkout";
+      }
+    }, 1500);
     return true;
   }
 
@@ -171,11 +188,121 @@
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
+  const PC_CHECKOUT_SELECTORS = {
+    cartBtn: ['.cart-button', '[data-testid="cart-button"]', 'a[href*="/cart"]'],
+    checkoutBtn: ['[data-testid="checkout-btn"]', '.checkout-button'],
+    continueBtn: ['[data-testid="continue-btn"]', 'button[data-testid="shipping-continue"]'],
+    placeOrderBtn: ['[data-testid="place-order"]', '.place-order-btn'],
+    orderConfirmation: ['.order-confirmation', '[data-testid="order-confirmation"]'],
+  };
+
+  function findCheckoutEl(selectors, textFallback) {
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el && isVisible(el)) return el;
+    }
+    if (textFallback) {
+      const allBtns = document.querySelectorAll("button, a.btn, input[type='submit']");
+      const re = new RegExp(textFallback, "i");
+      for (const btn of allBtns) {
+        const txt = (btn.textContent || btn.value || "").trim();
+        if (re.test(txt) && isVisible(btn) && !btn.disabled) return btn;
+      }
+    }
+    return null;
+  }
+
+  function sendPCCheckoutStatus(status, detail) {
+    chrome.runtime.sendMessage({
+      type: "QUEUE_STATUS",
+      site: "Pokémon Center",
+      status: status,
+      detail: detail || "",
+    });
+  }
+
+  function waitForPCElement(selectors, textFallback, timeoutMs) {
+    return new Promise((resolve) => {
+      const deadline = Date.now() + (timeoutMs || 15000);
+      const check = () => {
+        const el = findCheckoutEl(selectors, textFallback);
+        if (el) return resolve(el);
+        if (Date.now() > deadline) return resolve(null);
+        setTimeout(check, 500);
+      };
+      check();
+    });
+  }
+
+  async function checkout() {
+    try {
+      // Step 1: Navigate to cart if not on cart/checkout page
+      if (!window.location.pathname.startsWith("/cart") && !window.location.pathname.startsWith("/checkout")) {
+        const cartLink = findCheckoutEl(PC_CHECKOUT_SELECTORS.cartBtn, null);
+        if (cartLink) {
+          cartLink.click();
+        } else {
+          window.location.href = "/cart";
+        }
+        return;
+      }
+
+      // Step 2: Click checkout button
+      const checkoutBtn = await waitForPCElement(PC_CHECKOUT_SELECTORS.checkoutBtn, "Checkout", 10000);
+      if (!checkoutBtn) {
+        sendPCCheckoutStatus("checkout-failed", "Could not find checkout button");
+        return false;
+      }
+      checkoutBtn.click();
+      sendPCCheckoutStatus("checkout-shipping", "Proceeding to shipping...");
+
+      // Step 3: Shipping — wait for continue
+      const shipBtn = await waitForPCElement(PC_CHECKOUT_SELECTORS.continueBtn, "Continue", 20000);
+      if (!shipBtn) {
+        sendPCCheckoutStatus("checkout-failed", "Could not find continue button on shipping");
+        return false;
+      }
+      shipBtn.click();
+      sendPCCheckoutStatus("checkout-payment", "Proceeding to payment...");
+
+      // Step 4: Payment — wait for continue
+      const payBtn = await waitForPCElement(PC_CHECKOUT_SELECTORS.continueBtn, "Continue", 20000);
+      if (!payBtn) {
+        sendPCCheckoutStatus("checkout-failed", "Could not find continue button on payment");
+        return false;
+      }
+      payBtn.click();
+      sendPCCheckoutStatus("checkout-review", "Reviewing order...");
+
+      // Step 5: Place order
+      const placeBtn = await waitForPCElement(PC_CHECKOUT_SELECTORS.placeOrderBtn, "Place Order", 20000);
+      if (!placeBtn) {
+        sendPCCheckoutStatus("checkout-failed", "Could not find place order button");
+        return false;
+      }
+      placeBtn.click();
+
+      // Step 6: Confirm
+      const confirm = await waitForPCElement(PC_CHECKOUT_SELECTORS.orderConfirmation, "Order placed", 30000);
+      if (confirm) {
+        sendPCCheckoutStatus("checkout-success", "Order placed successfully!");
+        return true;
+      } else {
+        sendPCCheckoutStatus("checkout-failed", "Order confirmation not detected");
+        return false;
+      }
+    } catch (err) {
+      sendPCCheckoutStatus("checkout-failed", "Checkout error: " + (err?.message || "unknown"));
+      return false;
+    }
+  }
+
   window.__csbSiteHandler = {
     id: "pokemon-center",
     name: "Pokémon Center",
     detect,
     join,
     addToCart,
+    checkout,
   };
 })();

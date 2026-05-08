@@ -136,15 +136,15 @@ function renderTargets() {
 
     const stateClass = !u.active ? "" : (latest?.status === "captcha" ? "is-alert" : "is-on");
 
+    const toggleLabel = u.active ? "armed" : "paused";
     return `<div class="target ${stateClass}" data-url="${escAttr(u.url)}">
       <div class="target-icon">${icon}</div>
       <div class="target-body">
         <div class="target-label">${esc(label)}</div>
         <div class="target-url">${esc(truncateUrl(u.url))}</div>
       </div>
-      <span class="pill ${pillClass}">${esc(pillLabel)}</span>
-      <button class="target-toggle">${u.active ? "⏸" : "▶"}</button>
-      <button class="target-remove">×</button>
+      <button class="target-toggle ${u.active ? 'armed' : 'paused'}" title="Click to ${u.active ? 'pause' : 'activate'}">${esc(toggleLabel)}</button>
+      <button class="target-remove" title="Remove">×</button>
     </div>`;
   }).join("");
 
