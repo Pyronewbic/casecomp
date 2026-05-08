@@ -6,7 +6,7 @@
 
 Results are written to **`results.md`** (human-readable) and **`results.json`** (full data). Every run also appends to **`output/resultsCombined.md`** — a deduplicated running log across all searches.
 
-![eBay Pokémon card search demo](demo.gif)
+![eBay Pokémon card search demo](docs/demo.gif)
 
 ---
 
