@@ -538,9 +538,7 @@ export async function main() {
       const ebayUsed = await getEbayUsageToday();
       log(`  eBay: ${ebayUsed}/${DAILY_CAP} today | LLM calls: ${counters.llmCalls}`);
 
-      const psaSignal = cfg.listingFormat === "raw"
-        ? await getPsaGradingSignal(card, { log })
-        : null;
+      const psaSignal = await getPsaGradingSignal(card, { log });
 
       return {
         query: card,
