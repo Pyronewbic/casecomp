@@ -8,7 +8,7 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'casecomp-api'
+      - 'cardscrapebot'
       - '--image'
       - 'gcr.io/$PROJECT_ID/casecomp-api'
       - '--region'
