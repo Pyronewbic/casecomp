@@ -33,6 +33,10 @@
         <span>Targets</span>
         <span class="count" id="targets-count">0</span>
       </button>
+      <button class="feed-tab" data-tab="accounts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Accounts</span>
+      </button>
       <button class="feed-tab" data-tab="news">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg>
         <span>News Monitor</span>
@@ -80,6 +84,36 @@
     <div class="feed-kpis" id="feed-kpis"></div>
 
     <div id="feed-workers" class="feed-panel active"></div>
+
+    <div id="feed-accounts" class="feed-panel">
+      <div class="accounts-header">
+        <h2 class="accounts-title">Accounts</h2>
+        <div class="accounts-toolbar">
+          <input type="text" id="account-search" placeholder="Search accounts..." class="account-search">
+          <select id="account-filter" class="account-filter">
+            <option value="all">All Sites</option>
+            <option value="pokemon-center">Pokemon Center</option>
+            <option value="walmart">Walmart</option>
+            <option value="costco">Costco</option>
+            <option value="target">Target</option>
+          </select>
+          <button class="accounts-add-btn" id="add-account">+ Add Account</button>
+        </div>
+      </div>
+      <div class="accounts-table" id="accounts-table">
+        <div class="accounts-table-header">
+          <span>User / Email</span>
+          <span>Site</span>
+          <span>Proxy</span>
+          <span>Status</span>
+          <span></span>
+        </div>
+        <div id="accounts-list"></div>
+      </div>
+      <div id="account-modal" class="account-modal" style="display:none;">
+        <div class="account-modal-content" id="account-modal-content"></div>
+      </div>
+    </div>
 
     <div id="feed-news" class="feed-panel">
       <div class="news-config">

@@ -234,8 +234,12 @@
     });
   }
 
-  async function checkout() {
+  async function checkout(profile) {
     try {
+      if (profile) {
+        sendPCCheckoutStatus("checkout-shipping", `Using profile: ${profile.name}`);
+      }
+
       // Step 1: Navigate to cart if not on cart/checkout page
       if (!window.location.pathname.startsWith("/cart") && !window.location.pathname.startsWith("/checkout")) {
         const cartLink = findCheckoutEl(PC_CHECKOUT_SELECTORS.cartBtn, null);
