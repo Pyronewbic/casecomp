@@ -2,7 +2,7 @@
 
 Queue auto-join and drop intelligence for Pokemon TCG product releases across Pokemon Center, Walmart, and Costco.
 
-**Website:** [casecomp.xyz](https://casecomp.xyz)
+**Website:** [casecomp.xyz](https://casecomp.xyz) · **API docs:** [casecomp.xyz/developers](https://casecomp.xyz/developers)
 
 ## Install
 
