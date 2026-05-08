@@ -321,95 +321,20 @@ flowchart TD
 
 ## REST API
 
-Two options: **self-host** or use the **hosted API** at `api.casecomp.xyz`.
+**Hosted:** [api.casecomp.xyz](https://casecomp.xyz/developers) — aggregated drop data, managed infra, webhook delivery. Get an API key and go.
 
-### Hosted API
+**Self-hosted:** `yarn api` — runs on port 3000 with your own eBay keys and optional Redis. Only sees your own drops.
 
-No setup needed. Get an API key at [casecomp.xyz/developers](https://casecomp.xyz/developers) and start making requests:
+Full endpoint reference with schemas and try-it-out: **[Swagger docs](http://localhost:3000/docs)** (self-hosted) or **[casecomp.xyz/developers](https://casecomp.xyz/developers)** (hosted).
 
 ```bash
+# Hosted — drop intelligence
 curl https://api.casecomp.xyz/v1/drops?limit=20 \
   -H "Authorization: Bearer $CASECOMP_KEY"
+
+# Self-hosted — card search
+curl "localhost:3000/api/search?q=Umbreon+ex&source=snkrdunk&condition=A"
 ```
-
-The hosted API aggregates drop events from all extension users, provides reliable webhook delivery, and handles infrastructure (Redis, eBay API keys, rate limits) for you.
-
-### Self-hosted
-
-Run your own instance — you'll need your own eBay API keys and optional Redis:
-
-```bash
-yarn api   # starts on :3000
-```
-
-Swagger docs at [localhost:3000/docs](http://localhost:3000/docs). A self-hosted instance only sees drops from your own extension.
-
-### Card research endpoints (open)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/search?q=Umbreon+ex&source=snkrdunk&condition=A` | Search card listings |
-| `GET` | `/api/sold?q=Umbreon+ex&source=ebay` | Recent sold comps |
-| `GET` | `/api/psa?q=Umbreon+ex` | PSA population signal |
-| `POST` | `/api/grade` | AI pre-grade from image URL(s) |
-| `GET` | `/api/grades?q=Mega+Greninja&limit=100` | Export stored grades (training data) |
-| `GET` | `/api/health` | Health check + Redis status |
-
-### v1 API — Drop Intelligence (Bearer auth)
-
-Set `CASECOMP_API_KEY` in `.env` (self-hosted) or use your key from [casecomp.xyz](https://casecomp.xyz/developers). All v1 endpoints require `Authorization: Bearer <key>`.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/v1/drops?limit=20&site=pokemon` | List recent drop events |
-| `GET` | `/v1/drops/:id` | Single drop with queue metrics and timing |
-| `GET` | `/v1/comps?sku=sv8-151-booster` | Sold + listed prices from eBay, magi, SNKRDUNK, Yahoo |
-| `POST` | `/v1/webhooks` | Register webhook for events |
-| `GET` | `/v1/webhooks` | List registered webhooks |
-| `DELETE` | `/v1/webhooks/:id` | Remove a webhook |
-
-#### Webhook events
-
-`drop.opened` · `drop.closed` · `queue.joined` · `queue.advanced` · `queue.through` · `checkout.cleared` · `captcha.detected` · `listing.new`
-
-```bash
-# Register a webhook
-curl -X POST https://api.casecomp.xyz/v1/webhooks \
-  -H "Authorization: Bearer $CASECOMP_KEY" \
-  -d '{"url":"https://you.dev/hook","events":["drop.opened","queue.through"]}'
-```
-
-### Search params
-
-`q` (required), `source` (ebay/snkrdunk/magi/yahoo), `format` (raw/slab), `countries` (US,IN), `lang` (eng/jp/any), `results`, `sold`, `slab_provider`, `slab_grade`, `condition` (A-D), `grade` (true = AI pre-grade)
-
-### AI grading for training data
-
-```bash
-# Grade a single image
-curl -X POST localhost:3000/api/grade \
-  -H "Content-Type: application/json" \
-  -d '{"imageUrl":"https://cdn.snkrdunk.com/...","cardName":"Mega Greninja ex SAR"}'
-
-# Export all stored grades
-curl "localhost:3000/api/grades?limit=500"
-```
-
-Grade results are stored permanently in Redis for future model training. Each record includes card name, source, listing ID, price, condition, provider, model, and the full grade breakdown.
-
-### Redis caching
-
-Optional — falls back to file-based cache if Redis is unavailable. Set `REDIS_URL` in `.env` to enable.
-
-| Cache | TTL |
-|-------|-----|
-| eBay active listings | 6h |
-| eBay sold listings | 24h |
-| AI grades | 30d |
-| PSA population | 24h |
-| Drop events | permanent |
-| Webhooks | permanent |
-| Grade training log | permanent |
 
 ---
 
