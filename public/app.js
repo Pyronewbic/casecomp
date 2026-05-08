@@ -18,6 +18,9 @@ let currentCondition = "";
 let forceDemo = false;
 let isDemo = false;
 let allItems = [];
+let allActive = [];
+let allSold = [];
+let activeSourceFilter = "all";
 
 document.querySelectorAll(".hint").forEach(h => {
   h.addEventListener("click", () => {
@@ -108,6 +111,15 @@ function render(data) {
   `;
 
   renderPsa(data.psaSignal);
+
+  allActive = active;
+  allSold = sold;
+  activeSourceFilter = "all";
+
+  const isMulti = data.source === "multi";
+  const sources = isMulti ? detectSources(active, sold) : [];
+  renderSourceFilters(sources);
+
   renderList(activeList, active);
   renderList(soldList, sold);
 
@@ -131,6 +143,57 @@ function render(data) {
   if (activeTotal > 0 || soldTotal > 0) {
     alertSection.classList.remove("hidden");
   }
+}
+
+function detectSources(active, sold) {
+  const set = new Set();
+  [...active, ...sold].forEach(i => {
+    const s = itemSource(i.itemWebUrl);
+    if (s) set.add(s);
+  });
+  return [...set].sort();
+}
+
+function renderSourceFilters(sources) {
+  const existing = document.getElementById("source-filters");
+  if (existing) existing.remove();
+  if (!sources.length) return;
+
+  const container = document.createElement("div");
+  container.id = "source-filters";
+  container.className = "source-filters";
+  container.innerHTML = [
+    `<button class="source-filter active" data-source="all">All</button>`,
+    ...sources.map(s => `<button class="source-filter" data-source="${esc(s)}">${esc(s)}</button>`),
+  ].join("");
+
+  const tabsEl = document.querySelector(".list-tabs");
+  tabsEl.parentNode.insertBefore(container, tabsEl.nextSibling);
+
+  container.querySelectorAll(".source-filter").forEach(btn => {
+    btn.addEventListener("click", () => {
+      container.querySelectorAll(".source-filter").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeSourceFilter = btn.dataset.source;
+      applySourceFilter();
+    });
+  });
+}
+
+function applySourceFilter() {
+  const filterFn = activeSourceFilter === "all"
+    ? () => true
+    : (item) => itemSource(item.itemWebUrl) === activeSourceFilter;
+
+  const filteredActive = allActive.filter(filterFn);
+  const filteredSold = allSold.filter(filterFn);
+  allItems = [...filteredActive, ...filteredSold];
+
+  renderList(activeList, filteredActive);
+  renderList(soldList, filteredSold);
+
+  detailPanel.innerHTML = '<div class="detail-empty">Click a listing to inspect</div>';
+  if (filteredActive.length) selectItem(filteredActive[0].itemId);
 }
 
 function dedupeActive(data) {
@@ -177,6 +240,7 @@ function renderList(container, items) {
       : item.listingGradeLabel
         ? `<span class="slab-chip">${esc(item.listingGradeLabel)}</span>`
         : "";
+    const srcTag = sourceTag(item.itemWebUrl);
 
     return `
       <div class="listing-card" data-item-id="${esc(item.itemId)}">
@@ -186,6 +250,7 @@ function renderList(container, items) {
           <div class="price-row">
             <span class="price">${price}</span>
             ${gradeChip}
+            ${srcTag}
           </div>
           ${condition}
         </div>
@@ -313,6 +378,20 @@ function renderGradeDetail(grade) {
       ${grade.limitations ? `<div class="detail-grade-limitations">${esc(grade.limitations)}</div>` : ""}
     </div>
   `;
+}
+
+function itemSource(url) {
+  if (!url) return "";
+  if (url.includes("magi")) return "magi";
+  if (url.includes("yahoo")) return "yahoo";
+  if (url.includes("ebay")) return "eBay";
+  if (url.includes("snkrdunk")) return "snkrdunk";
+  return "";
+}
+
+function sourceTag(url) {
+  const name = itemSource(url);
+  return name ? `<span class="source-tag">${name}</span>` : "";
 }
 
 function gradeColor(v) {
