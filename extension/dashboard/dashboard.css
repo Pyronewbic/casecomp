@@ -305,10 +305,10 @@ main {
   text-align: center;
   padding: 40px 20px 28px;
 }
-.empty-hero { display: flex; flex-direction: column; align-items: center; }
+.empty-hero { display: flex; flex-direction: column; align-items: center; padding-top: 48px; }
 .empty-logo {
-  width: 72px; height: 72px;
-  margin-bottom: 18px;
+  width: 88px; height: 88px;
+  margin-bottom: 28px;
   animation: float 4s ease-in-out infinite;
 }
 @keyframes float {
@@ -317,31 +317,32 @@ main {
 }
 .empty-title {
   font-family: var(--font-display);
-  font-size: 18px; font-weight: 700;
+  font-size: 24px; font-weight: 700;
   color: var(--foil);
-  letter-spacing: .04em;
+  letter-spacing: .03em;
   margin: 0;
 }
 .empty-sub {
   color: var(--paper-d);
-  font-size: 13px;
-  max-width: 320px;
-  margin: 8px 0 22px;
+  font-size: 14px;
+  max-width: 580px;
+  margin: 12px 0 28px;
+  line-height: 1.6;
 }
 .empty-quick-add {
-  display: flex; gap: 8px;
+  display: flex; gap: 10px;
   width: 100%;
-  max-width: 540px;
-  margin-bottom: 28px;
+  max-width: 600px;
+  margin-bottom: 36px;
 }
 .empty-quick-add input {
   flex: 1;
   background: var(--ink-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   color: var(--paper);
-  padding: 10px 14px;
-  border-radius: 7px;
-  font-size: 13px;
+  padding: 13px 18px;
+  border-radius: 8px;
+  font-size: 14px;
   outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
@@ -357,8 +358,8 @@ main {
   font-size: 11px;
   letter-spacing: .12em;
   text-transform: uppercase;
-  padding: 0 18px;
-  border-radius: 7px;
+  padding: 0 22px;
+  border-radius: 8px;
   white-space: nowrap;
   transition: filter .15s;
 }
