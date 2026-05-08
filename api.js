@@ -11,7 +11,8 @@ import { gradeImage } from "./lib/grading.js";
 import { parseListingLanguagesFromInput } from "./lib/filters.js";
 import { buildEbaySearchQuery } from "./lib/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
-import { getRedisStatus, cacheWritePermanent, cacheReadByPattern, sha256 } from "./lib/redis-cache.js";
+import { getRedisStatus, sha256 } from "./lib/redis-cache.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus } from "./lib/firestore.js";
 
 const app = express();
 app.use(express.json());
@@ -73,8 +74,7 @@ function buildConfig(q) {
 }
 
 async function storeGradeLog(record) {
-  const key = `casecomp:grade-log:${Date.now()}:${sha256(record.imageUrl)}`;
-  await cacheWritePermanent(key, record);
+  await saveGradeLog(record);
 }
 
 async function gradeItems(items, config, cardName, source) {
@@ -243,16 +243,7 @@ app.post("/api/grade", async (req, res) => {
 app.get("/api/grades", async (req, res) => {
   const limit = Math.min(1000, Math.max(1, Number(req.query.limit) || 100));
   try {
-    let records = await cacheReadByPattern("casecomp:grade-log:*", limit);
-
-    if (req.query.q) {
-      const q = req.query.q.toLowerCase();
-      records = records.filter(r => (r.cardName || "").toLowerCase().includes(q));
-    }
-    if (req.query.source) {
-      records = records.filter(r => r.source === req.query.source);
-    }
-
+    const records = await getGradeLogs({ limit, query: req.query.q, source: req.query.source });
     res.json(records);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -261,13 +252,14 @@ app.get("/api/grades", async (req, res) => {
 
 // GET /api/health
 app.get("/api/health", async (req, res) => {
-  const redisStatus = await getRedisStatus();
+  const [redisStatus, firestoreStatus] = await Promise.all([getRedisStatus(), getFirestoreStatus()]);
   let ebayUsage = null;
   try { ebayUsage = await getEbayUsageToday(); } catch {}
   res.json({
     status: "ok",
     uptime: Math.floor(process.uptime()),
     redis: redisStatus,
+    firestore: firestoreStatus,
     ebay: { configured: !!(clientId && clientSecret), usageToday: ebayUsage, dailyCap: DAILY_CAP },
   });
 });
@@ -290,13 +282,8 @@ v1.use(authMiddleware);
 // GET /v1/drops — list recent drop events
 v1.get("/drops", async (req, res) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-  const site = req.query.site;
-  const status = req.query.status;
   try {
-    let records = await cacheReadByPattern("casecomp:drop:*", limit * 3);
-    if (site) records = records.filter(r => (r.site || "").toLowerCase().includes(site.toLowerCase()));
-    if (status) records = records.filter(r => r.status === status);
-    records = records.slice(0, limit);
+    const records = await getDrops({ limit, site: req.query.site, status: req.query.status });
     res.json({ drops: records, count: records.length, limit });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -306,9 +293,9 @@ v1.get("/drops", async (req, res) => {
 // GET /v1/drops/:id — single drop with queue metrics
 v1.get("/drops/:id", async (req, res) => {
   try {
-    const records = await cacheReadByPattern(`casecomp:drop:*${req.params.id}*`, 1);
-    if (!records.length) return res.status(404).json({ error: "Drop not found" });
-    res.json(records[0]);
+    const record = await getDrop(req.params.id);
+    if (!record) return res.status(404).json({ error: "Drop not found" });
+    res.json(record);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -356,8 +343,6 @@ v1.get("/comps", async (req, res) => {
 });
 
 // POST /v1/webhooks — register webhook
-const webhooks = [];
-
 v1.post("/webhooks", async (req, res) => {
   const { url, events } = req.body;
   if (!url) return res.status(400).json({ error: "Missing required field: url" });
@@ -372,30 +357,23 @@ v1.post("/webhooks", async (req, res) => {
     createdAt: new Date().toISOString(),
     active: true,
   };
-  webhooks.push(webhook);
-
-  try {
-    await cacheWritePermanent(`casecomp:webhook:${webhook.id}`, webhook);
-  } catch {}
-
+  await saveWebhook(webhook);
   res.status(201).json(webhook);
 });
 
 // GET /v1/webhooks — list registered webhooks
 v1.get("/webhooks", async (req, res) => {
   try {
-    const stored = await cacheReadByPattern("casecomp:webhook:*", 50);
-    const merged = stored.length ? stored : webhooks;
-    res.json({ webhooks: merged, count: merged.length });
+    const stored = await getWebhooks();
+    res.json({ webhooks: stored, count: stored.length });
   } catch (e) {
-    res.json({ webhooks, count: webhooks.length });
+    res.status(500).json({ error: e.message });
   }
 });
 
 // DELETE /v1/webhooks/:id — remove webhook
 v1.delete("/webhooks/:id", async (req, res) => {
-  const idx = webhooks.findIndex(w => w.id === req.params.id);
-  if (idx !== -1) webhooks.splice(idx, 1);
+  await deleteWebhook(req.params.id);
   res.json({ ok: true, id: req.params.id });
 });
 
@@ -411,11 +389,11 @@ app.post("/api/drop-event", async (req, res) => {
     site, status, detail: detail || "", url: url || "", tabId: tabId || null,
   };
   try {
-    await cacheWritePermanent(`casecomp:drop:${drop.id}`, drop);
-    // fire webhooks
-    for (const wh of webhooks) {
-      const eventMap = { detected: "drop.opened", through: "queue.through", joined: "queue.joined", waiting: "queue.advanced", captcha: "captcha.detected", "atc-success": "checkout.cleared", "new-listing": "listing.new" };
-      const event = eventMap[status];
+    await saveDrop(drop);
+    const allWebhooks = await getWebhooks();
+    const eventMap = { detected: "drop.opened", through: "queue.through", joined: "queue.joined", waiting: "queue.advanced", captcha: "captcha.detected", "atc-success": "checkout.cleared", "new-listing": "listing.new" };
+    const event = eventMap[status];
+    for (const wh of allWebhooks) {
       if (event && wh.active && wh.events.includes(event)) {
         fetch(wh.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event, drop }) }).catch(() => {});
       }
