@@ -147,7 +147,11 @@
             // Auto-checkout after ATC if enabled
             if (config.autoCheckout && SITE_HANDLER.checkout) {
               setTimeout(() => {
-                SITE_HANDLER.checkout();
+                chrome.storage.local.get(["profiles"], (pdata) => {
+                  const profiles = pdata.profiles || [];
+                  const defaultProfile = profiles.find(p => p.isDefault) || profiles[0] || null;
+                  SITE_HANDLER.checkout(defaultProfile);
+                });
               }, 1000);
             }
           }
