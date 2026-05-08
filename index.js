@@ -29,6 +29,7 @@ import { searchMagi } from "./lib/magi.js";
 import { searchYahooAuctions } from "./lib/yahooauctions.js";
 import { searchSnkrdunk } from "./lib/snkrdunk.js";
 import { getPsaGradingSignal } from "./lib/psa.js";
+import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
 
 export const CARDS = [
   "Giratina V Alt Art"
@@ -72,7 +73,7 @@ export const CONFIG = {
 };
 
 const argv = minimist(process.argv.slice(2), {
-  boolean: ["refresh", "parallel", "grade", "sold-browser", "grade-decision"],
+  boolean: ["refresh", "parallel", "grade", "sold-browser", "grade-decision", "demo"],
 });
 
 /**
@@ -300,6 +301,26 @@ export async function main() {
     const prefixes = String(argv.merge).split(",").map((s) => s.trim());
     const outputPrefix = argv.output != null && argv.output !== true ? String(argv.output) : "results";
     await mergeAndWrite(prefixes, outputPrefix);
+    return;
+  }
+
+  if (argv.demo) {
+    const cardList = resolveCardsFromArgv(argv, ["Mega Greninja ex SAR"]);
+    log("Demo mode — using sample data (no API keys needed)");
+    log(`Available demo cards: ${listDemoCards().join(", ")}`);
+    const results = cardList.map(card => {
+      const r = getDemoSearchResult(card);
+      log(`[demo] "${r.query}": ${r.counts.activeTotal} active, ${r.counts.sold} sold${r.psaSignal ? `, PSA pop ${r.psaSignal.totalPop}` : ""}`);
+      return r;
+    });
+    const config = applyArgvToConfig(CONFIG);
+    printSummary(results, config);
+    const outputPrefix = argv.output != null && argv.output !== true ? String(argv.output) : "results";
+    await Promise.all([
+      writeMarkdown(results, config, { footer: "Demo mode — sample data, not live.", outputPrefix }),
+      writeJson({ generatedAt: new Date().toISOString(), config, argv, cardQueries: cardList, results, _demo: true }, outputPrefix),
+    ]);
+    log(`Wrote ${outputPrefix}.md and ${outputPrefix}.json (demo)`);
     return;
   }
 

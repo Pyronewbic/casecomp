@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casecomp — Pokemon TCG Card Research</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="/logos/casecomp-logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="glow-bg"></div>
+
+  <header>
+    <div class="logo">
+      <img src="/logos/casecomp-logo.svg" alt="Casecomp" width="36" height="36">
+      <span>Casecomp</span>
+    </div>
+    <nav>
+      <a href="/docs" class="nav-link">API Docs</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Research any Pokemon card<br>in seconds</h1>
+      <p class="subtitle">Live prices from eBay, magi.camp, Yahoo Auctions &amp; SNKRDUNK. PSA grading signals. No account needed.</p>
+
+      <form id="search-form" autocomplete="off">
+        <div class="search-bar">
+          <input type="text" id="search-input" placeholder="Umbreon VMAX Alt Art, Charizard Base Set..." autofocus>
+          <button type="submit" id="search-btn">Search</button>
+        </div>
+        <div class="search-hints">
+          Try: <button type="button" class="hint" data-q="Mega Greninja ex SAR" data-source="snkrdunk" data-condition="A">Mega Greninja ex SAR (SNKRDUNK + AI Grade)</button>
+          <button type="button" class="hint" data-q="Umbreon ex SAR 217/187">Umbreon ex SAR 217/187 (eBay JP + AI Grade)</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="results" class="results hidden">
+      <div id="results-header" class="results-header"></div>
+      <div id="psa-signal" class="psa-signal hidden"></div>
+      <div class="results-layout">
+        <div class="results-left">
+          <div class="list-tabs">
+            <button class="list-tab active" data-tab="active">Active Listings</button>
+            <button class="list-tab" data-tab="sold">Recent Sold</button>
+          </div>
+          <div id="active-list" class="card-list"></div>
+          <div id="sold-list" class="card-list hidden"></div>
+        </div>
+        <div class="results-right">
+          <div id="detail-panel" class="detail-panel">
+            <div class="detail-empty">Click a listing to inspect</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="alert-section" class="alert-section hidden">
+      <div class="alert-box">
+        <h3>Get price alerts</h3>
+        <p>We'll email you when this card hits your target price.</p>
+        <form id="alert-form">
+          <input type="email" id="alert-email" placeholder="you@email.com" required>
+          <input type="number" id="alert-price" placeholder="Target price ($)" step="0.01" min="0" required>
+          <button type="submit">Set Alert</button>
+        </form>
+        <p id="alert-msg" class="alert-msg hidden"></p>
+      </div>
+    </section>
+
+    <section id="empty-state" class="empty-state">
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">$</div>
+          <h3>Live Prices</h3>
+          <p>Active listings and recent sold comps from eBay, magi.camp, Yahoo Auctions, and SNKRDUNK.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">PSA</div>
+          <h3>Grading Signal</h3>
+          <p>PSA population data, difficulty ratings, and PSA 10 probability to help you decide if grading is worth it.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">AI</div>
+          <h3>AI Pre-Grade</h3>
+          <p>Upload a photo and get an estimated PSA grade using AI analysis of centering, corners, edges, and surface.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Casecomp &mdash; Card research for collectors. <a href="/docs">API</a></p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
