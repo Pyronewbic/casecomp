@@ -43,6 +43,14 @@
         <span>History</span>
         <span class="count" id="history-count">0</span>
       </button>
+      <button class="feed-tab" data-tab="analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        <span>Analytics</span>
+      </button>
+      <button class="feed-tab" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
       <button class="feed-tab" data-tab="logs">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         <span>Logs</span>
@@ -135,6 +143,137 @@
         <button id="dash-url-add">+ Add Target</button>
       </div>
       <div id="dash-url-list"></div>
+    </div>
+
+    <div id="feed-analytics" class="feed-panel">
+      <div class="analytics-header">
+        <h2 class="analytics-title">Analytics</h2>
+        <div class="analytics-period">
+          <button class="period-btn active" data-period="day">Day</button>
+          <button class="period-btn" data-period="week">Week</button>
+          <button class="period-btn" data-period="month">Month</button>
+        </div>
+      </div>
+      <div class="analytics-top">
+        <div class="analytics-cards" id="analytics-cards"></div>
+        <div class="analytics-chart" id="analytics-chart"></div>
+      </div>
+      <div class="analytics-table">
+        <h3>Recent Checkouts</h3>
+        <div id="analytics-checkouts"></div>
+      </div>
+    </div>
+
+    <div id="feed-settings" class="feed-panel">
+      <div class="settings-grid">
+        <div class="settings-section">
+          <div class="section-head">
+            <h2>Checkout</h2>
+            <span class="rule"></span>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Auto-Checkout</span>
+              <span class="settings-desc">Automatically proceed through checkout after adding to cart</span>
+            </div>
+            <label class="toggle"><input type="checkbox" id="setting-auto-checkout"><span class="slider"></span></label>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="section-head">
+            <h2>Email Verification (IMAP)</h2>
+            <span class="rule"></span>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">IMAP Host</span>
+              <span class="settings-desc">IMAP server hostname (e.g. imap.gmail.com)</span>
+            </div>
+            <input type="text" class="settings-input" id="setting-imap-host" placeholder="imap.gmail.com">
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">IMAP Port</span>
+              <span class="settings-desc">Usually 993 for TLS</span>
+            </div>
+            <input type="number" class="settings-input settings-input-sm" id="setting-imap-port" placeholder="993">
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Username</span>
+              <span class="settings-desc">Email address for IMAP login</span>
+            </div>
+            <input type="text" class="settings-input" id="setting-imap-user" placeholder="you@gmail.com">
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Password</span>
+              <span class="settings-desc">App password or IMAP password</span>
+            </div>
+            <input type="password" class="settings-input" id="setting-imap-pass" placeholder="app-password">
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">TLS</span>
+              <span class="settings-desc">Use TLS encryption for IMAP connection</span>
+            </div>
+            <label class="toggle"><input type="checkbox" id="setting-imap-tls" checked><span class="slider"></span></label>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="section-head">
+            <h2>Proxy</h2>
+            <span class="rule"></span>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Enable Proxy</span>
+              <span class="settings-desc">Route requests through a proxy server</span>
+            </div>
+            <label class="toggle"><input type="checkbox" id="setting-proxy-enabled"><span class="slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Proxy Host</span>
+              <span class="settings-desc">Proxy server hostname or IP</span>
+            </div>
+            <input type="text" class="settings-input" id="setting-proxy-host" placeholder="127.0.0.1">
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Proxy Port</span>
+              <span class="settings-desc">Proxy server port</span>
+            </div>
+            <input type="number" class="settings-input settings-input-sm" id="setting-proxy-port" placeholder="8080">
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Proxy Username</span>
+              <span class="settings-desc">Leave blank if no auth required</span>
+            </div>
+            <input type="text" class="settings-input" id="setting-proxy-user" placeholder="username">
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Proxy Password</span>
+              <span class="settings-desc">Leave blank if no auth required</span>
+            </div>
+            <input type="password" class="settings-input" id="setting-proxy-pass" placeholder="password">
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Proxy Type</span>
+              <span class="settings-desc">Protocol type for the proxy</span>
+            </div>
+            <select class="settings-select" id="setting-proxy-type">
+              <option value="http">HTTP</option>
+              <option value="socks5">SOCKS5</option>
+            </select>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="feed-logs" class="feed-panel"></div>

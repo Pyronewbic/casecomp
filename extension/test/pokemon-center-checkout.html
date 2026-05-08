@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokemon Center — Checkout Simulator</title>
+  <style>
+    body { font-family: sans-serif; background: #fff; color: #333; margin: 0; padding: 40px; }
+    .checkout { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 20px; }
+    .step { display: none; padding: 20px; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 16px; }
+    .step.active { display: block; border-color: #e3350d; }
+    .step h2 { font-size: 16px; margin-bottom: 12px; color: #e3350d; }
+    .step p { font-size: 13px; color: #666; margin-bottom: 12px; }
+    .item { display: flex; align-items: center; gap: 12px; padding: 12px; background: #f9f9f9; border-radius: 6px; margin-bottom: 16px; }
+    .item-img { width: 60px; height: 60px; background: #eee; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; }
+    .item-name { font-weight: 600; }
+    .item-price { color: #e3350d; font-weight: 700; }
+    input[type="text"], input[type="tel"], select {
+      width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; font-size: 14px;
+    }
+    label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; }
+    button {
+      background: #e3350d; color: #fff; border: none; border-radius: 6px;
+      padding: 12px 30px; font-size: 14px; cursor: pointer; margin-top: 8px;
+    }
+    button:hover { background: #c02a0a; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .status { font-family: monospace; font-size: 11px; color: #999; margin-top: 20px; padding: 12px; background: #f5f5f5; border-radius: 6px; }
+    .status div { padding: 2px 0; }
+    .status .done { color: #4caf50; }
+    .status .current { color: #e3350d; font-weight: 700; }
+    .verification { display: none; padding: 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; margin-bottom: 16px; }
+    .verification input { width: 200px; }
+  </style>
+</head>
+<body>
+  <div class="checkout">
+    <h1>Pokemon Center — Checkout Simulator</h1>
+    <p style="color:#666;font-size:13px;margin-bottom:20px;">Simulates the full checkout flow. The extension's auto-checkout should navigate each step automatically.</p>
+
+    <!-- Step 1: Cart -->
+    <div class="step active" id="step-cart">
+      <h2>1. Cart</h2>
+      <div class="item">
+        <div class="item-img">[IMG]</div>
+        <div>
+          <div class="item-name">Surging Sparks Elite Trainer Box</div>
+          <div class="item-price">$49.99</div>
+        </div>
+      </div>
+      <button data-testid="checkout-btn" id="btn-checkout">Checkout</button>
+    </div>
+
+    <!-- Step 2: Shipping -->
+    <div class="step" id="step-shipping">
+      <h2>2. Shipping</h2>
+      <p>Shipping address (pre-filled for simulation)</p>
+      <input type="text" value="John Doe" placeholder="Name" readonly>
+      <input type="text" value="123 Pokemon St, Seattle WA 98101" placeholder="Address" readonly>
+      <button data-testid="shipping-continue" id="btn-shipping">Continue to Payment</button>
+    </div>
+
+    <!-- Step 3: Verification (optional) -->
+    <div class="verification" id="step-verify">
+      <h2 style="font-size:14px;margin-bottom:8px;">Email Verification Required</h2>
+      <p style="font-size:12px;color:#666;">A code was sent to j***@gmail.com</p>
+      <input type="tel" maxlength="6" inputmode="numeric" placeholder="Enter 6-digit code" data-testid="verification-code" id="verify-input">
+      <button id="btn-verify" style="margin-left:8px;">Verify</button>
+    </div>
+
+    <!-- Step 4: Payment -->
+    <div class="step" id="step-payment">
+      <h2>3. Payment</h2>
+      <p>Payment method (pre-filled for simulation)</p>
+      <input type="text" value="Visa •••• 4242" placeholder="Card" readonly>
+      <button id="btn-payment">Continue to Review</button>
+    </div>
+
+    <!-- Step 5: Review & Place Order -->
+    <div class="step" id="step-review">
+      <h2>4. Review & Place Order</h2>
+      <div class="item">
+        <div class="item-img">[IMG]</div>
+        <div>
+          <div class="item-name">Surging Sparks Elite Trainer Box</div>
+          <div class="item-price">$49.99 + $5.99 shipping</div>
+        </div>
+      </div>
+      <p><strong>Total: $55.98</strong></p>
+      <button data-testid="place-order" id="btn-place-order">Place Order</button>
+    </div>
+
+    <!-- Step 6: Confirmation -->
+    <div class="step" id="step-confirm">
+      <h2 style="color:#4caf50;">Order Placed!</h2>
+      <p>Order #CSB-2026-0508 confirmed. You'll receive an email shortly.</p>
+    </div>
+
+    <div class="status" id="log">
+      <div class="current">Waiting for extension to start checkout...</div>
+    </div>
+
+    <!-- Controls -->
+    <div style="margin-top:16px;display:flex;gap:8px;">
+      <button onclick="document.getElementById('step-verify').style.display='block'" style="background:#ffc107;color:#333;font-size:11px;padding:8px 12px;">Show Verification Step</button>
+      <button onclick="location.reload()" style="background:#666;font-size:11px;padding:8px 12px;">Reset</button>
+    </div>
+  </div>
+
+  <script>
+    const log = document.getElementById("log");
+    function addLog(msg, cls) {
+      const d = document.createElement("div");
+      d.textContent = `${new Date().toLocaleTimeString()} — ${msg}`;
+      d.className = cls || "";
+      log.appendChild(d);
+    }
+
+    function showStep(id) {
+      document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+    }
+
+    // Cart -> Shipping
+    document.getElementById("btn-checkout").addEventListener("click", () => {
+      addLog("Checkout button clicked", "done");
+      setTimeout(() => {
+        showStep("step-shipping");
+        addLog("Shipping page loaded", "current");
+      }, 500);
+    });
+
+    // Shipping -> Verification or Payment
+    document.getElementById("btn-shipping").addEventListener("click", () => {
+      addLog("Shipping confirmed", "done");
+      const verifyVisible = document.getElementById("step-verify").style.display === "block";
+      setTimeout(() => {
+        if (verifyVisible) {
+          addLog("Verification required — waiting for code", "current");
+        } else {
+          showStep("step-payment");
+          addLog("Payment page loaded", "current");
+        }
+      }, 500);
+    });
+
+    // Verification -> Payment
+    document.getElementById("btn-verify").addEventListener("click", () => {
+      const code = document.getElementById("verify-input").value;
+      if (code.length === 6) {
+        addLog(`Code verified: ${code}`, "done");
+        document.getElementById("step-verify").style.display = "none";
+        setTimeout(() => {
+          showStep("step-payment");
+          addLog("Payment page loaded", "current");
+        }, 500);
+      }
+    });
+
+    // Also handle input event for auto-fill
+    document.getElementById("verify-input").addEventListener("input", () => {
+      const code = document.getElementById("verify-input").value;
+      if (code.length === 6) {
+        addLog(`Code auto-filled: ${code}`, "done");
+        setTimeout(() => {
+          document.getElementById("step-verify").style.display = "none";
+          showStep("step-payment");
+          addLog("Payment page loaded", "current");
+        }, 1000);
+      }
+    });
+
+    // Payment -> Review
+    document.getElementById("btn-payment").addEventListener("click", () => {
+      addLog("Payment confirmed", "done");
+      setTimeout(() => {
+        showStep("step-review");
+        addLog("Review page loaded", "current");
+      }, 500);
+    });
+
+    // Place Order
+    document.getElementById("btn-place-order").addEventListener("click", () => {
+      addLog("Order placed!", "done");
+      setTimeout(() => {
+        showStep("step-confirm");
+        addLog("Order confirmed — checkout complete!", "done");
+      }, 800);
+    });
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-const TARGET_POLL_MS = 5000;
+const TARGET_POLL_MS = 2000;
 const tabUrlMap = new Map();
 
 const DEFAULT_CONFIG = {
@@ -11,6 +11,7 @@ const DEFAULT_CONFIG = {
   },
   autoJoin: true,
   autoAddToCart: false,
+  autoCheckout: false,
   soundAlerts: true,
   notifications: true,
   targetUrls: [],
@@ -22,6 +23,8 @@ const DEFAULT_CONFIG = {
   redditSeen: [],
   redditSubs: ["PKMNTCGDeals", "PokemonTCG"],
   logArchive: [],
+  imapConfig: { host: "", port: 993, user: "", pass: "", tls: true },
+  proxyConfig: { enabled: false, host: "", port: "", user: "", pass: "", type: "http" },
 };
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -34,6 +37,35 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "csb-reddit-poll") pollReddit();
 });
+
+// Proxy setup
+function applyProxyConfig() {
+  chrome.storage.local.get(["proxyConfig"], (data) => {
+    const cfg = data.proxyConfig;
+    if (!cfg?.enabled || !cfg.host) {
+      chrome.proxy.settings.clear({ scope: "regular" });
+      return;
+    }
+    chrome.proxy.settings.set({
+      value: {
+        mode: "fixed_servers",
+        rules: {
+          singleProxy: {
+            scheme: cfg.type || "http",
+            host: cfg.host,
+            port: parseInt(cfg.port) || 8080,
+          },
+        },
+      },
+      scope: "regular",
+    });
+  });
+}
+
+applyProxyConfig();
+
+// Pending verification requests
+const pendingVerifications = new Map();
 
 function pollTargets() {
   chrome.tabs.query({}, (allTabs) => {
@@ -73,6 +105,7 @@ setInterval(pollTargets, TARGET_POLL_MS);
 chrome.tabs.onRemoved.addListener((tabId) => {
   const closedUrl = tabUrlMap.get(tabId);
   tabUrlMap.delete(tabId);
+  if (closedUrl) openedTargets.delete(closedUrl);
 
   chrome.storage.local.get(["log", "logArchive", "targetUrls"], (data) => {
     const log = data.log || [];
@@ -109,6 +142,17 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   });
 });
 
+function urlsMatchTarget(tabUrl, targetUrl) {
+  try {
+    const t = new URL(tabUrl);
+    const u = new URL(targetUrl);
+    if (t.hostname !== u.hostname) return false;
+    return t.pathname.startsWith(u.pathname) || u.pathname.startsWith(t.pathname);
+  } catch { return false; }
+}
+
+const openedTargets = new Set();
+
 function autoOpenTargets() {
   chrome.storage.local.get(["enabled", "targetUrls"], (data) => {
     if (!data.enabled) return;
@@ -116,11 +160,13 @@ function autoOpenTargets() {
     if (!targets.length) return;
 
     chrome.tabs.query({}, (allTabs) => {
-      const openUrls = new Set(allTabs.map((t) => t.url));
       for (const entry of targets) {
         if (!entry.active) continue;
-        const alreadyOpen = allTabs.some((t) => t.url && t.url.startsWith(entry.url));
-        if (!alreadyOpen) {
+        if (openedTargets.has(entry.url)) continue;
+        const alreadyOpen = allTabs.some((t) => t.url && urlsMatchTarget(t.url, entry.url));
+        const trackedOpen = [...tabUrlMap.values()].some((u) => urlsMatchTarget(u, entry.url));
+        if (!alreadyOpen && !trackedOpen) {
+          openedTargets.add(entry.url);
           chrome.tabs.create({ url: entry.url, active: false }, (tab) => {
             if (tab) tabUrlMap.set(tab.id, entry.url);
           });
@@ -162,6 +208,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       notify(`${msg.site}: Added to cart!`, msg.detail || "Item added — go checkout!");
     } else if (msg.status === "atc-failed") {
       notify(`${msg.site}: Add-to-cart failed`, msg.detail || "Could not find ATC button");
+    } else if (msg.status === "checkout-shipping") {
+      notify(`${msg.site}: Checkout — Shipping`, msg.detail || "Proceeding to shipping");
+    } else if (msg.status === "checkout-payment") {
+      notify(`${msg.site}: Checkout — Payment`, msg.detail || "Proceeding to payment");
+    } else if (msg.status === "checkout-review") {
+      notify(`${msg.site}: Checkout — Review`, msg.detail || "Reviewing order");
+    } else if (msg.status === "checkout-success") {
+      notify(`${msg.site}: Order Placed!`, msg.detail || "Checkout completed successfully!");
+    } else if (msg.status === "checkout-failed") {
+      notify(`${msg.site}: Checkout Failed`, msg.detail || "Could not complete checkout");
+    } else if (msg.status === "verification-filled") {
+      notify(`${msg.site}: Verification Code Filled`, msg.detail || "Auto-filled verification code");
     } else if (msg.status === "discord-intel") {
       notify("Discord Intel", msg.detail || "Drop alert from Discord");
     } else if (msg.status === "new-listing") {
@@ -172,7 +230,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "GET_CONFIG") {
     chrome.storage.local.get(
-      ["enabled", "sites", "autoJoin", "autoAddToCart", "soundAlerts", "notifications", "targetUrls", "discordChannels", "discordKeywords", "redditSubs"],
+      ["enabled", "sites", "autoJoin", "autoAddToCart", "autoCheckout", "soundAlerts", "notifications", "targetUrls", "discordChannels", "discordKeywords", "redditSubs"],
       (data) => sendResponse(data),
     );
     return true;
@@ -230,6 +288,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (msg.type === "CHECK_VERIFICATION_EMAIL") {
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      pendingVerifications.set(tabId, { site: msg.site, requestedAt: Date.now() });
+    }
+    sendResponse({ ok: true, pending: true });
+    return true;
+  }
+
+  if (msg.type === "SUBMIT_VERIFICATION_CODE") {
+    // Send code to all tabs with pending verification requests
+    pendingVerifications.forEach((info, tabId) => {
+      chrome.tabs.sendMessage(tabId, {
+        type: "FILL_VERIFICATION_CODE",
+        code: msg.code,
+        site: info.site,
+      }).catch(() => {
+        pendingVerifications.delete(tabId);
+      });
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
+});
+
+// Listen for storage changes to apply proxy config
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.proxyConfig) applyProxyConfig();
 });
 
 function notify(title, body) {
