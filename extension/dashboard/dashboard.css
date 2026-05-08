@@ -1183,7 +1183,7 @@ body.engine-off .feed-kpis {
 
 .raw-header {
   display: grid;
-  grid-template-columns: 36px 190px 100px 50px 90px 1fr;
+  grid-template-columns: 36px 190px 100px 90px 1fr;
   gap: 0;
   padding: 8px 12px;
   background: var(--ink-2);
@@ -1199,7 +1199,7 @@ body.engine-off .feed-kpis {
 
 .raw-row {
   display: grid;
-  grid-template-columns: 36px 190px 100px 50px 90px 1fr;
+  grid-template-columns: 36px 190px 100px 90px 1fr;
   gap: 0;
   padding: 5px 12px;
   border-bottom: 1px solid var(--line);
