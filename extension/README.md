@@ -2,6 +2,8 @@
 
 Queue auto-join and drop intelligence for Pokemon TCG product releases across Pokemon Center, Walmart, and Costco.
 
+**Website:** [casecomp.xyz](https://casecomp.xyz)
+
 ## Install
 
 1. Open `chrome://extensions` in Chrome
