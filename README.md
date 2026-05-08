@@ -275,8 +275,9 @@ The `extension/` directory contains a Chrome extension for monitoring Pokemon TC
   - **Discord** — watches configured channels for keyword matches
   - **X.com** — scans tweets on your feed for PTCG keywords
   - **Reddit** — polls `r/PKMNTCGDeals` and `r/PokemonTCG` every 3 minutes
-- **Dashboard** — full-page view with tabbed layout:
-  - Workers (live queue feed with KPIs), Targets (add/remove/pause URLs), News Monitor (intel cards with clickable links), History (archived entries), Logs (raw table)
+- **Dashboard** — sidebar-nav layout with KPI strip, 5 panels:
+  - Workers (live queue feed with KPI cards), Targets (add/remove/pause URLs), News Monitor (Discord/X/Reddit intel), History (archived worker runs), Logs (raw event table)
+- **Tab lifecycle** — closing a monitored tab auto-archives its logs and pauses the target
 - **Product listing monitor** — scans Pokemon Center pages for new/restocked items
 
 ### Install
@@ -289,7 +290,7 @@ The `extension/` directory contains a Chrome extension for monitoring Pokemon TC
 
 ```mermaid
 flowchart TD
-  A[Alarm fires every 30s] --> B[Poll all open tabs]
+  A[Poll every 5s] --> B[Query all open tabs]
   B --> C{Site handler}
   C -->|Pokemon Center| D[Incapsula iframe poll]
   C -->|Walmart| E[Queue-it detection]
