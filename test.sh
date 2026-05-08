@@ -19,6 +19,7 @@ for f in \
   extension/content/sites/pokemon-center-jp.js \
   extension/content/sites/walmart.js \
   extension/content/sites/costco.js \
+  extension/content/sites/target.js \
   extension/content/queue-monitor.js; do
   node --check "$f" || { echo "FAIL: $f"; exit 1; }
 done
@@ -80,5 +81,13 @@ if [ -n "$FOUND" ]; then
   exit 1
 fi
 echo "✓ no secrets found"
+
+# API integration tests (skip if server not running)
+echo "=== api tests ==="
+if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
+  node test/api-test.js || exit 1
+else
+  echo "SKIP: API server not running on :3000"
+fi
 
 echo "=== all checks passed ==="

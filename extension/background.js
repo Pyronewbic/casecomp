@@ -8,6 +8,7 @@ const DEFAULT_CONFIG = {
     "pokemon-center-jp": true,
     walmart: true,
     costco: true,
+    target: true,
   },
   autoJoin: true,
   autoAddToCart: false,
@@ -70,7 +71,7 @@ const pendingVerifications = new Map();
 function pollTargets() {
   chrome.tabs.query({}, (allTabs) => {
     const liveTabIds = new Set(allTabs.map((t) => t.id));
-    const monitoredTabs = allTabs.filter((t) => t.url && /queue-it\.net|pokemoncenter\.com|pokemoncenter-online|pokemon\.co\.jp|walmart\.com|costco\.com|discord\.com\/channels|x\.com/.test(t.url));
+    const monitoredTabs = allTabs.filter((t) => t.url && /queue-it\.net|pokemoncenter\.com|pokemoncenter-online|pokemon\.co\.jp|walmart\.com|costco\.com|target\.com|discord\.com\/channels|x\.com/.test(t.url));
     for (const tab of monitoredTabs) {
       tabUrlMap.set(tab.id, tab.url);
       chrome.tabs.sendMessage(tab.id, { type: "POLL_QUEUE" }).catch(() => {});
@@ -202,6 +203,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       notify(`${msg.site}: You're through the queue!`, msg.detail || "Go go go!");
     } else if (msg.status === "joined") {
       notify(`${msg.site}: Joined queue`, msg.detail || "Waiting in line...");
+    } else if (msg.status === "blocked") {
+      notify(`${msg.site}: BLOCKED`, msg.detail || "Access denied — clear cookies or switch network");
     } else if (msg.status === "captcha") {
       notify(`${msg.site}: CAPTCHA detected!`, msg.detail || "Manual solve needed — switch to tab now!");
     } else if (msg.status === "atc-success") {
@@ -339,6 +342,7 @@ const SITE_NAME_TO_ID = {
   "PC Japan": "pokemon-center-jp",
   "Walmart": "walmart",
   "Costco": "costco",
+  "Target": "target",
   "discord": "discord",
 };
 

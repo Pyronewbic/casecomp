@@ -385,7 +385,8 @@ v1.post("/webhooks", async (req, res) => {
 v1.get("/webhooks", async (req, res) => {
   try {
     const stored = await cacheReadByPattern("casecomp:webhook:*", 50);
-    res.json({ webhooks: stored, count: stored.length });
+    const merged = stored.length ? stored : webhooks;
+    res.json({ webhooks: merged, count: merged.length });
   } catch (e) {
     res.json({ webhooks, count: webhooks.length });
   }

@@ -87,7 +87,7 @@
 
   function detect() {
     if (detectAccessDenied()) {
-      return { inQueue: true, captcha: true, joinable: false, detail: "Access denied (Error 17) — IP may be rate-limited. Wait and refresh." };
+      return { inQueue: true, blocked: true, joinable: false, detail: "Access denied (Error 17) — IP rate-limited. Clear cookies, wait, or switch network." };
     }
 
     if (detectCaptcha()) {

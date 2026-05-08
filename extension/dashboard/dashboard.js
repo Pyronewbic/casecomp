@@ -4,7 +4,7 @@ const $$ = (s) => document.querySelectorAll(s);
 const STORAGE_KEYS = [
   "enabled", "sites", "log", "monitorStatus",
   "discordChannels", "discordKeywords", "redditSubs", "targetUrls", "logArchive",
-  "checkoutLog", "autoCheckout", "imapConfig", "proxyConfig",
+  "checkoutLog", "autoCheckout", "imapConfig", "proxyConfig", "profiles",
 ];
 
 const SITE_ICONS = {
@@ -12,6 +12,7 @@ const SITE_ICONS = {
   "pokemon-center-jp": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="3"/><path d="M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20" stroke-width="1" opacity=".4"/></svg>',
   "walmart":           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2.9" y1="7" x2="7.2" y2="9.5"/><line x1="16.8" y1="14.5" x2="21.1" y2="17"/><line x1="2.9" y1="17" x2="7.2" y2="14.5"/><line x1="16.8" y1="9.5" x2="21.1" y2="7"/></svg>',
   "costco":            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/><line x1="12" y1="12" x2="12" y2="16"/></svg>',
+  "target":            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
   "discord":           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 9.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2zM14.5 9.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill="currentColor" stroke="none"/><path d="M5.5 16s1.5 2 6.5 2 6.5-2 6.5-2"/><path d="M20 7.5c-1.5-1-3.2-1.7-5-2l-.5 1.2M4 7.5c1.5-1 3.2-1.7 5-2l.5 1.2"/><path d="M3 12c0 4 2 7.5 4.5 9l1-2M21 12c0 4-2 7.5-4.5 9l-1-2"/></svg>',
 };
 
@@ -20,6 +21,7 @@ const MONITORS = [
   { id: "pokemon-center-jp", label: "Pokémon Center JP", letter: "P" },
   { id: "walmart",           label: "Walmart",           letter: "W" },
   { id: "costco",            label: "Costco",            letter: "C" },
+  { id: "target",            label: "Target",            letter: "T" },
 ];
 
 const SITE_NAME_TO_ID = {
@@ -28,6 +30,7 @@ const SITE_NAME_TO_ID = {
   "PC Japan": "pokemon-center-jp",
   "Walmart": "walmart",
   "Costco": "costco",
+  "Target": "target",
   "discord": "discord",
 };
 
@@ -36,6 +39,7 @@ const WORKER_STATUSES = new Set([
   "atc-success", "atc-failed", "target-opened",
   "checkout-shipping", "checkout-payment", "checkout-review",
   "checkout-success", "checkout-failed", "verification-filled",
+  "blocked",
 ]);
 
 const STATUS_TO_PILL = {
@@ -55,6 +59,7 @@ const STATUS_TO_PILL = {
   "checkout-success":   "pill-through",
   "checkout-failed":    "pill-captcha",
   "verification-filled":"pill-intel",
+  "blocked":            "pill-blocked",
 };
 
 const STATUS_TO_DATA = {
@@ -75,6 +80,8 @@ function isWorkerEntry(e) {
   return WORKER_STATUSES.has(e.status) || e.site === "system";
 }
 
+let _analyticsFilter = null;
+
 function renderAnalytics(period) {
   period = period || "day";
   const el = $("#analytics-cards");
@@ -82,41 +89,55 @@ function renderAnalytics(period) {
   const tableEl = $("#analytics-checkouts");
   if (!el) return;
 
-  // Compute stats from logData
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
   const periodMs = period === "month" ? 30 * day : period === "week" ? 7 * day : day;
-  const periodEntries = logData.filter(e => now - new Date(e.ts).getTime() < periodMs);
+  const periodEntries = logData.filter(e => now - new Date(e.ts).getTime() < periodMs && WORKER_STATUSES.has(e.status) && e.site !== "system");
 
-  const checkouts = periodEntries.filter(e => e.status === "atc-success" || e.status === "through");
-  const failures = periodEntries.filter(e => e.status === "atc-failed" || e.status === "captcha");
-  const totalEvents = periodEntries.length;
+  const filters = {
+    events: null,
+    checkouts: e => e.status === "atc-success" || e.status === "through" || e.status === "checkout-success",
+    joined: e => e.status === "joined",
+    failures: e => e.status === "atc-failed" || e.status === "captcha" || e.status === "checkout-failed",
+  };
 
-  // Cards
-  el.innerHTML = `
-    <div class="a-card highlight">
-      <div class="a-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
-      <div class="a-card-body"><div class="a-card-label">Events</div><div class="a-card-value">${totalEvents}</div></div>
-    </div>
-    <div class="a-card">
-      <div class="a-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <div class="a-card-body"><div class="a-card-label">Checkouts</div><div class="a-card-value">${checkouts.length}</div></div>
-    </div>
-    <div class="a-card">
-      <div class="a-card-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
-      <div class="a-card-body"><div class="a-card-label">Queues Joined</div><div class="a-card-value">${periodEntries.filter(e => e.status === "joined").length}</div></div>
-    </div>
-    <div class="a-card">
-      <div class="a-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-      <div class="a-card-body"><div class="a-card-label">Failures</div><div class="a-card-value">${failures.length}</div></div>
-    </div>
-  `;
+  const checkouts = periodEntries.filter(filters.checkouts);
+  const joined = periodEntries.filter(filters.joined);
+  const failures = periodEntries.filter(filters.failures);
 
-  // Chart - bucket events by time
-  const bucketCount = period === "month" ? 12 : period === "week" ? 7 : 24;
+  const cards = [
+    { key: "events", label: "Events", value: periodEntries.length, color: "green" },
+    { key: "checkouts", label: "Checkouts", value: checkouts.length, color: "blue" },
+    { key: "joined", label: "Queues Joined", value: joined.length, color: "purple" },
+    { key: "failures", label: "Failures", value: failures.length, color: "red" },
+  ];
+
+  el.innerHTML = cards.map(c => {
+    const active = _analyticsFilter === c.key ? " active" : "";
+    const hl = (!_analyticsFilter && c.key === "events") || _analyticsFilter === c.key ? " highlight" : "";
+    return `<div class="a-card${hl}${active}" data-filter="${c.key}">
+      <div class="a-card-icon ${c.color}"><span style="font-size:16px;font-weight:700;">${c.value}</span></div>
+      <div class="a-card-body"><div class="a-card-label">${c.label}</div><div class="a-card-value">${c.value}</div></div>
+    </div>`;
+  }).join("");
+
+  el.querySelectorAll(".a-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const key = card.dataset.filter;
+      _analyticsFilter = _analyticsFilter === key ? null : key;
+      renderAnalytics(period);
+    });
+  });
+
+  // Chart — filter entries based on selected card
+  const chartEntries = _analyticsFilter && filters[_analyticsFilter]
+    ? periodEntries.filter(filters[_analyticsFilter])
+    : periodEntries;
+
+  const bucketCount = period === "month" ? 30 : period === "week" ? 7 : 24;
   const bucketMs = periodMs / bucketCount;
   const buckets = new Array(bucketCount).fill(0);
-  for (const e of periodEntries) {
+  for (const e of chartEntries) {
     const age = now - new Date(e.ts).getTime();
     const idx = bucketCount - 1 - Math.floor(age / bucketMs);
     if (idx >= 0 && idx < bucketCount) buckets[idx]++;
@@ -125,14 +146,15 @@ function renderAnalytics(period) {
   const max = Math.max(...buckets, 1);
   const chartW = 600;
   const chartH = 140;
+  const pad = 5;
   const points = buckets.map((v, i) => {
-    const x = bucketCount > 1 ? (i / (bucketCount - 1)) * chartW : 0;
-    const y = chartH - (v / max) * (chartH - 10) - 5;
+    const x = bucketCount > 1 ? (i / (bucketCount - 1)) * chartW : chartW / 2;
+    const y = chartH - pad - (v / max) * (chartH - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
   const areaPoints = `0,${chartH} ${points} ${chartW},${chartH}`;
 
-  const yLabels = [max, Math.round(max * 0.75), Math.round(max * 0.5), Math.round(max * 0.25), 0];
+  const yLabels = [max, Math.round(max * 0.5), 0];
 
   let xLabels;
   if (period === "day") {
@@ -141,57 +163,98 @@ function renderAnalytics(period) {
       return `${h}:00`;
     });
   } else if (period === "week") {
-    const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-    xLabels = Array.from({length: 7}, (_, i) => days[new Date(now - (6-i) * day).getDay()]);
+    const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    xLabels = Array.from({length: 7}, (_, i) => dayNames[new Date(now - (6 - i) * day).getDay()]);
   } else {
     xLabels = Array.from({length: 6}, (_, i) => {
       const d = new Date(now - (30 - i * 6) * day);
-      return `${d.getMonth()+1}/${d.getDate()}`;
+      return `${d.getMonth() + 1}/${d.getDate()}`;
     });
   }
 
-  chartEl.innerHTML = `
+  if (chartEl) chartEl.innerHTML = `
     <div class="chart-y-axis">${yLabels.map(v => `<span>${v}</span>`).join("")}</div>
-    <svg class="chart-svg" viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="none">
-      <defs><linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--foil)"/><stop offset="1" stop-color="transparent"/></linearGradient></defs>
+    <svg class="chart-svg" viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="none" style="overflow:hidden;">
+      <defs><linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--foil)" stop-opacity=".3"/><stop offset="1" stop-color="var(--foil)" stop-opacity="0"/></linearGradient></defs>
       <polygon class="chart-area" points="${areaPoints}"/>
       <polyline points="${points}"/>
     </svg>
     <div class="chart-x-axis">${xLabels.map(l => `<span>${l}</span>`).join("")}</div>
   `;
 
+  // Site breakdown
+  const siteNameMap = { "pokemon-center": "Pokémon Center US", "pokemon-center-jp": "Pokémon Center JP", "walmart": "Walmart", "costco": "Costco", "target": "Target" };
+  const siteCounts = {};
+  for (const e of periodEntries) {
+    const id = SITE_NAME_TO_ID[e.site] || e.site?.toLowerCase().replace(/\s+/g, "-") || "other";
+    siteCounts[id] = (siteCounts[id] || 0) + 1;
+  }
+  const siteSorted = Object.entries(siteCounts).sort((a, b) => b[1] - a[1]);
+  const siteMax = siteSorted.length ? siteSorted[0][1] : 1;
+
+  // Product breakdown
+  const productCounts = {};
+  for (const e of periodEntries) {
+    const slug = slugFromUrl(e.tabUrl) || "unknown";
+    if (slug === "unknown") continue;
+    productCounts[slug] = (productCounts[slug] || 0) + 1;
+  }
+  const prodSorted = Object.entries(productCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const prodMax = prodSorted.length ? prodSorted[0][1] : 1;
+
+  const breakdownHtml = `
+    <div class="analytics-breakdowns">
+      <div class="breakdown-col">
+        <h3 class="breakdown-title">By Site</h3>
+        ${siteSorted.length ? siteSorted.map(([id, count]) => {
+          const name = siteNameMap[id] || id;
+          const pct = Math.round((count / siteMax) * 100);
+          const icon = SITE_ICONS[id] || "";
+          return `<div class="breakdown-row">
+            <span class="breakdown-icon">${icon}</span>
+            <span class="breakdown-name">${esc(name)}</span>
+            <div class="breakdown-bar"><div class="breakdown-fill" style="width:${pct}%"></div></div>
+            <span class="breakdown-count">${count}</span>
+          </div>`;
+        }).join("") : '<div style="color:var(--paper-dd);font-size:11px;">No data</div>'}
+      </div>
+      <div class="breakdown-col">
+        <h3 class="breakdown-title">By Product</h3>
+        ${prodSorted.length ? prodSorted.map(([slug, count]) => {
+          const pct = Math.round((count / prodMax) * 100);
+          return `<div class="breakdown-row">
+            <span class="breakdown-name">${esc(slug)}</span>
+            <div class="breakdown-bar"><div class="breakdown-fill" style="width:${pct}%"></div></div>
+            <span class="breakdown-count">${count}</span>
+          </div>`;
+        }).join("") : '<div style="color:var(--paper-dd);font-size:11px;">No data</div>'}
+      </div>
+    </div>
+  `;
+
   // Recent checkouts table
   const recentCheckouts = logData
-    .filter(e => e.status === "through" || e.status === "atc-success")
+    .filter(e => e.status === "through" || e.status === "atc-success" || e.status === "checkout-success")
     .slice(0, 10);
 
-  if (!recentCheckouts.length) {
-    tableEl.innerHTML = '<div style="color:var(--paper-dd);padding:20px;text-align:center;">No checkouts yet.</div>';
-    return;
-  }
-
-  const siteNameMap = { "pokemon-center": "Pokemon Center", "walmart": "Walmart", "costco": "Costco", "pokemon-center-jp": "Pokemon Center JP" };
-
-  tableEl.innerHTML = `
+  const checkoutTableHtml = recentCheckouts.length ? `
     <div class="checkout-table">
-      <div class="checkout-header">
-        <span>Product</span><span>Price</span><span>Retailer</span><span>Date</span>
-      </div>
+      <div class="checkout-header"><span>Product</span><span>Retailer</span><span>Date</span></div>
       ${recentCheckouts.map(e => {
-        const slug = slugFromUrl(e.tabUrl) || e.detail || "Unknown product";
+        const slug = slugFromUrl(e.tabUrl) || e.detail || "Unknown";
         const siteId = SITE_NAME_TO_ID[e.site] || e.site;
         const retailer = siteNameMap[siteId] || e.site || "—";
         const date = new Date(e.ts).toLocaleString([], { month: "numeric", day: "numeric", year: "2-digit", hour: "numeric", minute: "2-digit" });
         const link = e.tabUrl ? `<a class="checkout-product-link" href="${esc(e.tabUrl)}" target="_blank">↗</a>` : "";
         return `<div class="checkout-row">
           <div class="checkout-product"><span class="checkout-product-name">${esc(slug)}</span>${link}</div>
-          <span class="checkout-price">—</span>
           <span class="checkout-retailer">${esc(retailer)}</span>
           <span class="checkout-date">${date}</span>
         </div>`;
       }).join("")}
-    </div>
-  `;
+    </div>` : '<div style="color:var(--paper-dd);padding:20px;text-align:center;">No checkouts yet.</div>';
+
+  if (tableEl) tableEl.innerHTML = breakdownHtml + `<h3 class="breakdown-title" style="margin-top:24px;">Recent Checkouts</h3>` + checkoutTableHtml;
 }
 
 function loadSettings(data) {
@@ -250,6 +313,162 @@ function collectProxyConfig() {
   };
 }
 
+const ACCOUNT_SITE_LABELS = {
+  "pokemon-center": "Pokemon Center",
+  "walmart": "Walmart",
+  "costco": "Costco",
+  "target": "Target",
+};
+
+function maskEmail(email) {
+  if (!email) return "";
+  const parts = email.split("@");
+  if (parts.length !== 2) return email;
+  const name = parts[0];
+  if (name.length <= 1) return email;
+  return name[0] + "***@" + parts[1];
+}
+
+function renderAccounts() {
+  chrome.storage.local.get(["profiles"], (data) => {
+    const accounts = data.profiles || [];
+    const listEl = $("#accounts-list");
+    if (!listEl) return;
+
+    const searchVal = ($("#account-search")?.value || "").toLowerCase();
+    const filterVal = $("#account-filter")?.value || "all";
+
+    let filtered = accounts;
+    if (searchVal) filtered = filtered.filter(a => (a.account?.email || "").toLowerCase().includes(searchVal) || (a.name || "").toLowerCase().includes(searchVal));
+    if (filterVal !== "all") filtered = filtered.filter(a => a.account?.site === filterVal);
+
+    if (!filtered.length) {
+      listEl.innerHTML = `<div style="color:var(--paper-dd);padding:30px;text-align:center;font-family:var(--font-mono);font-size:11px;">${accounts.length ? "No matching accounts." : "No accounts yet. Click + Add Account."}</div>`;
+      return;
+    }
+
+    listEl.innerHTML = filtered.map(a => {
+      const siteLabel = ACCOUNT_SITE_LABELS[a.account?.site] || a.account?.site || "—";
+      const proxy = a.proxy || "—";
+      const status = a.status || "Idle";
+      const statusCls = status === "Active" ? "acct-active" : status === "Blocked" ? "acct-blocked" : "acct-idle";
+      const defaultBadge = a.isDefault ? ' <span class="acct-default">DEFAULT</span>' : "";
+      return `<div class="acct-row" data-acct-id="${esc(a.id)}">
+        <span class="acct-email">${esc(a.account?.email || "—")}${defaultBadge}</span>
+        <span class="acct-site">${esc(siteLabel)}</span>
+        <span class="acct-proxy">${esc(proxy)}</span>
+        <span class="acct-status ${statusCls}">${esc(status)}</span>
+        <div class="acct-actions">
+          <button class="acct-edit" data-acct-id="${esc(a.id)}">Edit</button>
+          <button class="acct-delete" data-acct-id="${esc(a.id)}">×</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    listEl.querySelectorAll(".acct-edit").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.acctId;
+        chrome.storage.local.get(["profiles"], d => {
+          const acct = (d.profiles || []).find(a => a.id === id);
+          if (acct) showAccountModal(acct);
+        });
+      });
+    });
+
+    listEl.querySelectorAll(".acct-delete").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.acctId;
+        chrome.storage.local.get(["profiles"], d => {
+          const arr = (d.profiles || []).filter(a => a.id !== id);
+          chrome.storage.local.set({ profiles: arr }, () => renderAccounts());
+        });
+      });
+    });
+  });
+}
+
+function showAccountModal(account) {
+  const modal = $("#account-modal");
+  const content = $("#account-modal-content");
+  if (!modal || !content) return;
+
+  const isNew = !account;
+  const a = account || {
+    id: "acct_" + Date.now().toString(36),
+    name: "",
+    account: { email: "", password: "", site: "pokemon-center" },
+    proxy: "",
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+  };
+
+  modal.style.display = "flex";
+  content.innerHTML = `
+    <div class="modal-header">
+      <h3>${isNew ? "Add Account" : "Update Account"}</h3>
+      <button class="modal-close" id="acct-modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="editor-field">
+        <label>Site</label>
+        <select id="acct-site">
+          <option value="pokemon-center"${(a.account?.site || "pokemon-center") === "pokemon-center" ? " selected" : ""}>Pokemon Center</option>
+          <option value="walmart"${a.account?.site === "walmart" ? " selected" : ""}>Walmart</option>
+          <option value="costco"${a.account?.site === "costco" ? " selected" : ""}>Costco</option>
+          <option value="target"${a.account?.site === "target" ? " selected" : ""}>Target</option>
+        </select>
+      </div>
+      <div class="editor-field">
+        <label>Login</label>
+        <input type="text" id="acct-email" placeholder="email@example.com" value="${esc(a.account?.email || "")}">
+      </div>
+      <div class="editor-field">
+        <label>Password</label>
+        <input type="password" id="acct-pass" placeholder="password" value="${esc(a.account?.password || "")}">
+      </div>
+      <div class="editor-field">
+        <label>Proxy</label>
+        <input type="text" id="acct-proxy" placeholder="host:port:user:pass or leave empty" value="${esc(a.proxy || "")}">
+      </div>
+      <label class="editor-checkbox">
+        <input type="checkbox" id="acct-default"${a.isDefault ? " checked" : ""}> Set as default
+      </label>
+    </div>
+    <button class="modal-save" id="acct-save">${isNew ? "Add Account" : "Update"}</button>
+  `;
+
+  content.querySelector("#acct-modal-close")?.addEventListener("click", () => { modal.style.display = "none"; });
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.style.display = "none"; });
+
+  content.querySelector("#acct-save")?.addEventListener("click", () => {
+    const updated = {
+      id: a.id,
+      name: a.name || $("#acct-email")?.value?.split("@")[0] || "Account",
+      account: {
+        email: $("#acct-email")?.value || "",
+        password: $("#acct-pass")?.value || "",
+        site: $("#acct-site")?.value || "pokemon-center",
+      },
+      proxy: $("#acct-proxy")?.value || "",
+      isDefault: $("#acct-default")?.checked || false,
+      status: "Idle",
+      createdAt: a.createdAt || new Date().toISOString(),
+    };
+
+    chrome.storage.local.get(["profiles"], data => {
+      let arr = data.profiles || [];
+      if (updated.isDefault) arr = arr.map(p => ({ ...p, isDefault: false }));
+      const idx = arr.findIndex(p => p.id === updated.id);
+      if (idx >= 0) arr[idx] = { ...arr[idx], ...updated };
+      else arr.push(updated);
+      chrome.storage.local.set({ profiles: arr }, () => {
+        modal.style.display = "none";
+        renderAccounts();
+      });
+    });
+  });
+}
+
 function load() {
   chrome.storage.local.get(STORAGE_KEYS, (data) => {
     $("#enabled").checked = data.enabled !== false;
@@ -262,6 +481,7 @@ function load() {
     renderKeywords(data.discordKeywords || []);
     renderTargets(data.targetUrls || []);
     loadSettings(data);
+    renderAccounts();
   });
 }
 
@@ -269,26 +489,6 @@ function load() {
 function renderFeeds() {
   const workers = logData.filter((e) => WORKER_STATUSES.has(e.status) && e.site !== "system");
 
-  // Inject placeholder for armed targets with no worker log
-  const cachedTargets = _lastTargets || [];
-  const siteNames = { "pokemon-center": "Pokémon Center", "pokemon-center-jp": "Pokémon Center JP", "walmart": "Walmart", "costco": "Costco" };
-  for (const t of cachedTargets) {
-    if (!t.active) continue;
-    const hasWorker = workers.some((e) => {
-      if (e.tabUrl === t.url) return true;
-      try { return new URL(e.tabUrl).hostname === new URL(t.url).hostname; } catch { return false; }
-    });
-    if (!hasWorker) {
-      const siteId = siteIdFromUrl(t.url);
-      workers.push({
-        ts: t.addedAt || new Date().toISOString(),
-        site: siteNames[siteId] || "Unknown",
-        status: "detected",
-        detail: "Armed — waiting for page to load",
-        tabUrl: t.url,
-      });
-    }
-  }
 
   renderWorkerPanel($("#feed-workers"), workers);
   const news = logData.filter((e) => !isWorkerEntry(e));
@@ -358,7 +558,14 @@ function renderFeedKPIs(workers) {
   const day = 24 * 60 * 60 * 1000;
   const recent = workers.filter((e) => now - new Date(e.ts).getTime() < day);
 
-  const armed = workers.filter((e) => e.status !== "through").length;
+  const armedSites = new Set();
+  for (const e of workers) {
+    if (e.status !== "through") {
+      const key = (e.tabId || "") + "::" + (SITE_NAME_TO_ID[e.site] || e.site);
+      armedSites.add(key);
+    }
+  }
+  const armed = armedSites.size;
   const queued = recent.filter((e) => e.status === "waiting" || e.status === "joined").length;
 
   let bestPos = null;
@@ -474,7 +681,8 @@ function renderHistory(el) {
 }
 
 function renderRawLog(el) {
-  const all = [...logData.map((e) => ({ ...e, _src: "live" })), ...archiveData.map((e) => ({ ...e, _src: "archive" }))];
+  const all = [...logData.map((e) => ({ ...e, _src: "live" })), ...archiveData.map((e) => ({ ...e, _src: "archive" }))]
+    .filter((e) => e.status !== "discord-intel" && e.status !== "new-listing");
   all.sort((a, b) => new Date(b.ts) - new Date(a.ts));
   const entries = filterBySearch(all);
   if (!entries.length) {
@@ -534,6 +742,7 @@ function renderWorkerPanel(el, entries) {
           <div class="site-chip"><span class="sc-icon">${SITE_ICONS["pokemon-center-jp"]}</span><span>Pokémon Center JP</span></div>
           <div class="site-chip"><span class="sc-icon">${SITE_ICONS["walmart"]}</span><span>Walmart</span></div>
           <div class="site-chip"><span class="sc-icon">${SITE_ICONS["costco"]}</span><span>Costco</span></div>
+          <div class="site-chip"><span class="sc-icon">${SITE_ICONS["target"]}</span><span>Target</span></div>
         </div>
       </div>
     </div>`;
@@ -674,6 +883,7 @@ function siteIdFromUrl(url) {
     if (h.includes("pokemoncenter-online") || h.includes("pokemon.co.jp")) return "pokemon-center-jp";
     if (h.includes("walmart")) return "walmart";
     if (h.includes("costco")) return "costco";
+    if (h.includes("target.com")) return "target";
     if (h.includes("pokemon.com")) return "pokemon-center";
   } catch {}
   return null;
@@ -748,7 +958,7 @@ function dashAddUrl() {
   if (!raw) return;
   try {
     const parsed = new URL(raw);
-    const allowed = ["www.pokemoncenter.com", "pokemoncenter.com", "www.pokemoncenter-online.com", "pokemoncenter-online.com", "pokemoncenter.pokemon.co.jp", "www.walmart.com", "www.costco.com", "www.pokemon.com", "tcg.pokemon.com"];
+    const allowed = ["www.pokemoncenter.com", "pokemoncenter.com", "www.pokemoncenter-online.com", "pokemoncenter-online.com", "pokemoncenter.pokemon.co.jp", "www.walmart.com", "www.costco.com", "www.target.com", "www.pokemon.com", "tcg.pokemon.com"];
     if (!allowed.some((h) => parsed.hostname === h || parsed.hostname.endsWith(".queue-it.net") || parsed.hostname.endsWith(".pokemon.com"))) {
       input.style.borderColor = "var(--pulse)";
       setTimeout(() => { input.style.borderColor = ""; }, 1500);
@@ -973,6 +1183,11 @@ $("#sub-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") $("
 $("#dash-url-add")?.addEventListener("click", dashAddUrl);
 $("#dash-url-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") dashAddUrl(); });
 
+// Add profile
+$("#add-account")?.addEventListener("click", () => showAccountModal(null));
+$("#account-search")?.addEventListener("input", () => renderAccounts());
+$("#account-filter")?.addEventListener("change", () => renderAccounts());
+
 // Settings: Auto-Checkout toggle
 $("#setting-auto-checkout")?.addEventListener("change", () => {
   saveSettingsField("autoCheckout", $("#setting-auto-checkout").checked);
@@ -1032,4 +1247,5 @@ chrome.storage.onChanged.addListener((changes) => {
       loadSettings(data);
     });
   }
+  if (changes.profiles) renderAccounts();
 });
