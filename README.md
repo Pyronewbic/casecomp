@@ -338,6 +338,19 @@ yarn api   # starts on :3000
 | `GET` | `/api/grades?q=Mega+Greninja&limit=100` | Export stored grades (training data) |
 | `GET` | `/api/health` | Health check + Redis status |
 
+### v1 API — Drop Intelligence (Bearer auth)
+
+Set `CASECOMP_API_KEY` in `.env` to enable authentication. All v1 endpoints require `Authorization: Bearer <key>`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/v1/drops?limit=20&site=pokemon` | List recent drop events |
+| `GET` | `/v1/drops/:id` | Single drop with queue metrics |
+| `GET` | `/v1/comps?sku=sv8-151-booster` | Sold + listed prices across all sources |
+| `POST` | `/v1/webhooks` | Register webhook (`drop.opened`, `queue.through`, etc.) |
+| `GET` | `/v1/webhooks` | List registered webhooks |
+| `DELETE` | `/v1/webhooks/:id` | Remove a webhook |
+
 ### Search params
 
 `q` (required), `source` (ebay/snkrdunk/magi/yahoo), `format` (raw/slab), `countries` (US,IN), `lang` (eng/jp/any), `results`, `sold`, `slab_provider`, `slab_grade`, `condition` (A-D), `grade` (true = AI pre-grade)
