@@ -143,7 +143,7 @@ app.get("/api/search", async (req, res) => {
       const ebayQuery = buildEbaySearchQuery(q, config);
       const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
       const soldRes = await searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false });
-      const psaSignal = config.listingFormat === "raw" ? await getPsaGradingSignal(q) : null;
+      const psaSignal = await getPsaGradingSignal(q);
       result = {
         query: q,
         source: "ebay",
