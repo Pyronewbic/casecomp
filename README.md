@@ -319,15 +319,32 @@ flowchart TD
 
 ---
 
-## REST API (`yarn api`)
+## REST API
 
-Run `node api.js` or `yarn api` to start the API on port 3000. Swagger docs at [localhost:3000/docs](http://localhost:3000/docs).
+Two options: **self-host** or use the **hosted API** at `api.casecomp.xyz`.
+
+### Hosted API
+
+No setup needed. Get an API key at [casecomp.xyz/developers](https://casecomp.xyz/developers) and start making requests:
+
+```bash
+curl https://api.casecomp.xyz/v1/drops?limit=20 \
+  -H "Authorization: Bearer $CASECOMP_KEY"
+```
+
+The hosted API aggregates drop events from all extension users, provides reliable webhook delivery, and handles infrastructure (Redis, eBay API keys, rate limits) for you.
+
+### Self-hosted
+
+Run your own instance — you'll need your own eBay API keys and optional Redis:
 
 ```bash
 yarn api   # starts on :3000
 ```
 
-### Endpoints
+Swagger docs at [localhost:3000/docs](http://localhost:3000/docs). A self-hosted instance only sees drops from your own extension.
+
+### Card research endpoints (open)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -340,16 +357,27 @@ yarn api   # starts on :3000
 
 ### v1 API — Drop Intelligence (Bearer auth)
 
-Set `CASECOMP_API_KEY` in `.env` to enable authentication. All v1 endpoints require `Authorization: Bearer <key>`.
+Set `CASECOMP_API_KEY` in `.env` (self-hosted) or use your key from [casecomp.xyz](https://casecomp.xyz/developers). All v1 endpoints require `Authorization: Bearer <key>`.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/v1/drops?limit=20&site=pokemon` | List recent drop events |
-| `GET` | `/v1/drops/:id` | Single drop with queue metrics |
-| `GET` | `/v1/comps?sku=sv8-151-booster` | Sold + listed prices across all sources |
-| `POST` | `/v1/webhooks` | Register webhook (`drop.opened`, `queue.through`, etc.) |
+| `GET` | `/v1/drops/:id` | Single drop with queue metrics and timing |
+| `GET` | `/v1/comps?sku=sv8-151-booster` | Sold + listed prices from eBay, magi, SNKRDUNK, Yahoo |
+| `POST` | `/v1/webhooks` | Register webhook for events |
 | `GET` | `/v1/webhooks` | List registered webhooks |
 | `DELETE` | `/v1/webhooks/:id` | Remove a webhook |
+
+#### Webhook events
+
+`drop.opened` · `drop.closed` · `queue.joined` · `queue.advanced` · `queue.through` · `checkout.cleared` · `captcha.detected` · `listing.new`
+
+```bash
+# Register a webhook
+curl -X POST https://api.casecomp.xyz/v1/webhooks \
+  -H "Authorization: Bearer $CASECOMP_KEY" \
+  -d '{"url":"https://you.dev/hook","events":["drop.opened","queue.through"]}'
+```
 
 ### Search params
 
@@ -379,6 +407,8 @@ Optional — falls back to file-based cache if Redis is unavailable. Set `REDIS_
 | eBay sold listings | 24h |
 | AI grades | 30d |
 | PSA population | 24h |
+| Drop events | permanent |
+| Webhooks | permanent |
 | Grade training log | permanent |
 
 ---
