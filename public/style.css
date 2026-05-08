@@ -257,6 +257,30 @@ main {
   background: var(--gold-dim);
 }
 
+.source-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.source-filter {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.source-filter:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+.source-filter.active {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: var(--gold-dim);
+}
+
 .results-right {
   position: sticky;
   top: 20px;
@@ -576,6 +600,16 @@ main {
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(255,255,255,0.05);
+}
+.source-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.03em;
+  margin-left: auto;
 }
 .slab-chip {
   font-family: 'Space Grotesk', system-ui, sans-serif;
