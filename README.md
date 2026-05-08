@@ -1,5 +1,7 @@
 # <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
+**[casecomp.xyz](https://casecomp.xyz)**
+
 **Casecomp** is a card research tool for collectors. Ask it for a card in plain English — `/casecomp Umbreon ex 217/187 PSA 10 japanese` — and it pulls live listings from eBay and magi.camp, recent sold comps, and (for raw searches) a PSA grading signal showing difficulty, 10 chance, and population. Results land in a clean markdown table with prices, shipping costs, and clickable links.
 
 Results are written to **`results.md`** (human-readable) and **`results.json`** (full data). Every run also appends to **`output/resultsCombined.md`** — a deduplicated running log across all searches.
