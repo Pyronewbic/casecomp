@@ -116,6 +116,12 @@
 
     const state = SITE_HANDLER.detect();
 
+    if (state.blocked) {
+      report("blocked", state.detail || "Access blocked — IP rate-limited");
+      if (config.soundAlerts) playUrgentChime();
+      return;
+    }
+
     if (state.captcha) {
       report("captcha", state.detail || "CAPTCHA detected — manual solve needed!");
       if (config.soundAlerts) playUrgentChime();

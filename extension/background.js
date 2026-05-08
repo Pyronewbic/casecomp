@@ -202,6 +202,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       notify(`${msg.site}: You're through the queue!`, msg.detail || "Go go go!");
     } else if (msg.status === "joined") {
       notify(`${msg.site}: Joined queue`, msg.detail || "Waiting in line...");
+    } else if (msg.status === "blocked") {
+      notify(`${msg.site}: BLOCKED`, msg.detail || "Access denied — clear cookies or switch network");
     } else if (msg.status === "captcha") {
       notify(`${msg.site}: CAPTCHA detected!`, msg.detail || "Manual solve needed — switch to tab now!");
     } else if (msg.status === "atc-success") {

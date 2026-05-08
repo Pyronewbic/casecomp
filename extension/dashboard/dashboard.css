@@ -545,6 +545,7 @@ main {
 .pill-idle     { color: var(--paper-dd); }
 .pill-armed    { color: var(--ok); }
 .pill-off      { color: var(--paper-dd); }
+.pill-blocked  { color: var(--pulse); border-color: var(--pulse); background: rgba(255,93,93,.08); animation: pulseFade 1.2s ease-in-out infinite; }
 @keyframes pulseFade {
   0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,93,93,.4); }
   50% { opacity: .55; box-shadow: 0 0 0 4px rgba(255,93,93,0); }
@@ -914,7 +915,9 @@ body.engine-off .feed-panel.active::after {
   display: flex; align-items: center; gap: 12px;
   transition: border-color .15s;
 }
+.a-card { cursor: pointer; }
 .a-card:hover { border-color: var(--line); }
+.a-card.active { border-color: var(--foil); }
 .a-card.highlight { border-color: var(--foil); background: linear-gradient(180deg, rgba(217,182,118,.06), var(--ink-1)); }
 .a-card-icon {
   width: 36px; height: 36px;
@@ -945,9 +948,9 @@ body.engine-off .feed-panel.active::after {
   width: 50px; text-align: right; padding-right: 8px;
   font-family: var(--font-mono); font-size: 9px; color: var(--paper-dd);
 }
-.chart-svg { width: 100%; height: 160px; margin-left: 50px; }
+.chart-svg { width: calc(100% - 50px); height: 140px; margin-left: 50px; overflow: hidden; }
 .chart-svg polyline { fill: none; stroke: var(--foil); stroke-width: 2; }
-.chart-svg .chart-area { fill: url(#chartGrad); opacity: .15; }
+.chart-svg .chart-area { fill: url(#chartGrad); }
 .chart-x-axis {
   display: flex; justify-content: space-between;
   margin-left: 50px; margin-top: 8px;
@@ -968,7 +971,7 @@ body.engine-off .feed-panel.active::after {
 }
 .checkout-header, .checkout-row {
   display: grid;
-  grid-template-columns: 2fr 100px 120px 160px;
+  grid-template-columns: 2fr 120px 160px;
   gap: 12px;
   padding: 10px 16px;
   align-items: center;
@@ -1087,4 +1090,56 @@ body.engine-off .feed-panel.active::after {
 .settings-select option {
   background: var(--ink-2);
   color: var(--paper);
+}
+
+/* ============ ANALYTICS BREAKDOWNS ============ */
+.analytics-breakdowns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 8px;
+}
+.breakdown-col { min-width: 0; }
+.breakdown-title {
+  font-family: var(--font-display);
+  font-size: 13px; font-weight: 600;
+  color: var(--paper);
+  margin-bottom: 12px;
+}
+.breakdown-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+}
+.breakdown-row .breakdown-icon {
+  width: 16px; height: 16px;
+  color: var(--foil);
+  display: flex;
+}
+.breakdown-row .breakdown-icon svg { width: 100%; height: 100%; }
+.breakdown-name {
+  font-size: 12px;
+  color: var(--paper-d);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.breakdown-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  background: var(--ink-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.breakdown-fill {
+  height: 100%;
+  background: var(--grad-foil);
+  border-radius: 2px;
+  transition: width .3s;
+}
+.breakdown-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-dd);
+  text-align: right;
 }

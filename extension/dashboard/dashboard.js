@@ -36,6 +36,7 @@ const WORKER_STATUSES = new Set([
   "atc-success", "atc-failed", "target-opened",
   "checkout-shipping", "checkout-payment", "checkout-review",
   "checkout-success", "checkout-failed", "verification-filled",
+  "blocked",
 ]);
 
 const STATUS_TO_PILL = {
@@ -55,6 +56,7 @@ const STATUS_TO_PILL = {
   "checkout-success":   "pill-through",
   "checkout-failed":    "pill-captcha",
   "verification-filled":"pill-intel",
+  "blocked":            "pill-blocked",
 };
 
 const STATUS_TO_DATA = {
@@ -75,6 +77,8 @@ function isWorkerEntry(e) {
   return WORKER_STATUSES.has(e.status) || e.site === "system";
 }
 
+let _analyticsFilter = null;
+
 function renderAnalytics(period) {
   period = period || "day";
   const el = $("#analytics-cards");
@@ -82,41 +86,55 @@ function renderAnalytics(period) {
   const tableEl = $("#analytics-checkouts");
   if (!el) return;
 
-  // Compute stats from logData
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
   const periodMs = period === "month" ? 30 * day : period === "week" ? 7 * day : day;
-  const periodEntries = logData.filter(e => now - new Date(e.ts).getTime() < periodMs);
+  const periodEntries = logData.filter(e => now - new Date(e.ts).getTime() < periodMs && WORKER_STATUSES.has(e.status) && e.site !== "system");
 
-  const checkouts = periodEntries.filter(e => e.status === "atc-success" || e.status === "through");
-  const failures = periodEntries.filter(e => e.status === "atc-failed" || e.status === "captcha");
-  const totalEvents = periodEntries.length;
+  const filters = {
+    events: null,
+    checkouts: e => e.status === "atc-success" || e.status === "through" || e.status === "checkout-success",
+    joined: e => e.status === "joined",
+    failures: e => e.status === "atc-failed" || e.status === "captcha" || e.status === "checkout-failed",
+  };
 
-  // Cards
-  el.innerHTML = `
-    <div class="a-card highlight">
-      <div class="a-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
-      <div class="a-card-body"><div class="a-card-label">Events</div><div class="a-card-value">${totalEvents}</div></div>
-    </div>
-    <div class="a-card">
-      <div class="a-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <div class="a-card-body"><div class="a-card-label">Checkouts</div><div class="a-card-value">${checkouts.length}</div></div>
-    </div>
-    <div class="a-card">
-      <div class="a-card-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
-      <div class="a-card-body"><div class="a-card-label">Queues Joined</div><div class="a-card-value">${periodEntries.filter(e => e.status === "joined").length}</div></div>
-    </div>
-    <div class="a-card">
-      <div class="a-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-      <div class="a-card-body"><div class="a-card-label">Failures</div><div class="a-card-value">${failures.length}</div></div>
-    </div>
-  `;
+  const checkouts = periodEntries.filter(filters.checkouts);
+  const joined = periodEntries.filter(filters.joined);
+  const failures = periodEntries.filter(filters.failures);
 
-  // Chart - bucket events by time
-  const bucketCount = period === "month" ? 12 : period === "week" ? 7 : 24;
+  const cards = [
+    { key: "events", label: "Events", value: periodEntries.length, color: "green" },
+    { key: "checkouts", label: "Checkouts", value: checkouts.length, color: "blue" },
+    { key: "joined", label: "Queues Joined", value: joined.length, color: "purple" },
+    { key: "failures", label: "Failures", value: failures.length, color: "red" },
+  ];
+
+  el.innerHTML = cards.map(c => {
+    const active = _analyticsFilter === c.key ? " active" : "";
+    const hl = (!_analyticsFilter && c.key === "events") || _analyticsFilter === c.key ? " highlight" : "";
+    return `<div class="a-card${hl}${active}" data-filter="${c.key}">
+      <div class="a-card-icon ${c.color}"><span style="font-size:16px;font-weight:700;">${c.value}</span></div>
+      <div class="a-card-body"><div class="a-card-label">${c.label}</div><div class="a-card-value">${c.value}</div></div>
+    </div>`;
+  }).join("");
+
+  el.querySelectorAll(".a-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const key = card.dataset.filter;
+      _analyticsFilter = _analyticsFilter === key ? null : key;
+      renderAnalytics(period);
+    });
+  });
+
+  // Chart — filter entries based on selected card
+  const chartEntries = _analyticsFilter && filters[_analyticsFilter]
+    ? periodEntries.filter(filters[_analyticsFilter])
+    : periodEntries;
+
+  const bucketCount = period === "month" ? 30 : period === "week" ? 7 : 24;
   const bucketMs = periodMs / bucketCount;
   const buckets = new Array(bucketCount).fill(0);
-  for (const e of periodEntries) {
+  for (const e of chartEntries) {
     const age = now - new Date(e.ts).getTime();
     const idx = bucketCount - 1 - Math.floor(age / bucketMs);
     if (idx >= 0 && idx < bucketCount) buckets[idx]++;
@@ -125,14 +143,15 @@ function renderAnalytics(period) {
   const max = Math.max(...buckets, 1);
   const chartW = 600;
   const chartH = 140;
+  const pad = 5;
   const points = buckets.map((v, i) => {
-    const x = bucketCount > 1 ? (i / (bucketCount - 1)) * chartW : 0;
-    const y = chartH - (v / max) * (chartH - 10) - 5;
+    const x = bucketCount > 1 ? (i / (bucketCount - 1)) * chartW : chartW / 2;
+    const y = chartH - pad - (v / max) * (chartH - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
   const areaPoints = `0,${chartH} ${points} ${chartW},${chartH}`;
 
-  const yLabels = [max, Math.round(max * 0.75), Math.round(max * 0.5), Math.round(max * 0.25), 0];
+  const yLabels = [max, Math.round(max * 0.5), 0];
 
   let xLabels;
   if (period === "day") {
@@ -141,57 +160,98 @@ function renderAnalytics(period) {
       return `${h}:00`;
     });
   } else if (period === "week") {
-    const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-    xLabels = Array.from({length: 7}, (_, i) => days[new Date(now - (6-i) * day).getDay()]);
+    const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    xLabels = Array.from({length: 7}, (_, i) => dayNames[new Date(now - (6 - i) * day).getDay()]);
   } else {
     xLabels = Array.from({length: 6}, (_, i) => {
       const d = new Date(now - (30 - i * 6) * day);
-      return `${d.getMonth()+1}/${d.getDate()}`;
+      return `${d.getMonth() + 1}/${d.getDate()}`;
     });
   }
 
-  chartEl.innerHTML = `
+  if (chartEl) chartEl.innerHTML = `
     <div class="chart-y-axis">${yLabels.map(v => `<span>${v}</span>`).join("")}</div>
-    <svg class="chart-svg" viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="none">
-      <defs><linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--foil)"/><stop offset="1" stop-color="transparent"/></linearGradient></defs>
+    <svg class="chart-svg" viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="none" style="overflow:hidden;">
+      <defs><linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--foil)" stop-opacity=".3"/><stop offset="1" stop-color="var(--foil)" stop-opacity="0"/></linearGradient></defs>
       <polygon class="chart-area" points="${areaPoints}"/>
       <polyline points="${points}"/>
     </svg>
     <div class="chart-x-axis">${xLabels.map(l => `<span>${l}</span>`).join("")}</div>
   `;
 
+  // Site breakdown
+  const siteNameMap = { "pokemon-center": "Pokémon Center US", "pokemon-center-jp": "Pokémon Center JP", "walmart": "Walmart", "costco": "Costco" };
+  const siteCounts = {};
+  for (const e of periodEntries) {
+    const id = SITE_NAME_TO_ID[e.site] || e.site?.toLowerCase().replace(/\s+/g, "-") || "other";
+    siteCounts[id] = (siteCounts[id] || 0) + 1;
+  }
+  const siteSorted = Object.entries(siteCounts).sort((a, b) => b[1] - a[1]);
+  const siteMax = siteSorted.length ? siteSorted[0][1] : 1;
+
+  // Product breakdown
+  const productCounts = {};
+  for (const e of periodEntries) {
+    const slug = slugFromUrl(e.tabUrl) || "unknown";
+    if (slug === "unknown") continue;
+    productCounts[slug] = (productCounts[slug] || 0) + 1;
+  }
+  const prodSorted = Object.entries(productCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const prodMax = prodSorted.length ? prodSorted[0][1] : 1;
+
+  const breakdownHtml = `
+    <div class="analytics-breakdowns">
+      <div class="breakdown-col">
+        <h3 class="breakdown-title">By Site</h3>
+        ${siteSorted.length ? siteSorted.map(([id, count]) => {
+          const name = siteNameMap[id] || id;
+          const pct = Math.round((count / siteMax) * 100);
+          const icon = SITE_ICONS[id] || "";
+          return `<div class="breakdown-row">
+            <span class="breakdown-icon">${icon}</span>
+            <span class="breakdown-name">${esc(name)}</span>
+            <div class="breakdown-bar"><div class="breakdown-fill" style="width:${pct}%"></div></div>
+            <span class="breakdown-count">${count}</span>
+          </div>`;
+        }).join("") : '<div style="color:var(--paper-dd);font-size:11px;">No data</div>'}
+      </div>
+      <div class="breakdown-col">
+        <h3 class="breakdown-title">By Product</h3>
+        ${prodSorted.length ? prodSorted.map(([slug, count]) => {
+          const pct = Math.round((count / prodMax) * 100);
+          return `<div class="breakdown-row">
+            <span class="breakdown-name">${esc(slug)}</span>
+            <div class="breakdown-bar"><div class="breakdown-fill" style="width:${pct}%"></div></div>
+            <span class="breakdown-count">${count}</span>
+          </div>`;
+        }).join("") : '<div style="color:var(--paper-dd);font-size:11px;">No data</div>'}
+      </div>
+    </div>
+  `;
+
   // Recent checkouts table
   const recentCheckouts = logData
-    .filter(e => e.status === "through" || e.status === "atc-success")
+    .filter(e => e.status === "through" || e.status === "atc-success" || e.status === "checkout-success")
     .slice(0, 10);
 
-  if (!recentCheckouts.length) {
-    tableEl.innerHTML = '<div style="color:var(--paper-dd);padding:20px;text-align:center;">No checkouts yet.</div>';
-    return;
-  }
-
-  const siteNameMap = { "pokemon-center": "Pokemon Center", "walmart": "Walmart", "costco": "Costco", "pokemon-center-jp": "Pokemon Center JP" };
-
-  tableEl.innerHTML = `
+  const checkoutTableHtml = recentCheckouts.length ? `
     <div class="checkout-table">
-      <div class="checkout-header">
-        <span>Product</span><span>Price</span><span>Retailer</span><span>Date</span>
-      </div>
+      <div class="checkout-header"><span>Product</span><span>Retailer</span><span>Date</span></div>
       ${recentCheckouts.map(e => {
-        const slug = slugFromUrl(e.tabUrl) || e.detail || "Unknown product";
+        const slug = slugFromUrl(e.tabUrl) || e.detail || "Unknown";
         const siteId = SITE_NAME_TO_ID[e.site] || e.site;
         const retailer = siteNameMap[siteId] || e.site || "—";
         const date = new Date(e.ts).toLocaleString([], { month: "numeric", day: "numeric", year: "2-digit", hour: "numeric", minute: "2-digit" });
         const link = e.tabUrl ? `<a class="checkout-product-link" href="${esc(e.tabUrl)}" target="_blank">↗</a>` : "";
         return `<div class="checkout-row">
           <div class="checkout-product"><span class="checkout-product-name">${esc(slug)}</span>${link}</div>
-          <span class="checkout-price">—</span>
           <span class="checkout-retailer">${esc(retailer)}</span>
           <span class="checkout-date">${date}</span>
         </div>`;
       }).join("")}
-    </div>
-  `;
+    </div>` : '<div style="color:var(--paper-dd);padding:20px;text-align:center;">No checkouts yet.</div>';
+
+  if (tableEl) tableEl.innerHTML = breakdownHtml + `<h3 class="breakdown-title" style="margin-top:24px;">Recent Checkouts</h3>` + checkoutTableHtml;
 }
 
 function loadSettings(data) {
@@ -269,26 +329,6 @@ function load() {
 function renderFeeds() {
   const workers = logData.filter((e) => WORKER_STATUSES.has(e.status) && e.site !== "system");
 
-  // Inject placeholder for armed targets with no worker log
-  const cachedTargets = _lastTargets || [];
-  const siteNames = { "pokemon-center": "Pokémon Center", "pokemon-center-jp": "Pokémon Center JP", "walmart": "Walmart", "costco": "Costco" };
-  for (const t of cachedTargets) {
-    if (!t.active) continue;
-    const hasWorker = workers.some((e) => {
-      if (e.tabUrl === t.url) return true;
-      try { return new URL(e.tabUrl).hostname === new URL(t.url).hostname; } catch { return false; }
-    });
-    if (!hasWorker) {
-      const siteId = siteIdFromUrl(t.url);
-      workers.push({
-        ts: t.addedAt || new Date().toISOString(),
-        site: siteNames[siteId] || "Unknown",
-        status: "detected",
-        detail: "Armed — waiting for page to load",
-        tabUrl: t.url,
-      });
-    }
-  }
 
   renderWorkerPanel($("#feed-workers"), workers);
   const news = logData.filter((e) => !isWorkerEntry(e));
@@ -358,7 +398,14 @@ function renderFeedKPIs(workers) {
   const day = 24 * 60 * 60 * 1000;
   const recent = workers.filter((e) => now - new Date(e.ts).getTime() < day);
 
-  const armed = workers.filter((e) => e.status !== "through").length;
+  const armedSites = new Set();
+  for (const e of workers) {
+    if (e.status !== "through") {
+      const key = (e.tabId || "") + "::" + (SITE_NAME_TO_ID[e.site] || e.site);
+      armedSites.add(key);
+    }
+  }
+  const armed = armedSites.size;
   const queued = recent.filter((e) => e.status === "waiting" || e.status === "joined").length;
 
   let bestPos = null;
@@ -474,7 +521,8 @@ function renderHistory(el) {
 }
 
 function renderRawLog(el) {
-  const all = [...logData.map((e) => ({ ...e, _src: "live" })), ...archiveData.map((e) => ({ ...e, _src: "archive" }))];
+  const all = [...logData.map((e) => ({ ...e, _src: "live" })), ...archiveData.map((e) => ({ ...e, _src: "archive" }))]
+    .filter((e) => e.status !== "discord-intel" && e.status !== "new-listing");
   all.sort((a, b) => new Date(b.ts) - new Date(a.ts));
   const entries = filterBySearch(all);
   if (!entries.length) {
