@@ -15,6 +15,7 @@
     "https://*.queue-it.net/*",
     "https://www.walmart.com/*",
     "https://www.costco.com/*",
+    "https://www.target.com/*",
     "https://www.pokemoncenter-online.com/*",
     "https://pokemoncenter-online.com/*",
     "https://pokemoncenter.pokemon.co.jp/*",
@@ -120,6 +121,16 @@
     },
     {
       "matches": [
+        "https://www.target.com/*"
+      ],
+      "js": [
+        "content/sites/target.js",
+        "content/queue-monitor.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
         "https://x.com/*"
       ],
       "js": [
@@ -136,6 +147,7 @@
         "content/sites/pokemon-center-jp.js",
         "content/sites/walmart.js",
         "content/sites/costco.js",
+        "content/sites/target.js",
         "content/queue-monitor.js"
       ],
       "run_at": "document_idle"

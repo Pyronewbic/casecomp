@@ -8,6 +8,7 @@ const DEFAULT_CONFIG = {
     "pokemon-center-jp": true,
     walmart: true,
     costco: true,
+    target: true,
   },
   autoJoin: true,
   autoAddToCart: false,
@@ -70,7 +71,7 @@ const pendingVerifications = new Map();
 function pollTargets() {
   chrome.tabs.query({}, (allTabs) => {
     const liveTabIds = new Set(allTabs.map((t) => t.id));
-    const monitoredTabs = allTabs.filter((t) => t.url && /queue-it\.net|pokemoncenter\.com|pokemoncenter-online|pokemon\.co\.jp|walmart\.com|costco\.com|discord\.com\/channels|x\.com/.test(t.url));
+    const monitoredTabs = allTabs.filter((t) => t.url && /queue-it\.net|pokemoncenter\.com|pokemoncenter-online|pokemon\.co\.jp|walmart\.com|costco\.com|target\.com|discord\.com\/channels|x\.com/.test(t.url));
     for (const tab of monitoredTabs) {
       tabUrlMap.set(tab.id, tab.url);
       chrome.tabs.sendMessage(tab.id, { type: "POLL_QUEUE" }).catch(() => {});
@@ -341,6 +342,7 @@ const SITE_NAME_TO_ID = {
   "PC Japan": "pokemon-center-jp",
   "Walmart": "walmart",
   "Costco": "costco",
+  "Target": "target",
   "discord": "discord",
 };
 
