@@ -18,6 +18,8 @@ const PAGES = {
   "/pokemon-center-jp/through": "pokemon-center-jp-through.html",
   "/queue-it":           "queue-it.html",
   "/captcha":            "captcha.html",
+  "/pokemon-center/checkout": "pokemon-center-checkout.html",
+  "/walmart/checkout":  "walmart-checkout.html",
 };
 
 const server = createServer((req, res) => {

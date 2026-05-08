@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Walmart — Checkout Simulator</title>
+  <style>
+    body { font-family: sans-serif; background: #fff; color: #333; margin: 0; padding: 40px; }
+    .checkout { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 20px; }
+    .step { display: none; padding: 20px; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 16px; }
+    .step.active { display: block; border-color: #0071dc; }
+    .step h2 { font-size: 16px; margin-bottom: 12px; color: #0071dc; }
+    .step p { font-size: 13px; color: #666; margin-bottom: 12px; }
+    .item { display: flex; align-items: center; gap: 12px; padding: 12px; background: #f9f9f9; border-radius: 6px; margin-bottom: 16px; }
+    .item-img { width: 60px; height: 60px; background: #eee; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; }
+    .item-name { font-weight: 600; }
+    .item-price { color: #0071dc; font-weight: 700; }
+    input[type="text"], input[type="tel"] {
+      width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; font-size: 14px;
+    }
+    button {
+      background: #0071dc; color: #fff; border: none; border-radius: 6px;
+      padding: 12px 30px; font-size: 14px; cursor: pointer; margin-top: 8px;
+    }
+    button:hover { background: #004f9a; }
+    .status { font-family: monospace; font-size: 11px; color: #999; margin-top: 20px; padding: 12px; background: #f5f5f5; border-radius: 6px; }
+    .status .done { color: #4caf50; }
+    .status .current { color: #0071dc; font-weight: 700; }
+    .verification { display: none; padding: 16px; background: #e3f2fd; border: 1px solid #42a5f5; border-radius: 6px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="checkout">
+    <h1>Walmart — Checkout Simulator</h1>
+    <p style="color:#666;font-size:13px;margin-bottom:20px;">Simulates Walmart checkout. Extension should auto-navigate each step.</p>
+
+    <div class="step active" id="step-cart">
+      <h2>1. Cart</h2>
+      <div class="item">
+        <div class="item-img">[IMG]</div>
+        <div>
+          <div class="item-name">Pokemon SV8.5 Prismatic Evo Surprise Box</div>
+          <div class="item-price">$29.97</div>
+        </div>
+      </div>
+      <button data-testid="checkout-btn" id="btn-checkout">Check out</button>
+    </div>
+
+    <div class="step" id="step-shipping">
+      <h2>2. Shipping</h2>
+      <input type="text" value="John Doe, 123 Main St, Bentonville AR 72712" readonly>
+      <button data-testid="shipping-continue" id="btn-shipping">Continue</button>
+    </div>
+
+    <div class="verification" id="step-verify">
+      <h2 style="font-size:14px;margin-bottom:8px;">Verify your identity</h2>
+      <p style="font-size:12px;">Enter the code sent to your email</p>
+      <input type="tel" maxlength="6" inputmode="numeric" placeholder="6-digit code" data-testid="verification-code" id="verify-input">
+      <button id="btn-verify" style="margin-left:8px;">Verify</button>
+    </div>
+
+    <div class="step" id="step-payment">
+      <h2>3. Payment</h2>
+      <input type="text" value="Visa •••• 4242" readonly>
+      <button data-testid="continue-btn" id="btn-payment">Continue</button>
+    </div>
+
+    <div class="step" id="step-review">
+      <h2>4. Review Order</h2>
+      <div class="item">
+        <div class="item-img">[IMG]</div>
+        <div>
+          <div class="item-name">Pokemon SV8.5 Prismatic Evo Surprise Box</div>
+          <div class="item-price">$29.97 + free shipping</div>
+        </div>
+      </div>
+      <p><strong>Total: $32.17</strong></p>
+      <button data-testid="place-order-btn" id="btn-place-order">Place order</button>
+    </div>
+
+    <div class="step" id="step-confirm" data-testid="order-confirmation">
+      <h2 style="color:#4caf50;">Order placed!</h2>
+      <p>Order #WMT-2026-0508 confirmed.</p>
+    </div>
+
+    <div class="status" id="log">
+      <div class="current">Waiting for extension...</div>
+    </div>
+
+    <div style="margin-top:16px;display:flex;gap:8px;">
+      <button onclick="document.getElementById('step-verify').style.display='block'" style="background:#42a5f5;font-size:11px;padding:8px 12px;">Show Verification</button>
+      <button onclick="location.reload()" style="background:#666;font-size:11px;padding:8px 12px;">Reset</button>
+    </div>
+  </div>
+
+  <script>
+    const log = document.getElementById("log");
+    function addLog(msg, cls) {
+      const d = document.createElement("div");
+      d.textContent = `${new Date().toLocaleTimeString()} — ${msg}`;
+      d.className = cls || "";
+      log.appendChild(d);
+    }
+    function showStep(id) {
+      document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+    }
+
+    document.getElementById("btn-checkout").addEventListener("click", () => {
+      addLog("Checkout clicked", "done");
+      setTimeout(() => { showStep("step-shipping"); addLog("Shipping loaded", "current"); }, 500);
+    });
+    document.getElementById("btn-shipping").addEventListener("click", () => {
+      addLog("Shipping confirmed", "done");
+      const v = document.getElementById("step-verify").style.display === "block";
+      setTimeout(() => { if (!v) { showStep("step-payment"); addLog("Payment loaded", "current"); } }, 500);
+    });
+    document.getElementById("btn-verify").addEventListener("click", () => {
+      if (document.getElementById("verify-input").value.length === 6) {
+        addLog("Verified", "done");
+        document.getElementById("step-verify").style.display = "none";
+        setTimeout(() => { showStep("step-payment"); addLog("Payment loaded", "current"); }, 500);
+      }
+    });
+    document.getElementById("verify-input").addEventListener("input", () => {
+      if (document.getElementById("verify-input").value.length === 6) {
+        addLog("Code auto-filled", "done");
+        setTimeout(() => {
+          document.getElementById("step-verify").style.display = "none";
+          showStep("step-payment");
+          addLog("Payment loaded", "current");
+        }, 1000);
+      }
+    });
+    document.getElementById("btn-payment").addEventListener("click", () => {
+      addLog("Payment confirmed", "done");
+      setTimeout(() => { showStep("step-review"); addLog("Review loaded", "current"); }, 500);
+    });
+    document.getElementById("btn-place-order").addEventListener("click", () => {
+      addLog("Order placed!", "done");
+      setTimeout(() => { showStep("step-confirm"); addLog("Confirmed!", "done"); }, 800);
+    });
+  </script>
+</body>
+</html>

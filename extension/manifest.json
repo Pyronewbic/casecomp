@@ -6,7 +6,8 @@
   "permissions": [
     "notifications",
     "storage",
-    "alarms"
+    "alarms",
+    "proxy"
   ],
   "host_permissions": [
     "https://www.pokemoncenter.com/*",
@@ -48,6 +49,17 @@
       ],
       "js": [
         "content/sites/pokemon-center-listings.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.pokemoncenter.com/*",
+        "https://pokemoncenter.com/*",
+        "https://www.walmart.com/*"
+      ],
+      "js": [
+        "content/imap-autofill.js"
       ],
       "run_at": "document_idle"
     },
