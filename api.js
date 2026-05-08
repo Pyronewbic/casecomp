@@ -12,7 +12,12 @@ import { parseListingLanguagesFromInput } from "./lib/filters.js";
 import { buildEbaySearchQuery } from "./lib/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
 import { getRedisStatus, sha256 } from "./lib/redis-cache.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus } from "./lib/firestore.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert } from "./lib/firestore.js";
+import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(express.json());
@@ -23,6 +28,9 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
+
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/logos", express.static(path.join(__dirname, "logos")));
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
@@ -105,10 +113,21 @@ async function gradeItems(items, config, cardName, source) {
   }));
 }
 
+// GET /api/demo — list available demo cards
+app.get("/api/demo", (req, res) => {
+  res.json({ cards: listDemoCards(), hint: "Use any of these with /api/search?q=...&demo=true" });
+});
+
 // GET /api/search
 app.get("/api/search", async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
+
+  const wantDemo = req.query.demo === "true" || (!clientId && !clientSecret);
+  if (wantDemo) {
+    return res.json(getDemoSearchResult(q, { source: req.query.source, condition: req.query.condition }));
+  }
+
   try {
     const config = buildConfig(req.query);
     const source = config.source || "ebay";
@@ -160,6 +179,13 @@ app.get("/api/search", async (req, res) => {
 app.get("/api/sold", async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
+
+  const wantSoldDemo = req.query.demo === "true" || (!clientId && !clientSecret);
+  if (wantSoldDemo) {
+    const d = getDemoSearchResult(q);
+    return res.json({ query: q, sold: d.sold, soldSource: d.soldSource || "demo", counts: { sold: d.sold.length }, _demo: true });
+  }
+
   try {
     const config = buildConfig(req.query);
     const source = config.source || "ebay";
@@ -399,6 +425,18 @@ app.post("/api/drop-event", async (req, res) => {
       }
     }
     res.json(drop);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/alerts — collect price alert signups
+app.post("/api/alerts", async (req, res) => {
+  const { email, targetPrice, query } = req.body;
+  if (!email || !query) return res.status(400).json({ error: "Missing email or query" });
+  try {
+    await saveAlert({ email, targetPrice: targetPrice || null, query, createdAt: new Date().toISOString() });
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

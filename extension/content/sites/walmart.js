@@ -224,8 +224,12 @@
     });
   }
 
-  async function checkout() {
+  async function checkout(profile) {
     try {
+      if (profile) {
+        sendCheckoutStatus("checkout-shipping", `Using profile: ${profile.name}`);
+      }
+
       // Step 1: Navigate to cart if not already there
       if (!window.location.pathname.startsWith("/cart")) {
         window.location.href = "/cart";
