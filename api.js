@@ -21,11 +21,22 @@ import path from "path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
+
+const ALLOWED_ORIGINS = new Set([
+  "https://casecomp.xyz",
+  "https://www.casecomp.xyz",
+  "https://api.casecomp.xyz",
+  process.env.LOVABLE_ORIGIN,
+].filter(Boolean));
+
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (!origin || ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin || "https://casecomp.xyz");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
@@ -69,6 +80,12 @@ const clientId = process.env.EBAY_CLIENT_ID;
 const clientSecret = process.env.EBAY_CLIENT_SECRET;
 async function getToken() { return getAccessToken(clientId, clientSecret); }
 async function on401() { invalidateToken(); }
+
+function validateQuery(q, res) {
+  if (!q) { res.status(400).json({ error: "Missing required parameter: q" }); return false; }
+  if (q.length > 200) { res.status(400).json({ error: "Query too long (max 200 characters)" }); return false; }
+  return true;
+}
 
 function buildConfig(q) {
   const config = {
@@ -152,7 +169,7 @@ app.get("/api/demo", (req, res) => {
 // GET /api/search
 app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType = "search"; next(); }, async (req, res) => {
   const { q } = req.query;
-  if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
+  if (!validateQuery(q, res)) return;
 
   const wantDemo = req.query.demo === "true" || (!clientId && !clientSecret);
   if (wantDemo) {
@@ -212,7 +229,7 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
 // GET /api/sold
 app.get("/api/sold", apiAuthMiddleware, (req, res, next) => { req._errorType = "sold"; next(); }, async (req, res) => {
   const { q } = req.query;
-  if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
+  if (!validateQuery(q, res)) return;
 
   const wantSoldDemo = req.query.demo === "true" || (!clientId && !clientSecret);
   if (wantSoldDemo) {
@@ -254,7 +271,7 @@ app.get("/api/sold", apiAuthMiddleware, (req, res, next) => { req._errorType = "
 // GET /api/psa
 app.get("/api/psa", authMiddleware, (req, res, next) => { req._errorType = "psa"; next(); }, async (req, res) => {
   const { q } = req.query;
-  if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
+  if (!validateQuery(q, res)) return;
   try {
     const signal = await getPsaGradingSignal(q);
     res.json({ query: q, signal });
