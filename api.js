@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./lib/swagger.js";
 import { getAccessToken, invalidateToken, searchActive, searchSold, getEbayUsageToday, DAILY_CAP } from "./lib/ebay.js";
@@ -12,7 +13,7 @@ import { parseListingLanguagesFromInput } from "./lib/filters.js";
 import { buildEbaySearchQuery } from "./lib/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
 import { getRedisStatus, sha256 } from "./lib/redis-cache.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert } from "./lib/firestore.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs } from "./lib/firestore.js";
 import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -34,6 +35,35 @@ app.use("/logos", express.static(path.join(__dirname, "logos")));
 
 app.get("/docs/spec.json", (req, res) => res.json(swaggerSpec));
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+const apiLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later" },
+});
+
+const demoLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+  message: { error: "Too many requests, please try again later" },
+});
+
+app.use("/api", (req, res, next) => {
+  if (req.path === "/health") return next();
+  if (req.query.demo === "true") return demoLimiter(req, res, next);
+  return apiLimiter(req, res, next);
+});
+app.use("/v1", apiLimiter);
+
+async function logError(type, message, detail = "") {
+  console.error(`[ERROR] ${type}: ${message}`);
+  try { await saveErrorLog({ type, message, detail, ts: new Date().toISOString() }); } catch {}
+}
 
 const clientId = process.env.EBAY_CLIENT_ID;
 const clientSecret = process.env.EBAY_CLIENT_SECRET;
@@ -120,7 +150,7 @@ app.get("/api/demo", (req, res) => {
 });
 
 // GET /api/search
-app.get("/api/search", apiAuthMiddleware, async (req, res) => {
+app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType = "search"; next(); }, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
 
@@ -174,12 +204,13 @@ app.get("/api/search", apiAuthMiddleware, async (req, res) => {
 
     res.json(result);
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
 
 // GET /api/sold
-app.get("/api/sold", apiAuthMiddleware, async (req, res) => {
+app.get("/api/sold", apiAuthMiddleware, (req, res, next) => { req._errorType = "sold"; next(); }, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
 
@@ -215,24 +246,26 @@ app.get("/api/sold", apiAuthMiddleware, async (req, res) => {
 
     res.json({ query: q, sold, soldSource, counts: { sold: sold.length } });
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
 
 // GET /api/psa
-app.get("/api/psa", authMiddleware, async (req, res) => {
+app.get("/api/psa", authMiddleware, (req, res, next) => { req._errorType = "psa"; next(); }, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
   try {
     const signal = await getPsaGradingSignal(q);
     res.json({ query: q, signal });
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
 
 // POST /api/grade
-app.post("/api/grade", authMiddleware, async (req, res) => {
+app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "grade"; next(); }, async (req, res) => {
   const { imageUrl, extraImages, provider, model, cardName, source, listingId, listingPrice, condition } = req.body;
   if (!imageUrl) return res.status(400).json({ error: "Missing required field: imageUrl" });
   try {
@@ -265,6 +298,7 @@ app.post("/api/grade", authMiddleware, async (req, res) => {
 
     res.json({ grade, stored: !!(grade && !grade.error) });
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
@@ -275,6 +309,18 @@ app.get("/api/grades", authMiddleware, async (req, res) => {
   try {
     const records = await getGradeLogs({ limit, query: req.query.q, source: req.query.source });
     res.json(records);
+  } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/errors
+app.get("/api/errors", authMiddleware, async (req, res) => {
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  try {
+    const errors = await getErrorLogs({ limit });
+    res.json({ errors, count: errors.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -341,6 +387,7 @@ v1.get("/drops", async (req, res) => {
     const records = await getDrops({ limit, site: req.query.site, status: req.query.status });
     res.json({ drops: records, count: records.length, limit });
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
@@ -352,6 +399,7 @@ v1.get("/drops/:id", async (req, res) => {
     if (!record) return res.status(404).json({ error: "Drop not found" });
     res.json(record);
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
@@ -394,6 +442,7 @@ v1.get("/comps", async (req, res) => {
       sold: { items: sold, count: sold.length },
     });
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
@@ -423,6 +472,7 @@ v1.get("/webhooks", async (req, res) => {
     const stored = await getWebhooks();
     res.json({ webhooks: stored, count: stored.length });
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
@@ -436,7 +486,7 @@ v1.delete("/webhooks/:id", async (req, res) => {
 app.use("/v1", v1);
 
 // Helper: log a drop event (called from extension sync or internal)
-app.post("/api/drop-event", authMiddleware, async (req, res) => {
+app.post("/api/drop-event", authMiddleware, (req, res, next) => { req._errorType = "drop"; next(); }, async (req, res) => {
   const { site, status, detail, url, tabId } = req.body;
   if (!site || !status) return res.status(400).json({ error: "Missing site or status" });
   const drop = {
@@ -456,6 +506,7 @@ app.post("/api/drop-event", authMiddleware, async (req, res) => {
     }
     res.json(drop);
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
@@ -468,6 +519,7 @@ app.post("/api/alerts", authMiddleware, async (req, res) => {
     await saveAlert({ email, targetPrice: targetPrice || null, query, createdAt: new Date().toISOString() });
     res.json({ ok: true });
   } catch (e) {
+    logError(req._errorType || "api", e.message, req.originalUrl);
     res.status(500).json({ error: e.message });
   }
 });
