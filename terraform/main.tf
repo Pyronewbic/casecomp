@@ -46,6 +46,45 @@ resource "google_firestore_database" "default" {
   depends_on = [google_project_service.firestore]
 }
 
+# ── Secret Manager ────────────────────────────────────────────
+
+resource "google_project_service" "secretmanager" {
+  service            = "secretmanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+locals {
+  secrets = [
+    "EBAY_CLIENT_ID",
+    "EBAY_CLIENT_SECRET",
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_HAIKU_KEY",
+    "PSA_AUTH_TOKEN",
+  ]
+}
+
+resource "google_secret_manager_secret" "api_secrets" {
+  for_each  = toset(local.secrets)
+  secret_id = each.key
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.secretmanager]
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_run_access" {
+  for_each  = toset(local.secrets)
+  secret_id = google_secret_manager_secret.api_secrets[each.key].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
 # ── Cloud Run ─────────────────────────────────────────────────
 
 resource "google_cloud_run_v2_service" "api" {
@@ -69,6 +108,19 @@ resource "google_cloud_run_v2_service" "api" {
         value = "3000"
       }
 
+      dynamic "env" {
+        for_each = toset(local.secrets)
+        content {
+          name = env.value
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.api_secrets[env.value].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+
       resources {
         limits = {
           cpu    = "2000m"
@@ -78,7 +130,10 @@ resource "google_cloud_run_v2_service" "api" {
     }
   }
 
-  depends_on = [google_project_service.run]
+  depends_on = [
+    google_project_service.run,
+    google_secret_manager_secret_iam_member.cloud_run_access,
+  ]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
