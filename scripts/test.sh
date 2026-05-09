@@ -4,7 +4,7 @@ echo "=== syntax check ==="
 
 node --check index.js || exit 1
 node --check scan.js || exit 1
-node --check psa-report.js || exit 1
+node --check scripts/psa-report.js || exit 1
 node --check api.js || exit 1
 node --check lib/redis-cache.js || exit 1
 node --check lib/swagger.js || exit 1
@@ -81,6 +81,10 @@ if [ -n "$FOUND" ]; then
   exit 1
 fi
 echo "✓ no secrets found"
+
+# Unit tests (pure functions — no server needed)
+echo "=== unit tests ==="
+node test/unit-test.js || exit 1
 
 # API integration tests (skip if server not running)
 echo "=== api tests ==="
