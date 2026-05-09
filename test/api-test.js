@@ -263,6 +263,129 @@ async function run() {
     assert(body.error.includes("imageUrl"));
   });
 
+  // ── Demo data ──
+
+  console.log("\n\x1b[1m=== demo data ===\x1b[0m");
+
+  await test("Greninja demo: 5 active, all AI graded", async () => {
+    const { body } = await json("/api/search?q=Mega+Greninja+ex+SAR&demo=true&source=snkrdunk&condition=A");
+    assert(body._demo === true, "not demo");
+    const items = body.activeByCountry?.US || [];
+    assert(items.length === 5, `expected 5 active, got ${items.length}`);
+    for (const item of items) {
+      assert(item.grade && !item.grade.error, `missing grade on ${item.itemId}`);
+      assert(item.grade.overall >= 1 && item.grade.overall <= 10, `bad overall: ${item.grade.overall}`);
+      assert(item.grade.centering != null, "missing centering");
+      assert(item.grade.corners != null, "missing corners");
+      assert(item.grade.edges != null, "missing edges");
+      assert(item.grade.surface != null, "missing surface");
+      assert(item.grade.confidence > 0 && item.grade.confidence <= 1, `bad confidence: ${item.grade.confidence}`);
+      assert(item.imageUrl, `missing imageUrl on ${item.itemId}`);
+    }
+  });
+
+  await test("Greninja demo: PSA signal with Value tier", async () => {
+    const { body } = await json("/api/search?q=Mega+Greninja+ex+SAR&demo=true&source=snkrdunk&condition=A");
+    const psa = body.psaSignal;
+    assert(psa, "missing psaSignal");
+    assert(psa.totalPop > 0, "bad totalPop");
+    assert(psa.pop10 > 0, "bad pop10");
+    assert(psa.pop9 > 0, "bad pop9");
+    assert(psa.difficulty, "missing difficulty");
+    assert(psa.gem10Pct > 0, "bad gem10Pct");
+    assert(psa.tier === "Value", `expected Value, got ${psa.tier}`);
+    assert(psa.estCost === "$25", `expected $25, got ${psa.estCost}`);
+    assert(psa.tierReason, "missing tierReason");
+  });
+
+  await test("Umbreon demo: 5 active AI graded + 4 sold", async () => {
+    const { body } = await json("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
+    assert(body._demo === true, "not demo");
+    const items = body.activeByCountry?.US || [];
+    assert(items.length === 5, `expected 5 active, got ${items.length}`);
+    assert(body.sold.length === 4, `expected 4 sold, got ${body.sold.length}`);
+    for (const item of items) {
+      assert(item.grade && !item.grade.error, `missing grade on ${item.itemId}`);
+      assert(item.grade.notes, `missing notes on ${item.itemId}`);
+      assert(item.imageUrl, `missing imageUrl on ${item.itemId}`);
+    }
+  });
+
+  await test("Umbreon demo: Regular tier for $750+ PSA 10", async () => {
+    const { body } = await json("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
+    const psa = body.psaSignal;
+    assert(psa, "missing psaSignal");
+    assert(psa.tier === "Regular", `expected Regular, got ${psa.tier}`);
+    assert(psa.estCost === "$50", `expected $50, got ${psa.estCost}`);
+    assert(psa.tierReason, "missing tierReason");
+  });
+
+  await test("Pikachu demo: multi-source slab, 6 active + 5 sold", async () => {
+    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    assert(body._demo === true, "not demo");
+    assert(body.source === "multi", `expected multi, got ${body.source}`);
+    assert(body.listingFormat === "slab", `expected slab, got ${body.listingFormat}`);
+    const items = body.activeByCountry?.US || [];
+    assert(items.length === 6, `expected 6 active, got ${items.length}`);
+    assert(body.sold.length === 5, `expected 5 sold, got ${body.sold.length}`);
+  });
+
+  await test("Pikachu demo: all listings have PSA 10 slab label + image", async () => {
+    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const items = body.activeByCountry?.US || [];
+    for (const item of items) {
+      assert(item.listingGradeLabel === "PSA 10", `expected PSA 10, got ${item.listingGradeLabel} on ${item.itemId}`);
+      assert(item.grade === null, `slab should have null grade on ${item.itemId}`);
+      assert(item.imageUrl, `missing imageUrl on ${item.itemId}`);
+    }
+  });
+
+  await test("Pikachu demo: listings from 3 sources", async () => {
+    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const items = body.activeByCountry?.US || [];
+    const sources = new Set(items.map(i => {
+      if (i.itemWebUrl.includes("magi")) return "magi";
+      if (i.itemWebUrl.includes("yahoo")) return "yahoo";
+      if (i.itemWebUrl.includes("ebay")) return "ebay";
+      return "unknown";
+    }));
+    assert(sources.has("magi"), "missing magi listings");
+    assert(sources.has("yahoo"), "missing yahoo listings");
+    assert(sources.has("ebay"), "missing ebay listings");
+  });
+
+  await test("Pikachu demo: Express tier for $700+ card", async () => {
+    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const psa = body.psaSignal;
+    assert(psa, "missing psaSignal");
+    assert(psa.tier === "Express", `expected Express, got ${psa.tier}`);
+    assert(psa.estCost === "$75", `expected $75, got ${psa.estCost}`);
+    assert(psa.tierReason, "missing tierReason");
+  });
+
+  await test("Pikachu demo: magi/yahoo have JPY prices", async () => {
+    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const items = body.activeByCountry?.US || [];
+    const jpItems = items.filter(i => i.itemWebUrl.includes("magi") || i.itemWebUrl.includes("yahoo"));
+    assert(jpItems.length > 0, "no magi/yahoo items");
+    for (const item of jpItems) {
+      assert(item.priceJPY > 0, `missing priceJPY on ${item.itemId}`);
+    }
+  });
+
+  await test("Demo: unknown card returns _demoNote", async () => {
+    const { body } = await json("/api/search?q=Nonexistent+Card+XYZ&demo=true");
+    assert(body._demo === true, "not demo");
+    assert(body._demoNote, "missing _demoNote for unknown card");
+    assert(body.counts.activeTotal === 0, "should have 0 active");
+  });
+
+  await test("Demo: /docs/spec.json returns version", async () => {
+    const { body } = await json("/docs/spec.json");
+    assert(body.info?.version, "missing version");
+    assert(body.info.version.includes("beta"), `expected beta version, got ${body.info.version}`);
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);
