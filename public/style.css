@@ -199,11 +199,22 @@ main {
   border-radius: var(--radius);
   padding: 20px 24px;
   margin-bottom: 28px;
+}
+.psa-stats-row {
   display: flex;
   gap: 32px;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
+}
+.psa-tier-reason {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  text-align: center;
 }
 .psa-stat {
   text-align: center;
