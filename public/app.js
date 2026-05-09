@@ -215,13 +215,19 @@ function renderPsa(psa) {
   if (!psa) { psaSignal.classList.add("hidden"); return; }
   psaSignal.classList.remove("hidden");
   const diffClass = psa.difficulty === "easy" ? "easy" : psa.difficulty === "hard" || psa.difficulty === "brutal" ? "hard" : "moderate";
+  const tierLabel = psa.tier && psa.estCost ? `${psa.tier} · ${psa.estCost}` : esc(psa.estCost || "—");
+  const reasonHtml = psa.tierReason ? `<div class="psa-tier-reason">${esc(psa.tierReason)}</div>` : "";
+
   psaSignal.innerHTML = `
-    <div class="psa-stat"><div class="label">Difficulty</div><div class="value ${diffClass}">${esc(psa.difficulty || "—")}</div></div>
-    <div class="psa-stat"><div class="label">PSA 10 Chance</div><div class="value">${psa.gem10Pct != null ? psa.gem10Pct + "%" : "—"}</div></div>
-    <div class="psa-stat"><div class="label">Total Pop</div><div class="value">${psa.totalPop != null ? psa.totalPop.toLocaleString() : "—"}</div></div>
-    <div class="psa-stat"><div class="label">PSA 10</div><div class="value">${psa.pop10 != null ? psa.pop10.toLocaleString() : "—"}</div></div>
-    <div class="psa-stat"><div class="label">PSA 9</div><div class="value">${psa.pop9 != null ? psa.pop9.toLocaleString() : "—"}</div></div>
-    <div class="psa-stat"><div class="label">Grading Cost</div><div class="value">${esc(psa.estCost || "—")}</div></div>
+    <div class="psa-stats-row">
+      <div class="psa-stat"><div class="label">Difficulty</div><div class="value ${diffClass}">${esc(psa.difficulty || "—")}</div></div>
+      <div class="psa-stat"><div class="label">PSA 10 Chance</div><div class="value">${psa.gem10Pct != null ? psa.gem10Pct + "%" : "—"}</div></div>
+      <div class="psa-stat"><div class="label">Total Pop</div><div class="value">${psa.totalPop != null ? psa.totalPop.toLocaleString() : "—"}</div></div>
+      <div class="psa-stat"><div class="label">PSA 10</div><div class="value">${psa.pop10 != null ? psa.pop10.toLocaleString() : "—"}</div></div>
+      <div class="psa-stat"><div class="label">PSA 9</div><div class="value">${psa.pop9 != null ? psa.pop9.toLocaleString() : "—"}</div></div>
+      <div class="psa-stat"><div class="label">Best Tier</div><div class="value">${tierLabel}</div></div>
+    </div>
+    ${reasonHtml}
   `;
 }
 
