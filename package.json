@@ -8,11 +8,15 @@
   },
   "scripts": {
     "start": "node index.js",
-    "psa": "node psa-report.js",
+    "api": "node api.js",
+    "test": "sh scripts/test.sh",
+    "test:unit": "node test/unit-test.js",
+    "test:api": "node test/api-test.js",
+    "test:live": "API_URL=https://api.casecomp.xyz node test/api-test.js",
     "scan": "node scan.js",
-    "playwright-install": "playwright install chromium",
-    "test": "sh test.sh",
-    "api": "node api.js"
+    "psa": "node scripts/psa-report.js",
+    "deploy": "gcloud builds submit --tag gcr.io/casecomp-495718/cardscrapebot --project casecomp-495718 && gcloud run deploy cardscrapebot --image gcr.io/casecomp-495718/cardscrapebot --region asia-south1 --project casecomp-495718 --port 3000 --allow-unauthenticated",
+    "playwright-install": "npx playwright install chromium"
   },
   "dependencies": {
     "@google-cloud/firestore": "^8.5.0",
