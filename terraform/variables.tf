@@ -7,7 +7,7 @@ variable "region" {
 }
 
 variable "domain" {
-  default = "api.cardcomp.xyz"
+  default = "api.casecomp.xyz"
 }
 
 variable "container_image" {
@@ -15,5 +15,5 @@ variable "container_image" {
 }
 
 variable "alert_email" {
-  default = "kan.nam.dev2@gmail.com"
+  sensitive = true
 }

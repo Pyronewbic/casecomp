@@ -6,3 +6,9 @@ output/
 ebay-usage.json
 results.json
 results.md
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/*.tfvars

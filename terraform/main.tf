@@ -5,6 +5,11 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  backend "gcs" {
+    bucket = "casecomp-terraform-state"
+    prefix = "terraform/state"
+  }
 }
 
 provider "google" {
@@ -176,7 +181,7 @@ resource "google_compute_url_map" "api_urlmap" {
 }
 
 resource "google_compute_managed_ssl_certificate" "api_cert" {
-  name = "cardscrapebot-cert"
+  name = "cardscrapebot-cert-v2"
 
   managed {
     domains = [var.domain]
