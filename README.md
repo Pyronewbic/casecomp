@@ -82,6 +82,19 @@ curl "https://api.casecomp.xyz/docs/spec.json"
 curl -H "Authorization: Bearer $CASECOMP_KEY" https://api.casecomp.xyz/v1/drops
 ```
 
+## Claude Code Skills
+
+Two slash commands work inside [Claude Code](https://claude.ai/claude-code) when running in this project:
+
+**`/casecomp`** — search for cards in plain English. Claude parses intent and runs the CLI with the right flags.
+
+```
+/casecomp Umbreon ex 217/187 PSA 10 japanese
+/casecomp compare Pikachu VMAX alt art and Espeon VMAX alt art
+/casecomp should I grade Mega Greninja ex SAR?
+/casecomp Charizard ex on magi, condition A, 10 results
+```
+
 ## CLI
 
 ```bash
@@ -91,8 +104,6 @@ node index.js --source magi --lang jp "Umbreon ex 217/187"      # magi.camp JP
 node index.js --grade "Mega Greninja ex SAR"                    # AI pre-grading
 node index.js --grade-decision "Umbreon ex 217/187"             # PSA break-even table
 ```
-
-Or via Claude Code: `/casecomp Umbreon ex 217/187 PSA 10 japanese`
 
 ### Flags
 

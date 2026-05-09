@@ -120,7 +120,7 @@ app.get("/api/demo", (req, res) => {
 });
 
 // GET /api/search
-app.get("/api/search", async (req, res) => {
+app.get("/api/search", apiAuthMiddleware, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
 
@@ -142,9 +142,11 @@ app.get("/api/search", async (req, res) => {
       result = await searchYahooAuctions(q, config);
     } else {
       const ebayQuery = buildEbaySearchQuery(q, config);
+      const cp = cachePrefix(req);
+      config._cachePrefix = cp;
       const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
       const soldRes = await searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false });
-      const psaSignal = await getPsaGradingSignal(q);
+      const psaSignal = await getPsaGradingSignal(q, { _cachePrefix: cp });
       result = {
         query: q,
         source: "ebay",
@@ -177,7 +179,7 @@ app.get("/api/search", async (req, res) => {
 });
 
 // GET /api/sold
-app.get("/api/sold", async (req, res) => {
+app.get("/api/sold", apiAuthMiddleware, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
 
@@ -205,6 +207,7 @@ app.get("/api/sold", async (req, res) => {
       soldSource = r.soldSource;
     } else {
       const ebayQuery = buildEbaySearchQuery(q, config);
+      config._cachePrefix = cachePrefix(req);
       const soldRes = await searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false });
       sold = soldRes.items || [];
       soldSource = soldRes.source;
@@ -217,7 +220,7 @@ app.get("/api/sold", async (req, res) => {
 });
 
 // GET /api/psa
-app.get("/api/psa", async (req, res) => {
+app.get("/api/psa", authMiddleware, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: "Missing required parameter: q" });
   try {
@@ -229,7 +232,7 @@ app.get("/api/psa", async (req, res) => {
 });
 
 // POST /api/grade
-app.post("/api/grade", async (req, res) => {
+app.post("/api/grade", authMiddleware, async (req, res) => {
   const { imageUrl, extraImages, provider, model, cardName, source, listingId, listingPrice, condition } = req.body;
   if (!imageUrl) return res.status(400).json({ error: "Missing required field: imageUrl" });
   try {
@@ -267,7 +270,7 @@ app.post("/api/grade", async (req, res) => {
 });
 
 // GET /api/grades
-app.get("/api/grades", async (req, res) => {
+app.get("/api/grades", authMiddleware, async (req, res) => {
   const limit = Math.min(1000, Math.max(1, Number(req.query.limit) || 100));
   try {
     const records = await getGradeLogs({ limit, query: req.query.q, source: req.query.source });
@@ -293,14 +296,39 @@ app.get("/api/health", async (req, res) => {
 
 // ============ V1 API — Drop Intelligence ============
 
-function authMiddleware(req, res, next) {
+function getRequestToken(req) {
   const auth = req.headers.authorization;
+  const query = req.query.key;
+  return auth?.startsWith("Bearer ") ? auth.slice(7) : query || "";
+}
+
+function isOwnerKey(req) {
+  const key = process.env.CASECOMP_API_KEY;
+  if (!key) return true;
+  return getRequestToken(req) === key;
+}
+
+function cachePrefix(req) {
+  if (isOwnerKey(req)) return "";
+  const token = getRequestToken(req);
+  return token.slice(0, 16) + "_";
+}
+
+function authMiddleware(req, res, next) {
   const key = process.env.CASECOMP_API_KEY;
   if (!key) return next();
-  if (!auth || !auth.startsWith("Bearer ") || auth.slice(7) !== key) {
+  const auth = req.headers.authorization;
+  const query = req.query.key;
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : query;
+  if (!token || token !== key) {
     return res.status(401).json({ error: "Invalid or missing API key" });
   }
   next();
+}
+
+function apiAuthMiddleware(req, res, next) {
+  if (req.query.demo === "true") return next();
+  return authMiddleware(req, res, next);
 }
 
 const v1 = express.Router();
@@ -352,6 +380,7 @@ v1.get("/comps", async (req, res) => {
       sold = r.sold || [];
     } else {
       const ebayQuery = buildEbaySearchQuery(query, config);
+      config._cachePrefix = cachePrefix(req);
       const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: query, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
       const soldRes = await searchSold({ query: ebayQuery, relevanceQuery: query, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false });
       for (const items of Object.values(activeRes.itemsByCountry || {})) active.push(...items);
@@ -407,7 +436,7 @@ v1.delete("/webhooks/:id", async (req, res) => {
 app.use("/v1", v1);
 
 // Helper: log a drop event (called from extension sync or internal)
-app.post("/api/drop-event", async (req, res) => {
+app.post("/api/drop-event", authMiddleware, async (req, res) => {
   const { site, status, detail, url, tabId } = req.body;
   if (!site || !status) return res.status(400).json({ error: "Missing site or status" });
   const drop = {
@@ -432,7 +461,7 @@ app.post("/api/drop-event", async (req, res) => {
 });
 
 // POST /api/alerts — collect price alert signups
-app.post("/api/alerts", async (req, res) => {
+app.post("/api/alerts", authMiddleware, async (req, res) => {
   const { email, targetPrice, query } = req.body;
   if (!email || !query) return res.status(400).json({ error: "Missing email or query" });
   try {
