@@ -32,6 +32,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/logos", express.static(path.join(__dirname, "logos")));
 
+app.get("/docs/spec.json", (req, res) => res.json(swaggerSpec));
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const clientId = process.env.EBAY_CLIENT_ID;
