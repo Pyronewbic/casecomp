@@ -2,9 +2,11 @@
 
 **[casecomp.xyz](https://casecomp.xyz)**
 
-**Casecomp** is a card research tool for collectors. Ask it for a card in plain English — `/casecomp Umbreon ex 217/187 PSA 10 japanese` — and it pulls live listings from eBay and magi.camp, recent sold comps, and (for raw searches) a PSA grading signal showing difficulty, 10 chance, and population. Results land in a clean markdown table with prices, shipping costs, and clickable links.
+**Casecomp** is a card research tool for collectors. Search for any Pokemon card and get live listings from eBay, magi.camp, Yahoo Auctions JP, and SNKRDUNK — with recent sold comps, PSA grading signals, and AI pre-grading from listing photos.
 
-Results are written to **`results.md`** (human-readable) and **`results.json`** (full data). Every run also appends to **`output/resultsCombined.md`** — a deduplicated running log across all searches.
+**Web dashboard:** [api.casecomp.xyz](https://api.casecomp.xyz) — try the interactive demo with real data, no setup needed.
+
+**CLI:** Ask in plain English — `/casecomp Umbreon ex 217/187 PSA 10 japanese` — results land in a markdown table with prices, shipping, and clickable links. Written to `results.md` (human) and `results.json` (data).
 
 ![eBay Pokémon card search demo](docs/demo.gif)
 
@@ -321,21 +323,39 @@ flowchart TD
 
 ---
 
+## Web Dashboard
+
+The dashboard at [api.casecomp.xyz](https://api.casecomp.xyz) provides an interactive search UI with:
+
+- **AI pre-grading** — centering, corners, edges, surface scores with confidence percentage and grade breakdown bars
+- **Multi-source slab search** — compare PSA 10 prices across eBay, magi.camp, and Yahoo Auctions side-by-side with source filter pills
+- **PSA signal bar** — difficulty, gem 10%, population data at a glance
+- **Detail panel** — click any listing to inspect images, price summary, grade breakdown, and link to source
+
+Three built-in demos work without API keys: Pikachu ex SAR PSA 10 (multi-source slab), Mega Greninja ex SAR (SNKRDUNK + AI grade), Umbreon ex SAR 217/187 (eBay JP + AI grade).
+
+Self-hosted: `node api.js` serves the dashboard on port 3000.
+
+---
+
 ## REST API
 
-**Hosted:** [api.casecomp.xyz](https://casecomp.xyz/developers) — aggregated drop data, managed infra, webhook delivery. Get an API key and go.
+**Hosted:** [api.casecomp.xyz](https://api.casecomp.xyz/docs) — search, grading, drop intelligence, webhooks. Get an API key at [casecomp.xyz/developers](https://casecomp.xyz/developers).
 
-**Self-hosted:** `yarn api` — runs on port 3000 with your own eBay keys and optional Redis. Only sees your own drops.
+**Self-hosted:** `node api.js` — runs on port 3000 with your own eBay keys and optional Redis.
 
-Full endpoint reference with schemas and try-it-out: **[Swagger docs](http://localhost:3000/docs)** (self-hosted) or **[casecomp.xyz/developers](https://casecomp.xyz/developers)** (hosted).
+Full endpoint reference: **[Swagger docs](https://api.casecomp.xyz/docs)** (hosted) or `localhost:3000/docs` (self-hosted).
 
 ```bash
-# Hosted — drop intelligence
+# Search — demo mode (no keys needed)
+curl "https://api.casecomp.xyz/api/search?q=Umbreon+ex+SAR+217/187&demo=true"
+
+# Search — live data
+curl "https://api.casecomp.xyz/api/search?q=Pikachu+ex+SAR&source=magi&format=slab&slab_provider=PSA&slab_grade=10"
+
+# Drop intelligence
 curl https://api.casecomp.xyz/v1/drops?limit=20 \
   -H "Authorization: Bearer $CASECOMP_KEY"
-
-# Self-hosted — card search
-curl "localhost:3000/api/search?q=Umbreon+ex&source=snkrdunk&condition=A"
 ```
 
 ---

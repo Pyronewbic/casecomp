@@ -1,7 +1,7 @@
 {
   "name": "casecomp",
-  "version": "1.0.0",
-  "description": "eBay Browse API Pokémon card search with optional AI pre-grading",
+  "version": "1.0.0-beta.1",
+  "description": "Pokemon TCG card research — live listings from eBay, magi.camp, Yahoo Auctions & SNKRDUNK with AI pre-grading and PSA signals",
   "type": "module",
   "engines": {
     "node": ">=20"
