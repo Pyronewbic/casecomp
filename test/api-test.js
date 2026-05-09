@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 const BASE = process.env.API_URL || "http://localhost:3000";
+const API_KEY = process.env.CASECOMP_API_KEY || "";
 let passed = 0;
 let failed = 0;
 
@@ -19,7 +20,20 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg || "assertion failed");
 }
 
-async function json(path, opts) {
+function authHeaders(extra = {}) {
+  const h = { ...extra };
+  if (API_KEY) h.Authorization = `Bearer ${API_KEY}`;
+  return h;
+}
+
+async function json(path, opts = {}) {
+  const headers = { ...authHeaders(), ...opts.headers };
+  const res = await fetch(`${BASE}${path}`, { ...opts, headers });
+  const body = await res.json();
+  return { res, body };
+}
+
+async function jsonNoAuth(path, opts = {}) {
   const res = await fetch(`${BASE}${path}`, opts);
   const body = await res.json();
   return { res, body };
@@ -263,12 +277,31 @@ async function run() {
     assert(body.error.includes("imageUrl"));
   });
 
+  // ── Auth ──
+
+  console.log("\n\x1b[1m=== auth ===\x1b[0m");
+
+  await test("GET /api/search without key returns 401 (if key configured)", async () => {
+    const { res } = await jsonNoAuth("/api/search?q=charizard");
+    if (API_KEY) {
+      assert(res.status === 401, `expected 401, got ${res.status}`);
+    } else {
+      assert(res.status === 200 || res.status === 400, `unexpected ${res.status}`);
+    }
+  });
+
+  await test("Demo bypasses auth", async () => {
+    const { res, body } = await jsonNoAuth("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    assert(body._demo === true);
+  });
+
   // ── Demo data ──
 
   console.log("\n\x1b[1m=== demo data ===\x1b[0m");
 
   await test("Greninja demo: 5 active, all AI graded", async () => {
-    const { body } = await json("/api/search?q=Mega+Greninja+ex+SAR&demo=true&source=snkrdunk&condition=A");
+    const { body } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true&source=snkrdunk&condition=A");
     assert(body._demo === true, "not demo");
     const items = body.activeByCountry?.US || [];
     assert(items.length === 5, `expected 5 active, got ${items.length}`);
@@ -285,7 +318,7 @@ async function run() {
   });
 
   await test("Greninja demo: PSA signal with Value tier", async () => {
-    const { body } = await json("/api/search?q=Mega+Greninja+ex+SAR&demo=true&source=snkrdunk&condition=A");
+    const { body } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true&source=snkrdunk&condition=A");
     const psa = body.psaSignal;
     assert(psa, "missing psaSignal");
     assert(psa.totalPop > 0, "bad totalPop");
@@ -299,7 +332,7 @@ async function run() {
   });
 
   await test("Umbreon demo: 5 active AI graded + 4 sold", async () => {
-    const { body } = await json("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
+    const { body } = await jsonNoAuth("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
     assert(body._demo === true, "not demo");
     const items = body.activeByCountry?.US || [];
     assert(items.length === 5, `expected 5 active, got ${items.length}`);
@@ -312,7 +345,7 @@ async function run() {
   });
 
   await test("Umbreon demo: Regular tier for $750+ PSA 10", async () => {
-    const { body } = await json("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
+    const { body } = await jsonNoAuth("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
     const psa = body.psaSignal;
     assert(psa, "missing psaSignal");
     assert(psa.tier === "Regular", `expected Regular, got ${psa.tier}`);
@@ -321,7 +354,7 @@ async function run() {
   });
 
   await test("Pikachu demo: multi-source slab, 6 active + 5 sold", async () => {
-    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const { body } = await jsonNoAuth("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
     assert(body._demo === true, "not demo");
     assert(body.source === "multi", `expected multi, got ${body.source}`);
     assert(body.listingFormat === "slab", `expected slab, got ${body.listingFormat}`);
@@ -331,7 +364,7 @@ async function run() {
   });
 
   await test("Pikachu demo: all listings have PSA 10 slab label + image", async () => {
-    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const { body } = await jsonNoAuth("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
     const items = body.activeByCountry?.US || [];
     for (const item of items) {
       assert(item.listingGradeLabel === "PSA 10", `expected PSA 10, got ${item.listingGradeLabel} on ${item.itemId}`);
@@ -341,7 +374,7 @@ async function run() {
   });
 
   await test("Pikachu demo: listings from 3 sources", async () => {
-    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const { body } = await jsonNoAuth("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
     const items = body.activeByCountry?.US || [];
     const sources = new Set(items.map(i => {
       if (i.itemWebUrl.includes("magi")) return "magi";
@@ -355,7 +388,7 @@ async function run() {
   });
 
   await test("Pikachu demo: Express tier for $700+ card", async () => {
-    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const { body } = await jsonNoAuth("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
     const psa = body.psaSignal;
     assert(psa, "missing psaSignal");
     assert(psa.tier === "Express", `expected Express, got ${psa.tier}`);
@@ -364,7 +397,7 @@ async function run() {
   });
 
   await test("Pikachu demo: magi/yahoo have JPY prices", async () => {
-    const { body } = await json("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    const { body } = await jsonNoAuth("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
     const items = body.activeByCountry?.US || [];
     const jpItems = items.filter(i => i.itemWebUrl.includes("magi") || i.itemWebUrl.includes("yahoo"));
     assert(jpItems.length > 0, "no magi/yahoo items");
@@ -374,14 +407,14 @@ async function run() {
   });
 
   await test("Demo: unknown card returns _demoNote", async () => {
-    const { body } = await json("/api/search?q=Nonexistent+Card+XYZ&demo=true");
+    const { body } = await jsonNoAuth("/api/search?q=Nonexistent+Card+XYZ&demo=true");
     assert(body._demo === true, "not demo");
     assert(body._demoNote, "missing _demoNote for unknown card");
     assert(body.counts.activeTotal === 0, "should have 0 active");
   });
 
   await test("Demo: /docs/spec.json returns version", async () => {
-    const { body } = await json("/docs/spec.json");
+    const { body } = await jsonNoAuth("/docs/spec.json");
     assert(body.info?.version, "missing version");
     assert(body.info.version.includes("beta"), `expected beta version, got ${body.info.version}`);
   });
