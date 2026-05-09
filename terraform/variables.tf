@@ -13,3 +13,7 @@ variable "domain" {
 variable "container_image" {
   default = "gcr.io/casecomp-495718/cardscrapebot"
 }
+
+variable "alert_email" {
+  default = "kan.nam.dev2@gmail.com"
+}

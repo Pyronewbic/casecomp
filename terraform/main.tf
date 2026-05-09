@@ -196,6 +196,63 @@ resource "google_compute_global_forwarding_rule" "api_https" {
   port_range = "443"
 }
 
+# ── Monitoring ────────────────────────────────────────────────
+
+resource "google_project_service" "monitoring" {
+  service            = "monitoring.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_monitoring_notification_channel" "email" {
+  display_name = "Casecomp Alerts"
+  type         = "email"
+
+  labels = {
+    email_address = var.alert_email
+  }
+
+  depends_on = [google_project_service.monitoring]
+}
+
+resource "google_logging_metric" "api_errors" {
+  name   = "cardscrapebot-errors"
+  filter = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"cardscrapebot\" textPayload=~\"\\[ERROR\\]\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+}
+
+resource "google_monitoring_alert_policy" "api_error_alert" {
+  display_name = "Casecomp API Errors"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Error rate > 5 in 5 minutes"
+
+    condition_threshold {
+      filter          = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.api_errors.name}\" AND resource.type=\"cloud_run_revision\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 5
+      duration        = "0s"
+
+      aggregations {
+        alignment_period   = "300s"
+        per_series_aligner = "ALIGN_SUM"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email.id]
+
+  alert_strategy {
+    auto_close = "1800s"
+  }
+
+  depends_on = [google_project_service.monitoring]
+}
+
 # ── Outputs ───────────────────────────────────────────────────
 
 output "cloud_run_url" {
