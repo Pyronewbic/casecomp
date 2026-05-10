@@ -1,6 +1,11 @@
 # <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
-**[casecomp.xyz](https://casecomp.xyz)** | **[API](https://api.casecomp.xyz/docs)** | **v1.0.0-beta.1**
+[![Version](https://img.shields.io/badge/version-1.0.0--beta.1-d9b676)](https://api.casecomp.xyz/docs/spec.json)
+[![Tests](https://img.shields.io/badge/tests-105%20passing-7ce0a8)](test/)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![API](https://img.shields.io/badge/API-docs-d9b676)](https://api.casecomp.xyz/docs)
+
+**[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Dashboard](https://api.casecomp.xyz)**
 
 Pokemon TCG card research tool. Live listings from eBay, magi.camp, Yahoo Auctions JP, and SNKRDUNK with AI pre-grading, PSA grading signals, and multi-source slab comparison.
 
@@ -46,7 +51,6 @@ lib/
   listingQuery.js   eBay search query builder
   firestore.js      Firestore: grade logs, drops, webhooks, cache
   demo.js           Demo data (3 cards with real listings)
-  cache.js          Legacy file cache (migrated to Firestore)
   swagger.js        OpenAPI 3.0.3 spec
 extension/          Chrome extension: queue auto-join, drop intel
 terraform/          GCP infra: Cloud Run, Firestore, LB, Secret Manager
@@ -66,25 +70,50 @@ Three demos work without keys (`?demo=true`):
 
 ## REST API
 
+All endpoints except health and demo require a `CC_LIVE_` API key.
+
+```bash
+# Auth: header or query param
+-H "Authorization: Bearer CC_LIVE_xxxxx"
+# or
+?key=CC_LIVE_xxxxx
+```
+
 Full reference: [api.casecomp.xyz/docs](https://api.casecomp.xyz/docs)
 
 ```bash
-# Demo (no keys)
+# Demo (no key needed)
 curl "https://api.casecomp.xyz/api/search?q=Umbreon+ex+SAR+217/187&demo=true"
 
-# Live search
-curl "https://api.casecomp.xyz/api/search?q=Pikachu+ex+SAR&source=magi&format=slab&slab_provider=PSA&slab_grade=10"
+# Live search (key required)
+curl -H "Authorization: Bearer $CASECOMP_KEY" \
+  "https://api.casecomp.xyz/api/search?q=Pikachu+ex+SAR&source=magi&format=slab&slab_provider=PSA&slab_grade=10"
 
 # OpenAPI spec
 curl "https://api.casecomp.xyz/docs/spec.json"
 
 # Drop intelligence
-curl -H "Authorization: Bearer $CASECOMP_KEY" https://api.casecomp.xyz/v1/drops
+curl -H "Authorization: Bearer $CASECOMP_KEY" \
+  "https://api.casecomp.xyz/v1/drops"
+
+# Error monitoring
+curl -H "Authorization: Bearer $CASECOMP_KEY" \
+  "https://api.casecomp.xyz/api/errors"
 ```
 
-## Claude Code Skills
+### Rate limits
 
-Two slash commands work inside [Claude Code](https://claude.ai/claude-code) when running in this project:
+| Endpoint | Limit |
+|----------|-------|
+| Authenticated (`CC_LIVE_` key) | 60 req/min |
+| Demo (`?demo=true`) | 20 req/min |
+| Health, docs, static | No limit |
+
+### Public endpoints (no key)
+
+`GET /api/health` | `GET /api/demo` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` on search/sold
+
+## Claude Code Skills
 
 **`/casecomp`** — search for cards in plain English. Claude parses intent and runs the CLI with the right flags.
 
@@ -130,13 +159,14 @@ EBAY_CLIENT_ID=         # required — developer.ebay.com
 EBAY_CLIENT_SECRET=     # required
 ANTHROPIC_API_KEY=      # AI grading + magi translation
 PSA_AUTH_TOKEN=         # PSA pop reports
+CASECOMP_API_KEY=       # API auth (CC_LIVE_ prefix)
 ```
 
 In production, secrets are stored in GCP Secret Manager and referenced by Cloud Run.
 
 ## Caching
 
-All caches use Firestore (shared across Cloud Run instances, persists across deploys):
+All caches use Firestore (shared across Cloud Run instances, persists across deploys). Owner key gets stale-while-revalidate; third-party keys get isolated per-key caches.
 
 | Collection | TTL | Content |
 |-----------|-----|---------|
@@ -149,7 +179,7 @@ All caches use Firestore (shared across Cloud Run instances, persists across dep
 
 ## Infrastructure
 
-GCP (Terraform managed): Cloud Run (asia-south1), Firestore, HTTPS load balancer with managed SSL, Secret Manager for API keys. See `terraform/`.
+GCP (Terraform managed): Cloud Run (asia-south1), Firestore, HTTPS load balancer with managed SSL, Secret Manager, Cloud Monitoring alerts. State stored in GCS bucket. See `terraform/`.
 
 ## Chrome Extension
 
@@ -159,11 +189,11 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-105 tests: 63 unit (filters, grading, query builder, demo data integrity) + 42 API (health, drops, webhooks, search, sold, PSA, grade, demo validation).
+105 tests: 63 unit (filters, grading, query builder, demo data integrity) + 42 API (health, drops, webhooks, search, sold, PSA, grade, auth, demo validation).
 
 ## Terms of Use
 
-Personal, non-commercial use only. Not for scalping, cook groups, or bulk purchasing. See full terms in the codebase.
+Personal, non-commercial use only. Not for scalping, cook groups, or bulk purchasing. Full terms in [LICENSE](LICENSE).
 
 ## Disclaimer
 
