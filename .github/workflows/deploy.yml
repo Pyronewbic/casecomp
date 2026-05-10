@@ -30,13 +30,15 @@ jobs:
         run: |
           BUILD_ID=$(gcloud builds submit --tag ${{ env.IMAGE }} --project ${{ env.PROJECT_ID }} --async --format='value(id)')
           echo "Waiting for build $BUILD_ID..."
-          until [ "$(gcloud builds describe $BUILD_ID --project ${{ env.PROJECT_ID }} --format='value(status)')" != "WORKING" ] && \
-                [ "$(gcloud builds describe $BUILD_ID --project ${{ env.PROJECT_ID }} --format='value(status)')" != "QUEUED" ]; do
-            sleep 10
+          while true; do
+            STATUS=$(gcloud builds describe $BUILD_ID --project ${{ env.PROJECT_ID }} --format='value(status)' 2>/dev/null)
+            echo "  status: $STATUS"
+            case "$STATUS" in
+              SUCCESS) break ;;
+              FAILURE|TIMEOUT|CANCELLED|INTERNAL_ERROR) echo "Build failed: $STATUS"; exit 1 ;;
+              *) sleep 15 ;;
+            esac
           done
-          STATUS=$(gcloud builds describe $BUILD_ID --project ${{ env.PROJECT_ID }} --format='value(status)')
-          echo "Build status: $STATUS"
-          [ "$STATUS" = "SUCCESS" ] || exit 1
 
       - name: Deploy to Cloud Run
         run: |
