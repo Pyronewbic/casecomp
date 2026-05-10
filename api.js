@@ -22,19 +22,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(express.json({ limit: "100kb" }));
-
-const ALLOWED_ORIGINS = new Set([
-  "https://casecomp.xyz",
-  "https://www.casecomp.xyz",
-  "https://api.casecomp.xyz",
-  process.env.LOVABLE_ORIGIN,
-].filter(Boolean));
-
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (!origin || ALLOWED_ORIGINS.has(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin || "https://casecomp.xyz");
-  }
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.sendStatus(204);

@@ -63,7 +63,6 @@ locals {
     "EBAY_CLIENT_ID",
     "EBAY_CLIENT_SECRET",
     "ANTHROPIC_API_KEY",
-    "ANTHROPIC_HAIKU_KEY",
     "PSA_AUTH_TOKEN",
     "CASECOMP_API_KEY",
   ]
