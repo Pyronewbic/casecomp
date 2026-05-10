@@ -4,7 +4,7 @@
   "description": "Pokemon TCG card research — live listings from eBay, magi.camp, Yahoo Auctions & SNKRDUNK with AI pre-grading and PSA signals",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "start": "node index.js",
