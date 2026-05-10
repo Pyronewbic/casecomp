@@ -11,7 +11,7 @@ variable "domain" {
 }
 
 variable "container_image" {
-  default = "gcr.io/casecomp-495718/cardscrapebot"
+  default = "gcr.io/casecomp-495718/casecomp-api"
 }
 
 variable "alert_email" {
