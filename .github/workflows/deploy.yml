@@ -11,7 +11,7 @@ env:
   PROJECT_ID: casecomp-495718
   REGION: asia-south1
   SERVICE: cardscrapebot
-  IMAGE: gcr.io/casecomp-495718/cardscrapebot
+  IMAGE: gcr.io/casecomp-495718/casecomp-api
 
 jobs:
   deploy:
@@ -28,7 +28,11 @@ jobs:
 
       - name: Build and push
         run: |
-          BUILD_ID=$(gcloud builds submit --tag ${{ env.IMAGE }} --project ${{ env.PROJECT_ID }} --async --format='value(id)')
+          BUILD_ID=$(gcloud builds submit \
+            --config=cloudbuild.yml \
+            --project ${{ env.PROJECT_ID }} \
+            --async \
+            --format='value(id)' .)
           echo "Waiting for build $BUILD_ID..."
           while true; do
             STATUS=$(gcloud builds describe $BUILD_ID --project ${{ env.PROJECT_ID }} --format='value(status)' 2>/dev/null)
