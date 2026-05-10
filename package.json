@@ -30,6 +30,7 @@
     "ioredis": "^5.10.1",
     "minimist": "^1.2.8",
     "playwright": "^1.59.1",
+    "sharp": "^0.34.5",
     "swagger-ui-express": "^5.0.1",
     "tough-cookie": "^5.1.2"
   },
