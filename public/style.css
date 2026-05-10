@@ -475,8 +475,8 @@ main {
 }
 .detail-grade-bars {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
 }
 .grade-bar-item {
   text-align: center;
@@ -504,6 +504,17 @@ main {
   font-family: 'Space Grotesk', system-ui, sans-serif;
   font-size: 14px;
   font-weight: 600;
+}
+.bar-detail {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+.grade-bar-lowest .bar-detail {
+  color: var(--red);
+  opacity: 1;
 }
 .detail-grade-notes {
   margin-top: 12px;
