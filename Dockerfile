@@ -8,11 +8,14 @@ RUN groupadd --system appuser && useradd --system --gid appuser appuser
 
 WORKDIR /app
 
+# Layer 1: playwright system deps (rarely changes)
+RUN npx playwright install --with-deps chromium
+
+# Layer 2: npm dependencies (changes when package.json changes)
 COPY package.json yarn.lock* package-lock.json* ./
 RUN npm install --production --ignore-scripts
 
-RUN npx playwright install --with-deps chromium
-
+# Layer 3: application code (changes every deploy)
 COPY . .
 RUN chown -R appuser:appuser /app
 
