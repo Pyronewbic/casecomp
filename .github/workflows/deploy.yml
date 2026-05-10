@@ -27,7 +27,16 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Build and push
-        run: gcloud builds submit --tag ${{ env.IMAGE }} --project ${{ env.PROJECT_ID }}
+        run: |
+          BUILD_ID=$(gcloud builds submit --tag ${{ env.IMAGE }} --project ${{ env.PROJECT_ID }} --async --format='value(id)')
+          echo "Waiting for build $BUILD_ID..."
+          until [ "$(gcloud builds describe $BUILD_ID --project ${{ env.PROJECT_ID }} --format='value(status)')" != "WORKING" ] && \
+                [ "$(gcloud builds describe $BUILD_ID --project ${{ env.PROJECT_ID }} --format='value(status)')" != "QUEUED" ]; do
+            sleep 10
+          done
+          STATUS=$(gcloud builds describe $BUILD_ID --project ${{ env.PROJECT_ID }} --format='value(status)')
+          echo "Build status: $STATUS"
+          [ "$STATUS" = "SUCCESS" ] || exit 1
 
       - name: Deploy to Cloud Run
         run: |
