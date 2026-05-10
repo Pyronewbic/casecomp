@@ -359,11 +359,12 @@ function selectItem(itemId) {
 function renderGradeDetail(grade) {
   if (!grade) return "";
 
+  const sd = grade.subgradeDetails || {};
   const bars = [
-    { label: "Centering", value: grade.centering },
-    { label: "Corners", value: grade.corners },
-    { label: "Edges", value: grade.edges },
-    { label: "Surface", value: grade.surface },
+    { label: "Centering", key: "centering", value: grade.centering },
+    { label: "Corners", key: "corners", value: grade.corners },
+    { label: "Edges", key: "edges", value: grade.edges },
+    { label: "Surface", key: "surface", value: grade.surface },
   ];
 
   const lowest = bars.reduce((min, b) => b.value < min.value ? b : min, bars[0]);
@@ -372,13 +373,16 @@ function renderGradeDetail(grade) {
     <div class="detail-grade">
       <div class="detail-grade-section-label">Grade Breakdown</div>
       <div class="detail-grade-bars">
-        ${bars.map(b => `
+        ${bars.map(b => {
+          const detail = sd[b.key]?.detail || "";
+          return `
           <div class="grade-bar-item${b === lowest ? " grade-bar-lowest" : ""}">
             <div class="bar-label">${b.label}</div>
             <div class="grade-bar-track"><div class="grade-bar-fill" style="width: ${(b.value / 10) * 100}%; background: ${gradeColor(b.value)}"></div></div>
             <div class="bar-value" style="color: ${gradeColor(b.value)}">${b.value.toFixed(1)}</div>
+            ${detail ? `<div class="bar-detail">${esc(detail)}</div>` : ""}
           </div>
-        `).join("")}
+        `;}).join("")}
       </div>
       ${grade.notes ? `<div class="detail-grade-notes">${esc(grade.notes)}</div>` : ""}
       ${grade.limitations ? `<div class="detail-grade-limitations">${esc(grade.limitations)}</div>` : ""}
