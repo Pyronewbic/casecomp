@@ -9,7 +9,7 @@ Initial public beta.
 - Multi-source slab search: compare PSA 10 prices across eBay, magi.camp, Yahoo Auctions
 - AI pre-grading from listing photos (centering, corners, edges, surface + confidence)
 - PSA tier recommendations (Value/Regular/Express) with reasoning per card value
-- REST API with CC_LIVE_ key auth, rate limiting (60/min auth, 20/min demo), error monitoring
+- REST API with CC_LIVE_ key auth, rate limiting (60/min auth, 20/min sample data), error monitoring
 - Firestore caching with stale-while-revalidate, per-key cache isolation
 - Magi search migrated from Playwright to fetch+cheerio (~10x faster)
 - eBay sold scrape retry with backoff on 503

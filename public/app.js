@@ -97,7 +97,7 @@ function render(data) {
   const soldTotal = data.counts?.sold || 0;
   const hasGrades = active.some(i => i.grade && !i.grade.error);
   const hasSlabs = active.some(i => i.listingGradeLabel);
-  const demoTag = data._demo ? '<span class="demo-badge">Demo Data</span>' : '';
+  const demoTag = data._demo ? '<span class="demo-badge">Sample Data</span>' : '';
   const gradeTag = hasGrades ? '<span class="demo-badge" style="margin-left: 6px;">AI Graded</span>'
     : hasSlabs ? '<span class="demo-badge" style="margin-left: 6px;">Slab</span>' : '';
   const noteHtml = data._demoNote ? `<p style="color: var(--muted); font-size: 13px; margin-top: 8px;">${esc(data._demoNote)}</p>` : '';
