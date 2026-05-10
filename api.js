@@ -1,5 +1,7 @@
 import "dotenv/config";
+import crypto from "crypto";
 import express from "express";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./lib/swagger.js";
@@ -21,8 +23,19 @@ import path from "path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
+
+app.set("trust proxy", true);
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
 app.use(express.json({ limit: "100kb" }));
+
 app.use((req, res, next) => {
+  req.requestId = crypto.randomUUID().slice(0, 8);
+  res.setHeader("X-Request-Id", req.requestId);
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -60,9 +73,18 @@ app.use("/api", (req, res, next) => {
 });
 app.use("/v1", apiLimiter);
 
-async function logError(type, message, detail = "") {
-  console.error(`[ERROR] ${type}: ${message}`);
-  try { await saveErrorLog({ type, message, detail, ts: new Date().toISOString() }); } catch {}
+function safeErrorMessage(e) {
+  const msg = e.message || String(e);
+  if (/ECONNREFUSED|ETIMEDOUT|ENOTFOUND/.test(msg)) return "Upstream service unavailable";
+  if (/api[_-]?key|token|secret|credential/i.test(msg)) return "Authentication error";
+  if (/firestore|grpc|google/i.test(msg)) return "Internal storage error";
+  if (msg.length > 200) return msg.slice(0, 200);
+  return msg;
+}
+
+async function logError(type, message, detail = "", requestId = "") {
+  console.error(`[ERROR] [${requestId}] ${type}: ${message}`);
+  try { await saveErrorLog({ type, message, detail, requestId, ts: new Date().toISOString() }); } catch {}
 }
 
 const clientId = process.env.EBAY_CLIENT_ID;
@@ -210,8 +232,8 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
 
     res.json(result);
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -252,8 +274,8 @@ app.get("/api/sold", apiAuthMiddleware, (req, res, next) => { req._errorType = "
 
     res.json({ query: q, sold, soldSource, counts: { sold: sold.length } });
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -265,8 +287,8 @@ app.get("/api/psa", authMiddleware, (req, res, next) => { req._errorType = "psa"
     const signal = await getPsaGradingSignal(q);
     res.json({ query: q, signal });
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -304,8 +326,8 @@ app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "g
 
     res.json({ grade, stored: !!(grade && !grade.error) });
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -316,8 +338,8 @@ app.get("/api/grades", authMiddleware, async (req, res) => {
     const records = await getGradeLogs({ limit, query: req.query.q, source: req.query.source });
     res.json(records);
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -393,8 +415,8 @@ v1.get("/drops", async (req, res) => {
     const records = await getDrops({ limit, site: req.query.site, status: req.query.status });
     res.json({ drops: records, count: records.length, limit });
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -405,8 +427,8 @@ v1.get("/drops/:id", async (req, res) => {
     if (!record) return res.status(404).json({ error: "Drop not found" });
     res.json(record);
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -448,8 +470,8 @@ v1.get("/comps", async (req, res) => {
       sold: { items: sold, count: sold.length },
     });
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -478,8 +500,8 @@ v1.get("/webhooks", async (req, res) => {
     const stored = await getWebhooks();
     res.json({ webhooks: stored, count: stored.length });
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -512,8 +534,8 @@ app.post("/api/drop-event", authMiddleware, (req, res, next) => { req._errorType
     }
     res.json(drop);
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -525,8 +547,8 @@ app.post("/api/alerts", authMiddleware, async (req, res) => {
     await saveAlert({ email, targetPrice: targetPrice || null, query, createdAt: new Date().toISOString() });
     res.json({ ok: true });
   } catch (e) {
-    logError(req._errorType || "api", e.message, req.originalUrl);
-    res.status(500).json({ error: e.message });
+    logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
