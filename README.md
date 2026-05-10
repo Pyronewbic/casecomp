@@ -62,7 +62,7 @@ lib/
   filters.js        Language, relevance, slab detection, blocklist
   listingQuery.js   eBay search query builder
   firestore.js      Firestore: grade logs, drops, webhooks, cache
-  demo.js           Demo data (3 cards with real listings)
+  demo.js           Sample data (3 cards with real listings)
   swagger.js        OpenAPI 3.0.3 spec
 extension/          Chrome extension: queue auto-join, drop intel
 terraform/          GCP infra: Cloud Run, Firestore, LB, Secret Manager
@@ -75,14 +75,14 @@ test/
 
 [api.casecomp.xyz](https://api.casecomp.xyz) — interactive search with detail panel, AI grade breakdown, PSA signal bar, source filters.
 
-Three demos work without keys (`?demo=true`):
+Three sample cards work without API keys (`?demo=true`):
 - Pikachu ex SAR PSA 10 (multi-source slab: eBay + magi + Yahoo)
 - Mega Greninja ex SAR (SNKRDUNK + AI grade)
 - Umbreon ex SAR 217/187 (eBay JP + AI grade)
 
 ## REST API
 
-All endpoints except health and demo require a `CC_LIVE_` API key.
+All endpoints except health and sample data require a `CC_LIVE_` API key.
 
 ```bash
 # Auth: header or query param
@@ -94,7 +94,7 @@ All endpoints except health and demo require a `CC_LIVE_` API key.
 Full reference: [api.casecomp.xyz/docs](https://api.casecomp.xyz/docs)
 
 ```bash
-# Demo (no key needed)
+# Sample data (no key needed)
 curl "https://api.casecomp.xyz/api/search?q=Umbreon+ex+SAR+217/187&demo=true"
 
 # Live search (key required)
@@ -118,12 +118,12 @@ curl -H "Authorization: Bearer $CASECOMP_KEY" \
 | Endpoint | Limit |
 |----------|-------|
 | Authenticated (`CC_LIVE_` key) | 60 req/min |
-| Demo (`?demo=true`) | 20 req/min |
+| Sample data (`?demo=true`) | 20 req/min |
 | Health, docs, static | No limit |
 
 ### Public endpoints (no key)
 
-`GET /api/health` | `GET /api/demo` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` on search/sold
+`GET /api/health` | `GET /api/demo` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold
 
 ## Claude Code Skills
 
