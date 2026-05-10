@@ -1,15 +1,27 @@
 # <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
-[![Version](https://img.shields.io/badge/version-1.0.0--beta.1-d9b676)](https://api.casecomp.xyz/docs/spec.json)
+[![Version](https://img.shields.io/badge/version-1.0.0--beta.1-d9b676)](CHANGELOG.md)
 [![Tests](https://github.com/Pyronewbic/casecomp/actions/workflows/test.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![API](https://img.shields.io/badge/API-docs-d9b676)](https://api.casecomp.xyz/docs)
 
-**[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Dashboard](https://api.casecomp.xyz)**
+**[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Dashboard](https://api.casecomp.xyz)** | **[Changelog](CHANGELOG.md)**
 
-Pokemon TCG card research tool. Live listings from eBay, magi.camp, Yahoo Auctions JP, and SNKRDUNK with AI pre-grading, PSA grading signals, and multi-source slab comparison.
+Search any Pokemon card across four marketplaces in one query. Get live prices, AI condition estimates, and PSA grading signals — instead of manually checking eBay, magi.camp, Yahoo Auctions, and SNKRDUNK separately.
 
 ![eBay Pokémon card search demo](docs/demo.gif)
+
+### Features
+
+- **Multi-source search** — eBay, magi.camp, Yahoo Auctions JP, SNKRDUNK in one query
+- **AI pre-grading** — centering, corners, edges, surface scores from listing photos (Claude/OpenAI)
+- **PSA grading signals** — population data, difficulty, gem 10%, recommended submission tier with reasoning
+- **Slab comparison** — compare PSA 10 / BGS 9.5 / TAG 10 prices across sources with filter pills
+- **Sold comps** — recent sold prices to see what cards actually sell for
+- **Web dashboard** — interactive search UI with detail panel, grade breakdown bars, source filters
+- **REST API** — authenticated endpoints with rate limiting, per-key caching, OpenAPI spec
+- **Claude Code skill** — `/casecomp` for plain-English card search, no CLI flags needed
+- **Chrome extension** — queue auto-join for Pokemon Center, Walmart, Costco, Target drops
 
 ---
 
@@ -190,6 +202,12 @@ Load unpacked from `extension/` in `chrome://extensions`.
 ## Tests
 
 105 tests: 63 unit (filters, grading, query builder, demo data integrity) + 42 API (health, drops, webhooks, search, sold, PSA, grade, auth, demo validation).
+
+## Contributing
+
+Contributions welcome. Fork the repo, create a branch, and open a PR against `dev`. Run `yarn test` before submitting — all 105 tests must pass.
+
+For bug reports or feature requests, open an [issue](https://github.com/Pyronewbic/casecomp/issues).
 
 ## Terms of Use
 
