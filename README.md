@@ -65,7 +65,7 @@ lib/
   demo.js           Sample data (3 cards with real listings)
   swagger.js        OpenAPI 3.0.3 spec
 extension/          Chrome extension: queue auto-join, drop intel
-terraform/          GCP infra: Cloud Run, Firestore, LB, Secret Manager
+terraform/          GCP infra: Cloud Run ×2, Firestore, LB + CDN, Secret Manager
 test/
   unit-test.js      63 unit tests (filters, grading, query, demo data)
   api-test.js       42 API integration tests
@@ -172,6 +172,7 @@ EBAY_CLIENT_SECRET=     # required
 ANTHROPIC_API_KEY=      # AI grading + magi translation
 PSA_AUTH_TOKEN=         # PSA pop reports
 CASECOMP_API_KEY=       # API auth (CC_LIVE_ prefix)
+CASECOMP_SANDBOX_KEY=   # public sandbox key (CC_LIVE_SANDBOX_ prefix, 5/min)
 ```
 
 In production, secrets are stored in GCP Secret Manager and referenced by Cloud Run.
@@ -191,7 +192,7 @@ All caches use Firestore (shared across Cloud Run instances, persists across dep
 
 ## Infrastructure
 
-GCP (Terraform managed): Cloud Run (asia-south1), Firestore, HTTPS load balancer with managed SSL, Secret Manager, Cloud Monitoring alerts. State stored in GCS bucket. See `terraform/`.
+GCP (Terraform managed): Cloud Run `casecomp-api` (API) + `casecomp-site` (frontend SSR), Firestore, HTTPS load balancer with Cloud CDN, managed SSL, Secret Manager, Cloud Monitoring alerts. State in GCS bucket. Same LB IP routes by host: `casecomp.xyz` → site, `api.casecomp.xyz` → API. See `terraform/`.
 
 ## Chrome Extension
 
