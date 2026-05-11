@@ -532,6 +532,38 @@ main {
   font-style: italic;
 }
 
+.detail-meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.detail-meta-row .detail-grid {
+  margin-bottom: 0;
+}
+.card-identity { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.card-id-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card-id-badge { font-family: monospace; font-size: 12px; color: var(--gold); background: var(--gold-dim); padding: 3px 8px; border-radius: 4px; font-weight: 600; }
+.card-id-rarity { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 700; color: var(--text); background: var(--inset); border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px; }
+.card-id-set { font-size: 11px; color: var(--muted); }
+.card-id-num { font-size: 11px; color: var(--muted); font-family: monospace; }
+.card-id-names { margin-top: 4px; display: flex; gap: 10px; }
+.card-id-name { font-size: 11px; color: var(--text); }
+.card-id-lang { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-right: 2px; }
+
+.arbitrage-container { background: var(--inset); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+.arbitrage-sources { display: flex; gap: 8px; margin-top: 8px; }
+.arb-source { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px; text-align: center; }
+.arb-source.arb-cheapest { border-color: var(--green); background: rgba(124, 224, 168, 0.05); }
+.arb-source-name { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.arb-cheapest .arb-source-name { color: var(--green); }
+.arb-source-price { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 18px; font-weight: 700; color: var(--text); }
+.arb-cheapest .arb-source-price { color: var(--green); }
+.arb-source-jpy { font-size: 10px; color: var(--muted); }
+.arb-source-count { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.arb-summary { margin-top: 8px; font-size: 11px; color: var(--gold); text-align: center; }
+
 .price-chart-container {
   background: var(--inset);
   border: 1px solid var(--border);
