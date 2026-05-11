@@ -6,20 +6,22 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./lib/swagger.js";
-import { getAccessToken, invalidateToken, searchActive, searchSold, getEbayUsageToday, DAILY_CAP } from "./lib/ebay.js";
-import { searchSnkrdunk } from "./lib/snkrdunk.js";
-import { searchMagi } from "./lib/magi.js";
-import { searchYahooAuctions } from "./lib/yahooauctions.js";
-import { getPsaGradingSignal } from "./lib/psa.js";
-import { gradeImage } from "./lib/grading.js";
-import { parseListingLanguagesFromInput } from "./lib/filters.js";
-import { buildEbaySearchQuery } from "./lib/listingQuery.js";
-import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
-import { getRedisStatus, sha256 } from "./lib/redis-cache.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/firestore.js";
+import { getAccessToken, invalidateToken, searchActive, searchSold, getEbayUsageToday, DAILY_CAP } from "./lib/sources/ebay.js";
+import { searchSnkrdunk } from "./lib/sources/snkrdunk.js";
+import { searchMagi } from "./lib/sources/magi.js";
+import { searchYahooAuctions } from "./lib/sources/yahooauctions.js";
+import { getPsaGradingSignal } from "./lib/grading/psa.js";
+import { gradeImage } from "./lib/grading/grading.js";
+import { parseListingLanguagesFromInput } from "./lib/search/filters.js";
+import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
+import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
+import { getRedisStatus, sha256 } from "./lib/data/redis-cache.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/data/firestore.js";
 import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
-import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/api-keys.js";
-import { recordSoldPrices, getPriceHistory } from "./lib/price-history.js";
+import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
+import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
+import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
+import { getOrCreateCard, findCardByQuery, parseCardIdentity, SET_NAME_MAP } from "./lib/data/card-identity.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -100,13 +102,14 @@ function isSandboxKey(req) {
   return token && token === process.env.CASECOMP_SANDBOX_KEY;
 }
 
+const isLocal = !process.env.K_SERVICE;
 app.use("/api", (req, res, next) => {
-  if (req.path === "/health") return next();
+  if (isLocal || req.path === "/health") return next();
   if (req.query.demo === "true") return demoLimiter(req, res, next);
   if (isSandboxKey(req)) return sandboxLimiter(req, res, next);
   return apiLimiter(req, res, next);
 });
-app.use("/v1", apiLimiter);
+if (!isLocal) app.use("/v1", apiLimiter);
 
 function safeErrorMessage(e) {
   const msg = e.message || String(e);
@@ -271,6 +274,7 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
     }
 
     if (result.sold?.length) recordSoldPrices(q, result.sold, result.source).catch(() => {});
+    getOrCreateCard(q, { source: result.source, lang: config.language }).catch(() => {});
     res.json(result);
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
@@ -425,6 +429,7 @@ app.get("/api/health", async (req, res) => {
 // ============ V1 API — Drop Intelligence ============
 
 async function authMiddleware(req, res, next) {
+  if (isLocal) return next();
   const ownerKey = process.env.CASECOMP_API_KEY;
   const sandboxKey = process.env.CASECOMP_SANDBOX_KEY;
   if (!ownerKey) return next();
@@ -440,6 +445,7 @@ async function authMiddleware(req, res, next) {
 }
 
 function ownerOnly(req, res, next) {
+  if (isLocal) return next();
   const token = getRequestToken(req);
   if (token !== process.env.CASECOMP_API_KEY) {
     return res.status(403).json({ error: "Owner key required" });
@@ -586,13 +592,62 @@ app.post("/api/drop-event", authMiddleware, (req, res, next) => { req._errorType
   }
 });
 
+// GET /api/card — look up card identity
+app.get("/api/card", apiAuthMiddleware, async (req, res) => {
+  const { q } = req.query;
+  if (!validateQuery(q, res)) return;
+  try {
+    const card = await findCardByQuery(q);
+    if (card) return res.json(card);
+
+    let identity = parseCardIdentity(q);
+
+    if (!identity.cardId) {
+      const demo = getDemoSearchResult(q);
+      const items = [];
+      for (const arr of Object.values(demo.activeByCountry || {})) items.push(...arr);
+      for (const item of items) {
+        const fromTitle = parseCardIdentity(item.title);
+        if (fromTitle.cardId) {
+          identity = fromTitle;
+          break;
+        }
+      }
+    }
+
+    if (identity.cardId) {
+      identity.setName = SET_NAME_MAP[identity.setCode] || identity.setCode;
+    }
+
+    res.json({ ...identity, stored: false });
+  } catch (e) {
+    logError("card", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
 // GET /api/price-history — historical sold prices for a card
 app.get("/api/price-history", authMiddleware, async (req, res) => {
   const { q } = req.query;
   if (!validateQuery(q, res)) return;
   const days = Math.min(365, Math.max(1, Number(req.query.days) || 90));
   try {
-    const history = await getPriceHistory(q, { days });
+    let history = await getPriceHistory(q, { days });
+
+    if (!history.length) {
+      const tcg = await seedFromTCGPlayer(q);
+      if (tcg) {
+        await recordSoldPrices(q, [{
+          itemId: `tcg_${tcg.productId}`,
+          price: tcg.price,
+          priceCurrency: "USD",
+          title: tcg.name,
+          soldDate: new Date().toISOString().split("T")[0],
+        }], "tcgplayer");
+        history = await getPriceHistory(q, { days });
+      }
+    }
+
     const prices = history.map(h => h.price).filter(Boolean);
     const stats = prices.length ? {
       min: Math.min(...prices),
