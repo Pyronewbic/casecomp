@@ -627,7 +627,7 @@ app.get("/api/card", apiAuthMiddleware, async (req, res) => {
 });
 
 // GET /api/price-history — historical sold prices for a card
-app.get("/api/price-history", authMiddleware, async (req, res) => {
+app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
   const { q } = req.query;
   if (!validateQuery(q, res)) return;
   const days = Math.min(365, Math.max(1, Number(req.query.days) || 90));
