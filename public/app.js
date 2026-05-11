@@ -336,6 +336,9 @@ function selectItem(itemId) {
     ? `<div class="detail-actions"><a href="${esc(item.itemWebUrl)}" target="_blank" rel="noopener">View on ${sourceName} &rarr;</a></div>`
     : "";
 
+  const hasGrade = !!grade;
+  const defaultTab = hasGrade ? "grade" : "prices";
+
   detailPanel.innerHTML = `
     <div class="detail-title">${esc(item.title)}</div>
     ${mainImg}
@@ -345,15 +348,33 @@ function selectItem(itemId) {
       ${fieldsHtml}
       <div id="card-identity" class="card-identity hidden"></div>
     </div>
-    ${gradeHtml}
-    <div id="arbitrage-container" class="arbitrage-container hidden"></div>
-    <div id="price-chart-container" class="price-chart-container hidden">
-      <div class="detail-grade-section-label">Price History</div>
-      <canvas id="price-chart" height="120"></canvas>
-      <div id="price-chart-stats" class="price-chart-stats"></div>
+    <div class="detail-tabs">
+      ${hasGrade ? `<button class="detail-tab${defaultTab === "grade" ? " active" : ""}" data-dtab="grade">Grade</button>` : ""}
+      <button class="detail-tab${defaultTab === "prices" ? " active" : ""}" data-dtab="prices">Prices</button>
+    </div>
+    <div class="detail-tab-panel${defaultTab === "grade" ? "" : " hidden"}" data-dtpanel="grade">
+      ${gradeHtml}
+    </div>
+    <div class="detail-tab-panel${defaultTab === "prices" ? "" : " hidden"}" data-dtpanel="prices">
+      <div id="arbitrage-container" class="arbitrage-container hidden"></div>
+      <div id="price-chart-container" class="price-chart-container hidden">
+        <div class="detail-grade-section-label">Price History</div>
+        <canvas id="price-chart" height="120"></canvas>
+        <div id="price-chart-stats" class="price-chart-stats"></div>
+      </div>
     </div>
     ${linkHtml}
   `;
+
+  detailPanel.querySelectorAll(".detail-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      detailPanel.querySelectorAll(".detail-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      detailPanel.querySelectorAll(".detail-tab-panel").forEach(p => p.classList.add("hidden"));
+      const panel = detailPanel.querySelector(`[data-dtpanel="${tab.dataset.dtab}"]`);
+      if (panel) panel.classList.remove("hidden");
+    });
+  });
 
   detailPanel.querySelectorAll(".detail-images img").forEach(img => {
     img.addEventListener("click", () => {

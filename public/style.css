@@ -542,6 +542,12 @@ main {
 .detail-meta-row .detail-grid {
   margin-bottom: 0;
 }
+.detail-tabs { display: flex; gap: 4px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.detail-tab { background: none; border: none; color: var(--muted); font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+.detail-tab:hover { color: var(--text); }
+.detail-tab.active { color: var(--gold); background: var(--gold-dim); }
+.detail-tab-panel { }
+
 .card-identity { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .card-id-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .card-id-badge { font-family: monospace; font-size: 12px; color: var(--gold); background: var(--gold-dim); padding: 3px 8px; border-radius: 4px; font-weight: 600; }

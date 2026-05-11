@@ -1,6 +1,9 @@
 import { parseGradeJSON } from "../lib/grading/grading.js";
 import { buildEbaySearchQuery, describeListingSearch } from "../lib/search/listingQuery.js";
 import {
+  filterByCondition,
+  detectCondition,
+  flagPriceOutliers,
   detectLanguage,
   tokenizeQuery,
   extractPokemonName,
@@ -491,6 +494,73 @@ test("PSA signals have tier + reason", () => {
     assert(r.psaSignal.totalPop > 0, `bad totalPop in ${key}`);
     assert(r.psaSignal.gem10Pct > 0, `bad gem10Pct in ${key}`);
   }
+});
+
+// ── Condition detection ──
+
+console.log("\n\x1b[1m=== detectCondition ===\x1b[0m");
+
+test("detects Mint from SNKRDUNK", () => {
+  eq(detectCondition({ condition: "A — Mint", title: "" }), "Mint");
+});
+
+test("detects NM from eBay", () => {
+  eq(detectCondition({ condition: "", title: "Umbreon ex SAR NM Japanese" }), "NM");
+});
+
+test("detects condition from Japanese title", () => {
+  eq(detectCondition({ condition: "", title: "〔状態A-〕メガゲッコウガex SAR" }), "NM");
+});
+
+test("detects Ungraded", () => {
+  eq(detectCondition({ condition: "Ungraded", title: "" }), "Ungraded");
+});
+
+test("returns null for unknown", () => {
+  eq(detectCondition({ condition: "", title: "Pokemon card" }), null);
+});
+
+// ── Condition filter ──
+
+console.log("\n\x1b[1m=== filterByCondition ===\x1b[0m");
+
+test("filters to NM", () => {
+  const items = [
+    { title: "Card NM", condition: "" },
+    { title: "Card LP", condition: "" },
+    { title: "Card", condition: "A — Mint" },
+  ];
+  const r = filterByCondition(items, "nm");
+  eq(r.length, 2);
+});
+
+test("returns all if no condition", () => {
+  const items = [{ title: "a" }, { title: "b" }];
+  eq(filterByCondition(items, "").length, 2);
+  eq(filterByCondition(items, null).length, 2);
+});
+
+// ── Price outliers ──
+
+console.log("\n\x1b[1m=== flagPriceOutliers ===\x1b[0m");
+
+test("flags items below 40% of median", () => {
+  const items = [
+    { price: 100 },
+    { price: 400 },
+    { price: 410 },
+    { price: 420 },
+    { price: 430 },
+  ];
+  const r = flagPriceOutliers(items);
+  assert(r[0]._priceOutlier === true, "100 should be outlier");
+  assert(r[1]._priceOutlier === false, "400 should not be outlier");
+});
+
+test("no outliers with less than 3 items", () => {
+  const items = [{ price: 100 }, { price: 500 }];
+  const r = flagPriceOutliers(items);
+  assert(!r[0]._priceOutlier);
 });
 
 // ── Card identity ──

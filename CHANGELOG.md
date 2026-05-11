@@ -7,10 +7,16 @@ Initial public beta.
 ### Added
 - Consumer dashboard at /dashboard: search, arbitrage, price history, grade breakdown
 - Admin dashboard at /admin: stats KPIs, developer key CRUD, error log viewer
-- Cross-source arbitrage: /api/arbitrage compares prices across eBay, magi, SNKRDUNK
+- Cross-source arbitrage: /api/arbitrage compares prices across eBay, magi, Yahoo, SNKRDUNK
+- Condition detection: auto-detects NM/LP/MP from EN + JP markers (状態A/美品)
+- Condition filter: ?condition=nm works across all sources
+- Price outlier flagging: listings >40% below median flagged
+- Card identity: /api/card with canonical IDs, set resolution from card numbers
 - Price history: /api/price-history tracks sold comp prices over time
+- TCGPlayer integration: seeds price history when no data exists
 - Scheduled price tracking: /api/track-prices for Cloud Scheduler
 - Developer API key management: create, rotate, revoke, delete via Firestore
+- Detail panel tabs: Grade / Prices to reduce scrolling
 - Multi-source slab search: compare PSA 10 prices across eBay, magi.camp, Yahoo Auctions
 - Per-subgrade AI grading: centering, corners, edges, surface graded independently in parallel
 - Front + back image analysis with subgradeDetails (score, confidence, detail per attribute)
@@ -22,7 +28,7 @@ Initial public beta.
 - eBay sold scrape retry with backoff on 503
 - OAuth token pre-fetched on server startup
 - Security: helmet headers, error sanitization, request IDs, trust proxy
-- 105 tests (63 unit + 42 API integration)
+- 143 tests (81 unit + 62 API integration)
 - GitHub Actions CI on push/PR, auto-deploy on merge to main
 - Chrome extension: queue auto-join for Pokemon Center, Walmart, Costco, Target
 - Claude Code `/casecomp` skill for plain-English card search
