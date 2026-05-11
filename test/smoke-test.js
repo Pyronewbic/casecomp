@@ -77,7 +77,7 @@ async function run() {
     assert(await cards.count() > 0, "listing cards rendered");
 
     // Results header
-    assert(await page.locator(".demo-badge").isVisible(), "sample data badge visible");
+    assert(await page.locator(".demo-badge").first().isVisible(), "sample data badge visible");
 
     // Detail panel
     console.log("Detail panel:");
