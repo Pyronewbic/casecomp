@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config";
 import minimist from "minimist";
-import { bustCaches } from "./lib/cache.js";
+import { bustCaches } from "./lib/data/cache.js";
 import {
   getAccessToken,
   invalidateToken,
@@ -10,25 +10,25 @@ import {
   testEbayAuth,
   getEbayUsageToday,
   DAILY_CAP,
-} from "./lib/ebay.js";
+} from "./lib/sources/ebay.js";
 import {
   filterRelevantResults,
   detectLanguage,
   normalizeListingLanguage,
   parseListingLanguagesFromInput,
-} from "./lib/filters.js";
+} from "./lib/search/filters.js";
 import {
   gradeImage,
   testGradingProvider,
   printSiteGradingHelp,
-} from "./lib/grading.js";
+} from "./lib/grading/grading.js";
 import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary, mergeAndWrite } from "./lib/output.js";
-import { buildEbaySearchQuery, describeListingSearch } from "./lib/listingQuery.js";
-import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
-import { searchMagi } from "./lib/magi.js";
-import { searchYahooAuctions } from "./lib/yahooauctions.js";
-import { searchSnkrdunk } from "./lib/snkrdunk.js";
-import { getPsaGradingSignal } from "./lib/psa.js";
+import { buildEbaySearchQuery, describeListingSearch } from "./lib/search/listingQuery.js";
+import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
+import { searchMagi } from "./lib/sources/magi.js";
+import { searchYahooAuctions } from "./lib/sources/yahooauctions.js";
+import { searchSnkrdunk } from "./lib/sources/snkrdunk.js";
+import { getPsaGradingSignal } from "./lib/grading/psa.js";
 import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
 
 export const CARDS = [
@@ -676,10 +676,10 @@ export {
   gradeViaSnapGrade,
   gradeViaLocal,
   parseGradeJSON,
-} from "./lib/grading.js";
+} from "./lib/grading/grading.js";
 export {
   getCachedGrade,
   cacheGrade,
-} from "./lib/grading.js";
+} from "./lib/grading/grading.js";
 export { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary } from "./lib/output.js";
-export { buildEbaySearchQuery, describeListingSearch } from "./lib/listingQuery.js";
+export { buildEbaySearchQuery, describeListingSearch } from "./lib/search/listingQuery.js";
