@@ -94,7 +94,7 @@ data "google_project" "current" {
 # ── Cloud Run ─────────────────────────────────────────────────
 
 resource "google_cloud_run_v2_service" "api" {
-  name     = "cardscrapebot"
+  name     = "casecomp-api"
   location = var.region
 
   template {
@@ -149,6 +149,27 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   member   = "allUsers"
 }
 
+# ── Static Site (GCS) ────────────────────────────────────────
+
+resource "google_storage_bucket" "site" {
+  name          = "casecomp-site"
+  location      = var.region
+  force_destroy = false
+
+  uniform_bucket_level_access = true
+
+  website {
+    main_page_suffix = "index.html"
+    not_found_page   = "index.html"
+  }
+}
+
+resource "google_storage_bucket_iam_member" "site_public" {
+  bucket = google_storage_bucket.site.name
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
+}
+
 # ── Load Balancer ─────────────────────────────────────────────
 
 resource "google_compute_global_address" "api_ip" {
@@ -158,7 +179,7 @@ resource "google_compute_global_address" "api_ip" {
 }
 
 resource "google_compute_region_network_endpoint_group" "api_neg" {
-  name                  = "cardscrapebot-neg"
+  name                  = "casecomp-api-neg"
   region                = var.region
   network_endpoint_type = "SERVERLESS"
 
@@ -175,23 +196,60 @@ resource "google_compute_backend_service" "api_backend" {
   }
 }
 
+resource "google_compute_backend_bucket" "site_backend" {
+  name        = "casecomp-site-backend"
+  bucket_name = google_storage_bucket.site.name
+  enable_cdn  = true
+}
+
 resource "google_compute_url_map" "api_urlmap" {
   name            = "cardscrapebot-urlmap"
-  default_service = google_compute_backend_service.api_backend.id
+  default_service = google_compute_backend_bucket.site_backend.id
+
+  host_rule {
+    hosts        = [var.api_domain]
+    path_matcher = "api"
+  }
+
+  host_rule {
+    hosts        = [var.site_domain, "www.${var.site_domain}"]
+    path_matcher = "site"
+  }
+
+  path_matcher {
+    name            = "api"
+    default_service = google_compute_backend_service.api_backend.id
+  }
+
+  path_matcher {
+    name            = "site"
+    default_service = google_compute_backend_bucket.site_backend.id
+  }
 }
 
 resource "google_compute_managed_ssl_certificate" "api_cert" {
   name = "cardscrapebot-cert-v2"
 
   managed {
-    domains = [var.domain]
+    domains = [var.api_domain]
+  }
+}
+
+resource "google_compute_managed_ssl_certificate" "site_cert" {
+  name = "casecomp-site-cert"
+
+  managed {
+    domains = [var.site_domain, "www.${var.site_domain}"]
   }
 }
 
 resource "google_compute_target_https_proxy" "api_proxy" {
   name             = "cardscrapebot-https-proxy"
   url_map          = google_compute_url_map.api_urlmap.id
-  ssl_certificates = [google_compute_managed_ssl_certificate.api_cert.id]
+  ssl_certificates = [
+    google_compute_managed_ssl_certificate.api_cert.id,
+    google_compute_managed_ssl_certificate.site_cert.id,
+  ]
 }
 
 resource "google_compute_global_forwarding_rule" "api_https" {
@@ -221,7 +279,7 @@ resource "google_monitoring_notification_channel" "email" {
 
 resource "google_logging_metric" "api_errors" {
   name   = "cardscrapebot-errors"
-  filter = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"cardscrapebot\" textPayload=~\"\\[ERROR\\]\""
+  filter = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"casecomp-api\" textPayload=~\"\\[ERROR\\]\""
 
   metric_descriptor {
     metric_kind = "DELTA"
@@ -274,7 +332,7 @@ resource "google_monitoring_uptime_check_config" "api_uptime" {
     type = "uptime_url"
     labels = {
       project_id = var.project_id
-      host       = var.domain
+      host       = var.api_domain
     }
   }
 
@@ -323,5 +381,5 @@ output "lb_ip" {
 }
 
 output "api_url" {
-  value = "https://${var.domain}"
+  value = "https://${var.api_domain}"
 }

@@ -10,7 +10,7 @@ permissions:
 env:
   PROJECT_ID: casecomp-495718
   REGION: asia-south1
-  SERVICE: cardscrapebot
+  SERVICE: casecomp-api
   IMAGE: gcr.io/casecomp-495718/casecomp-api
 
 jobs:
