@@ -8,6 +8,7 @@ node --check scripts/psa-report.js || exit 1
 node --check api.js || exit 1
 node --check lib/data/redis-cache.js || exit 1
 node --check lib/swagger.js || exit 1
+node --check test/smoke-test.js || exit 1
 
 for f in \
   extension/background.js \
@@ -92,6 +93,14 @@ if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
   node test/api-test.js || exit 1
 else
   echo "SKIP: API server not running on :3000"
+fi
+
+# Smoke tests (skip if Playwright not installed)
+echo "=== smoke tests ==="
+if npx playwright --version > /dev/null 2>&1; then
+  node test/smoke-test.js || exit 1
+else
+  echo "SKIP: Playwright not installed (run: yarn playwright-install)"
 fi
 
 echo "=== all checks passed ==="
