@@ -1,17 +1,27 @@
 # Terraform — Casecomp Infrastructure
 
-GCP infrastructure for the Casecomp API. State is stored in a GCS bucket (`casecomp-terraform-state`).
+GCP infrastructure for Casecomp. State is stored in a GCS bucket (`casecomp-terraform-state`).
 
 ## Resources
 
 | Resource | Purpose |
 |----------|---------|
-| Cloud Run (`cardscrapebot`) | API + dashboard, asia-south1, scales to 20 instances |
+| Cloud Run `casecomp-api` | API + dashboard, asia-south1, scales to 20 instances |
+| Cloud Run `casecomp-site` | Frontend SSR (TanStack Start), scales to 10 instances |
 | Firestore | Grade logs, drops, webhooks, alerts, all caches |
-| HTTPS Load Balancer | Global IP, managed SSL cert, URL map, backend service |
-| Secret Manager | EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY |
-| Cloud Monitoring | Log-based metric on `[ERROR]`, email alert on >5 errors/5min |
+| HTTPS Load Balancer | Global IP (`34.107.143.136`), URL map routes by host |
+| Cloud CDN | Caches static assets from frontend Cloud Run |
+| SSL Certificates | Managed certs for `api.casecomp.xyz` and `casecomp.xyz` + `www` |
+| GCS Bucket `casecomp-site` | (Legacy) Static site bucket, replaced by Cloud Run SSR |
+| Secret Manager | EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY |
+| Cloud Monitoring | Log-based metric on `[ERROR]`, error + uptime alerts → email |
 | APIs enabled | Cloud Run, Compute, Firestore, Cloud Build, Secret Manager, Monitoring |
+
+## Routing
+
+Same LB IP, routed by hostname:
+- `casecomp.xyz` / `www.casecomp.xyz` → Cloud Run `casecomp-site` (CDN enabled)
+- `api.casecomp.xyz` → Cloud Run `casecomp-api`
 
 ## Variables
 
@@ -19,8 +29,9 @@ GCP infrastructure for the Casecomp API. State is stored in a GCS bucket (`casec
 |----------|---------|-------------|
 | `project_id` | `casecomp-495718` | GCP project |
 | `region` | `asia-south1` | Deploy region |
-| `domain` | `api.casecomp.xyz` | SSL cert domain |
-| `container_image` | `gcr.io/casecomp-495718/cardscrapebot` | Docker image |
+| `api_domain` | `api.casecomp.xyz` | API SSL cert domain |
+| `site_domain` | `casecomp.xyz` | Frontend SSL cert domain |
+| `container_image` | `gcr.io/casecomp-495718/casecomp-api` | API Docker image |
 | `alert_email` | *(sensitive, in terraform.tfvars)* | Monitoring alert recipient |
 
 ## Usage
@@ -37,7 +48,10 @@ If resources were created manually (outside Terraform), import them before apply
 
 ```bash
 terraform import google_cloud_run_v2_service.api \
-  "projects/casecomp-495718/locations/asia-south1/services/cardscrapebot"
+  "projects/casecomp-495718/locations/asia-south1/services/casecomp-api"
+
+terraform import google_cloud_run_v2_service.site \
+  "projects/casecomp-495718/locations/asia-south1/services/casecomp-site"
 ```
 
 ## Files
