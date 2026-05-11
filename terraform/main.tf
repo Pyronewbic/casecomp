@@ -196,15 +196,70 @@ resource "google_compute_backend_service" "api_backend" {
   }
 }
 
-resource "google_compute_backend_bucket" "site_backend" {
-  name        = "casecomp-site-backend"
-  bucket_name = google_storage_bucket.site.name
-  enable_cdn  = true
+resource "google_cloud_run_v2_service" "site" {
+  name     = "casecomp-site"
+  location = var.region
+
+  template {
+    scaling {
+      max_instance_count = 10
+    }
+
+    containers {
+      image = "gcr.io/${var.project_id}/casecomp-site"
+
+      ports {
+        container_port = 8080
+      }
+
+      resources {
+        limits = {
+          cpu    = "1000m"
+          memory = "512Mi"
+        }
+      }
+    }
+  }
+
+  depends_on = [google_project_service.run]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "site_public" {
+  name     = google_cloud_run_v2_service.site.name
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+resource "google_compute_region_network_endpoint_group" "site_neg" {
+  name                  = "casecomp-site-neg"
+  region                = var.region
+  network_endpoint_type = "SERVERLESS"
+
+  cloud_run {
+    service = google_cloud_run_v2_service.site.name
+  }
+}
+
+resource "google_compute_backend_service" "site_backend" {
+  name       = "casecomp-site-backend"
+  enable_cdn = true
+
+  cdn_policy {
+    cache_mode                   = "CACHE_ALL_STATIC"
+    default_ttl                  = 3600
+    max_ttl                      = 86400
+    signed_url_cache_max_age_sec = 0
+  }
+
+  backend {
+    group = google_compute_region_network_endpoint_group.site_neg.id
+  }
 }
 
 resource "google_compute_url_map" "api_urlmap" {
   name            = "cardscrapebot-urlmap"
-  default_service = google_compute_backend_bucket.site_backend.id
+  default_service = google_compute_backend_service.site_backend.id
 
   host_rule {
     hosts        = [var.api_domain]
@@ -223,7 +278,7 @@ resource "google_compute_url_map" "api_urlmap" {
 
   path_matcher {
     name            = "site"
-    default_service = google_compute_backend_bucket.site_backend.id
+    default_service = google_compute_backend_service.site_backend.id
   }
 }
 
