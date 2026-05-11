@@ -6,8 +6,12 @@ variable "region" {
   default = "asia-south1"
 }
 
-variable "domain" {
+variable "api_domain" {
   default = "api.casecomp.xyz"
+}
+
+variable "site_domain" {
+  default = "casecomp.xyz"
 }
 
 variable "container_image" {
