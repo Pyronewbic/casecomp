@@ -27,7 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -219,7 +219,9 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
 
   const wantDemo = req.query.demo === "true" || (!clientId && !clientSecret);
   if (wantDemo) {
-    return res.json(getDemoSearchResult(q, { source: req.query.source, condition: req.query.condition }));
+    const demoResult = getDemoSearchResult(q, { source: req.query.source, condition: req.query.condition });
+    if (demoResult.sold?.length) recordSoldPrices(q, demoResult.sold, demoResult.source).catch(() => {});
+    return res.json(demoResult);
   }
 
   try {
@@ -598,6 +600,108 @@ app.post("/api/alerts", authMiddleware, async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// POST /api/track-prices — scheduled job to record prices for tracked cards
+app.post("/api/track-prices", authMiddleware, async (req, res) => {
+  const cards = req.body.cards || [
+    "Pikachu ex SAR 234/193 PSA 10",
+    "Umbreon ex SAR 217/187",
+    "Mega Greninja ex SAR",
+  ];
+  const results = [];
+  for (const card of cards) {
+    try {
+      const demoResult = getDemoSearchResult(card);
+      if (demoResult.sold?.length) {
+        await recordSoldPrices(card, demoResult.sold, demoResult.source);
+        results.push({ card, recorded: demoResult.sold.length });
+      } else {
+        results.push({ card, recorded: 0 });
+      }
+    } catch (e) {
+      results.push({ card, error: e.message });
+    }
+  }
+  res.json({ tracked: results.length, results });
+});
+
+// GET /api/arbitrage — cross-source price comparison for a card
+app.get("/api/arbitrage", apiAuthMiddleware, async (req, res) => {
+  const { q } = req.query;
+  if (!validateQuery(q, res)) return;
+
+  const isDemo = req.query.demo === "true";
+
+  try {
+    const sources = ["ebay", "magi", "snkrdunk"];
+    const pricesBySource = {};
+
+    for (const source of sources) {
+      try {
+        let data;
+        if (isDemo) {
+          const full = getDemoSearchResult(q);
+          const items = [];
+          for (const arr of Object.values(full.activeByCountry || {})) items.push(...arr);
+          const filtered = items.filter(i => {
+            const url = i.itemWebUrl || "";
+            return url.includes(source === "ebay" ? "ebay" : source === "magi" ? "magi" : "snkrdunk");
+          });
+          data = { activeByCountry: { US: filtered }, source };
+        } else {
+          const config = buildConfig({ ...req.query, source });
+          config._cachePrefix = cachePrefix(req);
+          if (source === "snkrdunk") {
+            data = await searchSnkrdunk(q, config);
+          } else if (source === "magi") {
+            data = await searchMagi(q, config);
+          } else {
+            const ebayQuery = buildEbaySearchQuery(q, config);
+            const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
+            data = { activeByCountry: activeRes.itemsByCountry || {}, source: "ebay" };
+          }
+        }
+
+        const items = [];
+        for (const arr of Object.values(data.activeByCountry || {})) items.push(...arr);
+        if (items.length) {
+          const prices = items.map(i => i.totalCost || i.price).filter(Boolean).sort((a, b) => a - b);
+          pricesBySource[source] = {
+            lowest: prices[0],
+            highest: prices[prices.length - 1],
+            count: prices.length,
+            currency: items[0].priceCurrency || "USD",
+            priceJPY: items[0].priceJPY || null,
+          };
+        }
+      } catch {}
+    }
+
+    const sourceNames = Object.keys(pricesBySource);
+    let arbitrage = null;
+    if (sourceNames.length >= 2) {
+      const sorted = sourceNames.sort((a, b) => pricesBySource[a].lowest - pricesBySource[b].lowest);
+      const cheapest = sorted[0];
+      const most = sorted[sorted.length - 1];
+      const spread = Math.round((pricesBySource[most].lowest - pricesBySource[cheapest].lowest) * 100) / 100;
+      const spreadPct = Math.round((spread / pricesBySource[most].lowest) * 100);
+      if (spread > 0) {
+        arbitrage = {
+          cheapest: { source: cheapest, price: pricesBySource[cheapest].lowest },
+          mostExpensive: { source: most, price: pricesBySource[most].lowest },
+          spread,
+          spreadPct,
+          summary: `${spread > 0 ? "$" + spread : "No"} cheaper on ${cheapest} vs ${most} (${spreadPct}% spread)`,
+        };
+      }
+    }
+
+    res.json({ query: q, sources: pricesBySource, arbitrage });
+  } catch (e) {
+    logError("arbitrage", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
