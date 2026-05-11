@@ -65,6 +65,7 @@ locals {
     "ANTHROPIC_API_KEY",
     "PSA_AUTH_TOKEN",
     "CASECOMP_API_KEY",
+    "CASECOMP_SANDBOX_KEY",
   ]
 }
 
