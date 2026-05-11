@@ -532,6 +532,29 @@ main {
   font-style: italic;
 }
 
+.price-chart-container {
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.price-chart-container canvas {
+  width: 100%;
+  margin-top: 8px;
+}
+.price-chart-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.price-chart-stats b {
+  color: var(--text);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
 .detail-actions {
   display: flex;
   gap: 10px;

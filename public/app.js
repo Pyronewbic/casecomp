@@ -343,6 +343,11 @@ function selectItem(itemId) {
     ${summaryHtml}
     ${fieldsHtml}
     ${gradeHtml}
+    <div id="price-chart-container" class="price-chart-container hidden">
+      <div class="detail-grade-section-label">Price History</div>
+      <canvas id="price-chart" height="120"></canvas>
+      <div id="price-chart-stats" class="price-chart-stats"></div>
+    </div>
     ${linkHtml}
   `;
 
@@ -353,6 +358,110 @@ function selectItem(itemId) {
       detailPanel.querySelectorAll(".detail-images img").forEach(i => i.classList.remove("active-img"));
       img.classList.add("active-img");
     });
+  });
+
+  loadPriceChart(currentQuery);
+}
+
+async function loadPriceChart(query) {
+  const container = document.getElementById("price-chart-container");
+  const canvas = document.getElementById("price-chart");
+  const statsEl = document.getElementById("price-chart-stats");
+  if (!container || !canvas) return;
+
+  try {
+    const res = await fetch(`/api/price-history?q=${encodeURIComponent(query)}&days=90`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.history?.length) return;
+
+    container.classList.remove("hidden");
+
+    const points = data.history
+      .filter(h => h.price > 0)
+      .sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
+
+    if (!points.length) return;
+
+    drawPriceChart(canvas, points);
+
+    if (data.stats) {
+      statsEl.innerHTML = `
+        <span>Low: <b>${formatPrice(data.stats.min, "USD")}</b></span>
+        <span>Avg: <b>${formatPrice(data.stats.avg, "USD")}</b></span>
+        <span>High: <b>${formatPrice(data.stats.max, "USD")}</b></span>
+        <span>${data.stats.count} sales</span>
+      `;
+    }
+  } catch {}
+}
+
+function drawPriceChart(canvas, points) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.parentElement.clientWidth;
+  const h = 120;
+  canvas.width = w;
+  canvas.height = h;
+  canvas.style.width = w + "px";
+
+  const prices = points.map(p => p.price);
+  const min = Math.min(...prices) * 0.95;
+  const max = Math.max(...prices) * 1.05;
+  const range = max - min || 1;
+
+  const pad = { top: 10, right: 10, bottom: 20, left: 50 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = pad.top + (ch * i / 3);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+
+    const val = max - (range * i / 3);
+    ctx.fillStyle = "rgba(138,138,154,0.6)";
+    ctx.font = "10px 'Space Grotesk', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("$" + Math.round(val), pad.left - 6, y + 3);
+  }
+
+  // Line
+  ctx.strokeStyle = "#d9b676";
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = pad.left + (i / (points.length - 1 || 1)) * cw;
+    const y = pad.top + ch - ((p.price - min) / range) * ch;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Fill under line
+  const lastX = pad.left + cw;
+  const lastY = pad.top + ch - ((points[points.length - 1].price - min) / range) * ch;
+  ctx.lineTo(lastX, pad.top + ch);
+  ctx.lineTo(pad.left, pad.top + ch);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(217,182,118,0.08)";
+  ctx.fill();
+
+  // Dots
+  ctx.fillStyle = "#d9b676";
+  points.forEach((p, i) => {
+    const x = pad.left + (i / (points.length - 1 || 1)) * cw;
+    const y = pad.top + ch - ((p.price - min) / range) * ch;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
   });
 }
 
