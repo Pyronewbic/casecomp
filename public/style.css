@@ -17,7 +17,7 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   min-height: 100vh;
@@ -46,14 +46,20 @@ a:hover { text-decoration: underline; }
 }
 
 header {
-  position: relative;
-  z-index: 1;
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 32px;
+  padding: 0 32px;
+  height: 64px;
   max-width: 1200px;
   margin: 0 auto;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(7, 7, 10, 0.7);
+  border-bottom: 1px solid var(--border);
 }
 
 .logo {
@@ -65,6 +71,20 @@ header {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--gold);
+}
+
+.beta-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--red);
+  border: 1px solid rgba(255, 93, 93, 0.3);
+  background: rgba(255, 93, 93, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
 }
 
 .nav-link {
@@ -80,6 +100,16 @@ main {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 32px 80px;
+}
+
+.fade-up {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .hero {
@@ -99,6 +129,17 @@ main {
   font-size: 17px;
   max-width: 560px;
   margin: 0 auto 36px;
+}
+
+.search-sticky {
+  position: sticky;
+  top: 64px;
+  z-index: 30;
+  background: rgba(7, 7, 10, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 0;
+  margin: -12px 0 0;
 }
 
 .search-bar {
@@ -150,9 +191,9 @@ main {
   background: none;
   border: 1px solid var(--border);
   color: var(--muted);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 13px;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
   cursor: pointer;
   font-family: inherit;
   transition: all 0.2s;
@@ -160,7 +201,8 @@ main {
 }
 .hint:hover {
   color: var(--gold);
-  border-color: rgba(217, 182, 118, 0.3);
+  border-color: rgba(217, 182, 118, 0.4);
+  background: rgba(217, 182, 118, 0.06);
 }
 
 /* Results */
@@ -220,9 +262,10 @@ main {
   text-align: center;
 }
 .psa-stat .label {
-  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--muted);
   margin-bottom: 4px;
 }
@@ -384,11 +427,12 @@ main {
   font-size: 13px;
 }
 .detail-field .detail-label {
-  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   color: var(--muted);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 .detail-field .detail-value {
   font-family: 'Space Grotesk', system-ui, sans-serif;
@@ -462,11 +506,11 @@ main {
   margin-bottom: 12px;
 }
 .detail-grade-section-label {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--gold);
   margin-bottom: 12px;
 }
@@ -542,18 +586,89 @@ main {
 .detail-meta-row .detail-grid {
   margin-bottom: 0;
 }
-.detail-tabs { display: flex; gap: 4px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-.detail-tab { background: none; border: none; color: var(--muted); font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
-.detail-tab:hover { color: var(--text); }
-.detail-tab.active { color: var(--gold); background: var(--gold-dim); }
+.detail-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.detail-tab { background: none; border: 1px solid var(--border); color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 16px; border-radius: 9999px; cursor: pointer; transition: all 0.2s; }
+.detail-tab:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+.detail-tab.active { color: var(--gold); border-color: var(--gold); background: rgba(217, 182, 118, 0.08); }
 .detail-tab-panel { }
+
+.graded-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--inset);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.psa-inline {
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 0;
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.psa-inline-stat {
+  padding: 0 16px;
+  border-right: 1px solid var(--border);
+}
+.psa-inline-stat:last-child { border-right: none; }
+.psa-inline-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.psa-inline-value {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+.psa-inline-value.easy { color: var(--green); }
+.psa-inline-value.hard { color: var(--red); }
+.psa-inline-value.moderate { color: var(--gold); }
+.psa-inline-cost {
+  font-size: 12px;
+  color: var(--gold);
+  margin-left: 4px;
+  font-weight: 500;
+}
+.gem-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gem-bar-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  max-width: 60px;
+}
+.gem-bar-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 3px;
+}
 
 .card-identity { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .card-id-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.card-id-badge { font-family: monospace; font-size: 12px; color: var(--gold); background: var(--gold-dim); padding: 3px 8px; border-radius: 4px; font-weight: 600; }
+.card-id-badge { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gold); background: var(--gold-dim); padding: 3px 8px; border-radius: 4px; font-weight: 600; }
 .card-id-rarity { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 700; color: var(--text); background: var(--inset); border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px; }
 .card-id-set { font-size: 11px; color: var(--muted); }
-.card-id-num { font-size: 11px; color: var(--muted); font-family: monospace; }
+.card-id-num { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
 .card-id-names { margin-top: 4px; display: flex; gap: 10px; }
 .card-id-name { font-size: 11px; color: var(--text); }
 .card-id-lang { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-right: 2px; }
@@ -562,7 +677,7 @@ main {
 .arbitrage-sources { display: flex; gap: 8px; margin-top: 8px; }
 .arb-source { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px; text-align: center; }
 .arb-source.arb-cheapest { border-color: var(--green); background: rgba(124, 224, 168, 0.05); }
-.arb-source-name { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.arb-source-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
 .arb-cheapest .arb-source-name { color: var(--green); }
 .arb-source-price { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 18px; font-weight: 700; color: var(--text); }
 .arb-cheapest .arb-source-price { color: var(--green); }
@@ -790,6 +905,7 @@ main {
   border-radius: var(--radius);
   padding: 28px 24px;
   text-align: center;
+  transition-delay: calc(var(--i, 0) * 100ms);
 }
 .feature-icon {
   font-family: 'Space Grotesk', system-ui, sans-serif;
@@ -849,7 +965,8 @@ footer {
   .results-right { position: static; }
   .features { grid-template-columns: 1fr; }
   .psa-signal { gap: 20px; }
-  header { padding: 16px 20px; }
+  header { padding: 0 20px; height: 56px; }
+  .search-sticky { top: 56px; }
   main { padding: 0 20px 60px; }
   #alert-form { flex-direction: column; }
   .search-bar { flex-direction: column; }

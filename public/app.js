@@ -21,6 +21,7 @@ let allItems = [];
 let allActive = [];
 let allSold = [];
 let activeSourceFilter = "all";
+let currentPsaSignal = null;
 
 document.querySelectorAll(".hint").forEach(h => {
   h.addEventListener("click", () => {
@@ -110,6 +111,7 @@ function render(data) {
     ${noteHtml}
   `;
 
+  currentPsaSignal = data.psaSignal || null;
   renderPsa(data.psaSignal);
 
   allActive = active;
@@ -317,13 +319,16 @@ function selectItem(itemId) {
   `;
 
   const fields = [];
-  if (item.condition) fields.push({ label: "Condition", value: item.condition });
+  const condVal = item.condition
+    ? (slabLabel ? `${item.condition} <span class="graded-badge">Graded</span>` : item.condition)
+    : (slabLabel ? `<span class="graded-badge">Graded</span>` : "");
+  if (condVal) fields.push({ label: "Condition", value: condVal, raw: true });
   if (item.soldDate || item.endedDate) fields.push({ label: "Sold", value: item.soldDate || item.endedDate });
-  if (item.priceJPY) fields.push({ label: "JPY", value: `¥${item.priceJPY.toLocaleString()}` });
+  if (item.priceJPY) fields.push({ label: "Price (JPY)", value: `¥${item.priceJPY.toLocaleString()}` });
   if (item.totalCost && item.totalCost !== item.price) fields.push({ label: "Item Price", value: formatPrice(item.price, item.priceCurrency) });
 
   const fieldsHtml = fields.length ? `<div class="detail-grid">${fields.map(f => `
-    <div class="detail-field"><div class="detail-label">${esc(f.label)}</div><div class="detail-value">${esc(f.value)}</div></div>
+    <div class="detail-field"><div class="detail-label">${esc(f.label)}</div><div class="detail-value">${f.raw ? f.value : esc(f.value)}</div></div>
   `).join("")}</div>` : "";
 
   const gradeHtml = renderGradeDetail(grade);
@@ -356,6 +361,7 @@ function selectItem(itemId) {
       ${gradeHtml}
     </div>
     <div class="detail-tab-panel${defaultTab === "prices" ? "" : " hidden"}" data-dtpanel="prices">
+      ${renderPsaInline(currentPsaSignal)}
       <div id="arbitrage-container" class="arbitrage-container hidden"></div>
       <div id="price-chart-container" class="price-chart-container hidden">
         <div class="detail-grade-section-label">Price History</div>
@@ -552,6 +558,36 @@ function drawPriceChart(canvas, points) {
   });
 }
 
+function renderPsaInline(psa) {
+  if (!psa) return "";
+  const diffClass = psa.difficulty === "easy" ? "easy" : psa.difficulty === "hard" || psa.difficulty === "brutal" ? "hard" : "moderate";
+  const gemPct = psa.gem10Pct != null ? psa.gem10Pct : null;
+  const tierLabel = psa.tier || "—";
+  const costLabel = psa.estCost ? `<span class="psa-inline-cost">${esc(psa.estCost)}</span>` : "";
+
+  return `<div class="psa-inline">
+    <div class="psa-inline-stat">
+      <div class="psa-inline-label">Gem</div>
+      <div class="gem-bar">
+        <span class="psa-inline-value">${gemPct != null ? gemPct + "%" : "—"}</span>
+        ${gemPct != null ? `<div class="gem-bar-track"><div class="gem-bar-fill" style="width: ${gemPct}%"></div></div>` : ""}
+      </div>
+    </div>
+    <div class="psa-inline-stat">
+      <div class="psa-inline-label">Pop</div>
+      <div class="psa-inline-value">${psa.totalPop != null ? psa.totalPop.toLocaleString() : "—"}</div>
+    </div>
+    <div class="psa-inline-stat">
+      <div class="psa-inline-label">Difficulty</div>
+      <div class="psa-inline-value ${diffClass}">${esc(psa.difficulty || "—")}</div>
+    </div>
+    <div class="psa-inline-stat">
+      <div class="psa-inline-label">Tier</div>
+      <div class="psa-inline-value">${esc(tierLabel)}${costLabel}</div>
+    </div>
+  </div>`;
+}
+
 function renderGradeDetail(grade) {
   if (!grade) return "";
 
@@ -618,6 +654,11 @@ function esc(s) {
   d.textContent = String(s);
   return d.innerHTML;
 }
+
+const fadeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("visible"); fadeObserver.unobserve(e.target); } });
+}, { threshold: 0.1 });
+document.querySelectorAll(".fade-up").forEach(el => fadeObserver.observe(el));
 
 alertForm.addEventListener("submit", async (e) => {
   e.preventDefault();
