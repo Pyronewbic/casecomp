@@ -11,7 +11,7 @@ GCP infrastructure for Casecomp. State is stored in a GCS bucket (`casecomp-terr
 | Firestore | Grade logs, drops, webhooks, alerts, all caches |
 | HTTPS Load Balancer | Global IP (`34.107.143.136`), URL map routes by host |
 | Cloud CDN | Caches static assets from frontend Cloud Run |
-| SSL Certificates | Managed certs for `api.casecomp.xyz` and `casecomp.xyz` + `www` |
+| SSL Certificates | GCP managed cert for `api.casecomp.xyz`; Cloudflare handles `casecomp.xyz` SSL |
 | GCS Bucket `casecomp-site` | (Legacy) Static site bucket, replaced by Cloud Run SSR |
 | Secret Manager | EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY |
 | Cloud Monitoring | Log-based metric on `[ERROR]`, error + uptime alerts → email |
@@ -19,9 +19,9 @@ GCP infrastructure for Casecomp. State is stored in a GCS bucket (`casecomp-terr
 
 ## Routing
 
-Same LB IP, routed by hostname:
-- `casecomp.xyz` / `www.casecomp.xyz` → Cloud Run `casecomp-site` (CDN enabled)
-- `api.casecomp.xyz` → Cloud Run `casecomp-api`
+Same LB IP (`34.107.143.136`), routed by hostname:
+- `casecomp.xyz` / `www.casecomp.xyz` → Cloudflare (SSL) → GCP LB → Cloud Run `casecomp-site` (CDN enabled)
+- `api.casecomp.xyz` → GCP LB (managed SSL) → Cloud Run `casecomp-api`
 
 ## Variables
 

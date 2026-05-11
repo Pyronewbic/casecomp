@@ -1,6 +1,7 @@
 import "dotenv/config";
 import crypto from "crypto";
 import express from "express";
+import compression from "compression";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import swaggerUi from "swagger-ui-express";
@@ -17,6 +18,7 @@ import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
 import { getRedisStatus, sha256 } from "./lib/redis-cache.js";
 import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs } from "./lib/firestore.js";
 import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
+import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/api-keys.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -31,6 +33,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
+app.use(compression());
 app.use(express.json({ limit: "100kb" }));
 
 app.use((req, res, next) => {
@@ -80,7 +83,6 @@ const demoLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip,
   message: { error: "Too many requests, please try again later" },
 });
 
@@ -89,7 +91,6 @@ const sandboxLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip,
   message: { error: "Sandbox rate limit: 5 requests per minute" },
 });
 
@@ -403,13 +404,25 @@ app.get("/api/health", async (req, res) => {
 
 // ============ V1 API — Drop Intelligence ============
 
-function authMiddleware(req, res, next) {
-  const key = process.env.CASECOMP_API_KEY;
+async function authMiddleware(req, res, next) {
+  const ownerKey = process.env.CASECOMP_API_KEY;
   const sandboxKey = process.env.CASECOMP_SANDBOX_KEY;
-  if (!key) return next();
+  if (!ownerKey) return next();
   const token = getRequestToken(req);
-  if (!token || (token !== key && token !== sandboxKey)) {
-    return res.status(401).json({ error: "Invalid or missing API key" });
+  if (!token) return res.status(401).json({ error: "Invalid or missing API key" });
+  if (token === ownerKey || token === sandboxKey) return next();
+  const devKey = await validateApiKey(token);
+  if (devKey) {
+    req._devKey = devKey;
+    return next();
+  }
+  return res.status(401).json({ error: "Invalid or missing API key" });
+}
+
+function ownerOnly(req, res, next) {
+  const token = getRequestToken(req);
+  if (token !== process.env.CASECOMP_API_KEY) {
+    return res.status(403).json({ error: "Owner key required" });
   }
   next();
 }
@@ -562,6 +575,118 @@ app.post("/api/alerts", authMiddleware, async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// ============ Admin — API Key Management ============
+
+const admin = express.Router();
+admin.use(ownerOnly);
+
+// GET /admin/keys — list all developer keys
+admin.get("/keys", async (req, res) => {
+  try {
+    const keys = await listApiKeys();
+    res.json({ keys, count: keys.length });
+  } catch (e) {
+    logError("admin", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// POST /admin/keys — create a new developer key
+admin.post("/keys", async (req, res) => {
+  const { label, rateLimit: rl } = req.body;
+  if (!label) return res.status(400).json({ error: "Missing label" });
+  try {
+    const result = await createApiKey({ label, rateLimit: rl });
+    res.status(201).json(result);
+  } catch (e) {
+    logError("admin", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /admin/keys/:id — get a single key
+admin.get("/keys/:id", async (req, res) => {
+  try {
+    const key = await getApiKey(req.params.id);
+    if (!key) return res.status(404).json({ error: "Key not found" });
+    res.json(key);
+  } catch (e) {
+    logError("admin", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// PATCH /admin/keys/:id — update label, rateLimit, active
+admin.patch("/keys/:id", async (req, res) => {
+  try {
+    const updated = await updateApiKey(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: "Key not found" });
+    res.json(updated);
+  } catch (e) {
+    logError("admin", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// DELETE /admin/keys/:id — delete a key
+admin.delete("/keys/:id", async (req, res) => {
+  try {
+    const deleted = await deleteApiKey(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Key not found" });
+    res.json({ ok: true, id: req.params.id });
+  } catch (e) {
+    logError("admin", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// POST /admin/keys/:id/rotate — rotate a developer key
+admin.post("/keys/:id/rotate", async (req, res) => {
+  try {
+    const result = await rotateApiKey(req.params.id);
+    if (!result) return res.status(404).json({ error: "Key not found" });
+    res.json(result);
+  } catch (e) {
+    logError("admin", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.use("/admin", admin);
+
+// POST /api/keys/rotate — rotate the owner API key
+app.post("/api/keys/rotate", async (req, res) => {
+  const token = getRequestToken(req);
+  const ownerKey = process.env.CASECOMP_API_KEY;
+  if (!token || token !== ownerKey) {
+    return res.status(401).json({ error: "Only the owner key can rotate keys" });
+  }
+
+  try {
+    const { SecretManagerServiceClient } = await import("@google-cloud/secret-manager");
+    const client = new SecretManagerServiceClient();
+    const projectId = process.env.GCLOUD_PROJECT || "casecomp-495718";
+
+    const newKey = `CC_LIVE_${crypto.randomBytes(24).toString("base64url")}`;
+
+    await client.addSecretVersion({
+      parent: `projects/${projectId}/secrets/CASECOMP_API_KEY`,
+      payload: { data: Buffer.from(newKey) },
+    });
+
+    process.env.CASECOMP_API_KEY = newKey;
+
+    res.json({
+      ok: true,
+      key: newKey,
+      note: "New key is active immediately. Old key is invalid. Store this key — it won't be shown again.",
+    });
+  } catch (e) {
+    logError("keys", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });

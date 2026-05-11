@@ -296,6 +296,90 @@ async function run() {
     assert(body._demo === true);
   });
 
+  // ── Admin keys ──
+
+  console.log("\n\x1b[1m=== admin keys ===\x1b[0m");
+
+  let testKeyId = null;
+
+  await test("GET /admin/keys without owner key returns 403", async () => {
+    const { res } = await jsonNoAuth("/admin/keys");
+    assert(res.status === 403 || res.status === 401, `expected 401/403, got ${res.status}`);
+  });
+
+  await test("GET /admin/keys with owner key returns list", async () => {
+    const { res, body } = await json("/admin/keys");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(Array.isArray(body.keys));
+    assert(typeof body.count === "number");
+  });
+
+  await test("POST /admin/keys creates a key", async () => {
+    const { res, body } = await json("/admin/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: "test-key", rateLimit: 10 }),
+    });
+    assert(res.status === 201, `status ${res.status}`);
+    assert(body.id?.startsWith("key_"), `bad id: ${body.id}`);
+    assert(body.key?.startsWith("CC_LIVE_"), "key should start with CC_LIVE_");
+    assert(body.label === "test-key");
+    assert(body.rateLimit === 10);
+    assert(body.active === true);
+    testKeyId = body.id;
+  });
+
+  await test("POST /admin/keys requires label", async () => {
+    const { res } = await json("/admin/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+  });
+
+  if (testKeyId) {
+    await test("GET /admin/keys/:id returns single key", async () => {
+      const { res, body } = await json(`/admin/keys/${testKeyId}`);
+      assert(res.status === 200);
+      assert(body.id === testKeyId);
+      assert(body.label === "test-key");
+    });
+
+    await test("PATCH /admin/keys/:id updates key", async () => {
+      const { res, body } = await json(`/admin/keys/${testKeyId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: "updated-key", active: false }),
+      });
+      assert(res.status === 200);
+      assert(body.label === "updated-key");
+      assert(body.active === false);
+    });
+
+    await test("POST /admin/keys/:id/rotate returns new key", async () => {
+      const { res, body } = await json(`/admin/keys/${testKeyId}/rotate`, { method: "POST" });
+      assert(res.status === 200);
+      assert(body.key?.startsWith("CC_LIVE_"), "rotated key should start with CC_LIVE_");
+    });
+
+    await test("DELETE /admin/keys/:id deletes key", async () => {
+      const { res, body } = await json(`/admin/keys/${testKeyId}`, { method: "DELETE" });
+      assert(res.status === 200);
+      assert(body.ok === true);
+    });
+
+    await test("GET /admin/keys/:id after delete returns 404", async () => {
+      const { res } = await json(`/admin/keys/${testKeyId}`);
+      assert(res.status === 404, `expected 404, got ${res.status}`);
+    });
+  }
+
+  await test("GET /admin/keys/nonexistent returns 404", async () => {
+    const { res } = await json("/admin/keys/key_nonexistent_xyz");
+    assert(res.status === 404);
+  });
+
   // ── Demo data ──
 
   console.log("\n\x1b[1m=== demo data ===\x1b[0m");

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casecomp Admin — API Keys</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header>
+    <div class="logo">API Key Management</div>
+    <div class="auth-bar">
+      <input type="password" id="owner-key" placeholder="Owner key (CC_LIVE_...)" autocomplete="off">
+      <button id="auth-btn">Authenticate</button>
+      <button id="logout-btn" class="danger hidden">Logout</button>
+    </div>
+  </header>
+
+  <main id="main" class="hidden">
+    <div id="stats" class="stats-grid"></div>
+
+    <div class="quick-links">
+      <a href="/api/health" target="_blank">Health</a>
+      <a href="/docs" target="_blank">API Docs</a>
+    </div>
+
+    <div class="toolbar">
+      <h2>Developer Keys</h2>
+      <button id="create-btn">+ Create Key</button>
+    </div>
+
+    <div id="create-form" class="hidden card">
+      <input type="text" id="new-label" placeholder="Label (e.g. Lovable frontend)">
+      <input type="number" id="new-rate" placeholder="Rate limit (req/min)" value="60">
+      <button id="submit-create">Create</button>
+    </div>
+
+    <div id="key-list"></div>
+
+    <div class="toolbar" style="margin-top: 24px;">
+      <h2>Recent Errors</h2>
+      <button class="secondary" onclick="loadErrors()">Refresh</button>
+    </div>
+    <div id="error-list"></div>
+
+    <div id="status" class="hidden"></div>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>
