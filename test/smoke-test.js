@@ -194,7 +194,7 @@ async function run() {
     for (const [path, type] of [
       ["/", "text/html"],
       ["/style.css", "text/css"],
-      ["/app.js", "application/javascript"],
+      ["/app.js", "javascript"],
     ]) {
       const res = await page2.goto(BASE + path);
       assert(res.status() === 200, `${path} returns 200`);
