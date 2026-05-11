@@ -26,7 +26,9 @@ Initial public beta.
 ### Infrastructure
 - Cloud Run `casecomp-api` (API) + `casecomp-site` (frontend SSR with Cloud CDN)
 - HTTPS LB routes by host: casecomp.xyz → site, api.casecomp.xyz → API
-- Firestore, managed SSL certs, Secret Manager (incl. sandbox key)
+- Cloudflare SSL + edge caching for casecomp.xyz (~85ms TTFB, down from 1,210ms)
+- GCP managed SSL for api.casecomp.xyz
+- Firestore, Secret Manager (incl. sandbox key)
 - Cloud Monitoring: error alerts + uptime check on /api/health
 - Terraform with GCS state backend
 - Workload Identity Federation for GitHub Actions → GCP (no stored keys)
