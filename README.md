@@ -192,7 +192,7 @@ All caches use Firestore (shared across Cloud Run instances, persists across dep
 
 ## Infrastructure
 
-GCP (Terraform managed): Cloud Run `casecomp-api` (API) + `casecomp-site` (frontend SSR), Firestore, HTTPS load balancer with Cloud CDN, managed SSL, Secret Manager, Cloud Monitoring alerts. State in GCS bucket. Same LB IP routes by host: `casecomp.xyz` → site, `api.casecomp.xyz` → API. See `terraform/`.
+GCP (Terraform managed): Cloud Run `casecomp-api` (API) + `casecomp-site` (frontend SSR with Cloud CDN), Firestore, HTTPS LB, Secret Manager, Cloud Monitoring. Cloudflare handles SSL + edge caching for `casecomp.xyz` (~85ms TTFB). GCP managed SSL for `api.casecomp.xyz`. Same LB IP routes by host. See `terraform/`.
 
 ## Chrome Extension
 
