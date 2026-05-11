@@ -49,6 +49,24 @@ app.use("/logos", express.static(path.join(__dirname, "logos")));
 app.get("/docs/spec.json", (req, res) => res.json(swaggerSpec));
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+function getRequestToken(req) {
+  const auth = req.headers.authorization;
+  const query = req.query.key;
+  return auth?.startsWith("Bearer ") ? auth.slice(7) : query || "";
+}
+
+function isOwnerKey(req) {
+  const key = process.env.CASECOMP_API_KEY;
+  if (!key) return true;
+  return getRequestToken(req) === key;
+}
+
+function cachePrefix(req) {
+  if (isOwnerKey(req)) return "";
+  const token = getRequestToken(req);
+  return token.slice(0, 16) + "_";
+}
+
 const apiLimiter = rateLimit({
   windowMs: 60_000,
   max: 60,
@@ -66,9 +84,24 @@ const demoLimiter = rateLimit({
   message: { error: "Too many requests, please try again later" },
 });
 
+const sandboxLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+  message: { error: "Sandbox rate limit: 5 requests per minute" },
+});
+
+function isSandboxKey(req) {
+  const token = getRequestToken(req);
+  return token && token === process.env.CASECOMP_SANDBOX_KEY;
+}
+
 app.use("/api", (req, res, next) => {
   if (req.path === "/health") return next();
   if (req.query.demo === "true") return demoLimiter(req, res, next);
+  if (isSandboxKey(req)) return sandboxLimiter(req, res, next);
   return apiLimiter(req, res, next);
 });
 app.use("/v1", apiLimiter);
@@ -369,24 +402,6 @@ app.get("/api/health", async (req, res) => {
 });
 
 // ============ V1 API — Drop Intelligence ============
-
-function getRequestToken(req) {
-  const auth = req.headers.authorization;
-  const query = req.query.key;
-  return auth?.startsWith("Bearer ") ? auth.slice(7) : query || "";
-}
-
-function isOwnerKey(req) {
-  const key = process.env.CASECOMP_API_KEY;
-  if (!key) return true;
-  return getRequestToken(req) === key;
-}
-
-function cachePrefix(req) {
-  if (isOwnerKey(req)) return "";
-  const token = getRequestToken(req);
-  return token.slice(0, 16) + "_";
-}
 
 function authMiddleware(req, res, next) {
   const key = process.env.CASECOMP_API_KEY;
