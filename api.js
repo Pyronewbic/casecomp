@@ -19,6 +19,7 @@ import { getRedisStatus, sha256 } from "./lib/redis-cache.js";
 import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs } from "./lib/firestore.js";
 import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/api-keys.js";
+import { recordSoldPrices, getPriceHistory } from "./lib/price-history.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -264,6 +265,7 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
       }
     }
 
+    if (result.sold?.length) recordSoldPrices(q, result.sold, result.source).catch(() => {});
     res.json(result);
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
@@ -562,6 +564,27 @@ app.post("/api/drop-event", authMiddleware, (req, res, next) => { req._errorType
     res.json(drop);
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /api/price-history — historical sold prices for a card
+app.get("/api/price-history", authMiddleware, async (req, res) => {
+  const { q } = req.query;
+  if (!validateQuery(q, res)) return;
+  const days = Math.min(365, Math.max(1, Number(req.query.days) || 90));
+  try {
+    const history = await getPriceHistory(q, { days });
+    const prices = history.map(h => h.price).filter(Boolean);
+    const stats = prices.length ? {
+      min: Math.min(...prices),
+      max: Math.max(...prices),
+      avg: Math.round(prices.reduce((s, p) => s + p, 0) / prices.length * 100) / 100,
+      count: prices.length,
+    } : null;
+    res.json({ query: q, days, history, stats });
+  } catch (e) {
+    logError("price-history", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
