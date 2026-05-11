@@ -636,7 +636,7 @@ app.get("/api/arbitrage", apiAuthMiddleware, async (req, res) => {
   const isDemo = req.query.demo === "true";
 
   try {
-    const sources = ["ebay", "magi", "snkrdunk"];
+    const sources = ["ebay", "magi", "yahoo", "snkrdunk"];
     const pricesBySource = {};
 
     for (const source of sources) {
@@ -648,7 +648,8 @@ app.get("/api/arbitrage", apiAuthMiddleware, async (req, res) => {
           for (const arr of Object.values(full.activeByCountry || {})) items.push(...arr);
           const filtered = items.filter(i => {
             const url = i.itemWebUrl || "";
-            return url.includes(source === "ebay" ? "ebay" : source === "magi" ? "magi" : "snkrdunk");
+            const match = { ebay: "ebay", magi: "magi", yahoo: "yahoo", snkrdunk: "snkrdunk" };
+            return url.includes(match[source]);
           });
           data = { activeByCountry: { US: filtered }, source };
         } else {
@@ -658,6 +659,8 @@ app.get("/api/arbitrage", apiAuthMiddleware, async (req, res) => {
             data = await searchSnkrdunk(q, config);
           } else if (source === "magi") {
             data = await searchMagi(q, config);
+          } else if (source === "yahoo") {
+            data = await searchYahooAuctions(q, config);
           } else {
             const ebayQuery = buildEbaySearchQuery(q, config);
             const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });

@@ -6,9 +6,9 @@ GCP infrastructure for Casecomp. State is stored in a GCS bucket (`casecomp-terr
 
 | Resource | Purpose |
 |----------|---------|
-| Cloud Run `casecomp-api` | API + dashboard, asia-south1, scales to 20 instances |
+| Cloud Run `casecomp-api` | API + admin (/admin) + consumer dashboard (/dashboard), asia-south1, scales to 20 |
 | Cloud Run `casecomp-site` | Frontend SSR (TanStack Start), scales to 10 instances |
-| Firestore | Grade logs, drops, webhooks, alerts, all caches |
+| Firestore | Grade logs, drops, webhooks, alerts, caches, api-keys, price-history, error-logs |
 | HTTPS Load Balancer | Global IP (`34.107.143.136`), URL map routes by host |
 | Cloud CDN | Caches static assets from frontend Cloud Run |
 | SSL Certificates | GCP managed cert for `api.casecomp.xyz`; Cloudflare handles `casecomp.xyz` SSL |

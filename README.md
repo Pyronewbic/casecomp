@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![API](https://img.shields.io/badge/API-docs-d9b676)](https://api.casecomp.xyz/docs)
 
-**[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Dashboard](https://api.casecomp.xyz)** | **[Changelog](CHANGELOG.md)**
+**[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Dashboard](https://api.casecomp.xyz/dashboard)** | **[Admin](https://api.casecomp.xyz/admin)** | **[Changelog](CHANGELOG.md)**
 
 Search any Pokemon card across four marketplaces in one query. Get live prices, AI condition estimates, and PSA grading signals — instead of manually checking eBay, magi.camp, Yahoo Auctions, and SNKRDUNK separately.
 
@@ -14,13 +14,15 @@ Search any Pokemon card across four marketplaces in one query. Get live prices, 
 ### Features
 
 - **Multi-source search** — eBay, magi.camp, Yahoo Auctions JP, SNKRDUNK in one query
-- **AI pre-grading** — centering, corners, edges, surface scores from listing photos (Claude/OpenAI)
+- **Cross-source arbitrage** — compares lowest prices across sources, highlights spread
+- **AI pre-grading** — per-subgrade analysis (centering, corners, edges, surface) from listing photos
+- **Price history** — sold comp tracking over time with line charts and stats
 - **PSA grading signals** — population data, difficulty, gem 10%, recommended submission tier with reasoning
 - **Slab comparison** — compare PSA 10 / BGS 9.5 / TAG 10 prices across sources with filter pills
-- **Sold comps** — recent sold prices to see what cards actually sell for
-- **Web dashboard** — interactive search UI with detail panel, grade breakdown bars, source filters
+- **Dashboard** — search, arbitrage, price history, grade breakdown at `/dashboard`
+- **Admin** — API key management, stats KPIs, error log at `/admin`
 - **REST API** — authenticated endpoints with rate limiting, per-key caching, OpenAPI spec
-- **Claude Code skill** — `/casecomp` for plain-English card search, no CLI flags needed
+- **Claude Code skill** — `/casecomp` for plain-English card search
 - **Chrome extension** — queue auto-join for Pokemon Center, Walmart, Costco, Target drops
 
 ---
@@ -63,6 +65,8 @@ lib/
   listingQuery.js   eBay search query builder
   firestore.js      Firestore: grade logs, drops, webhooks, cache
   demo.js           Sample data (3 cards with real listings)
+  api-keys.js       Firestore-backed developer key management
+  price-history.js  Sold comp price tracking over time
   swagger.js        OpenAPI 3.0.3 spec
 extension/          Chrome extension: queue auto-join, drop intel
 terraform/          GCP infra: Cloud Run ×2, Firestore, LB + CDN, Secret Manager
@@ -97,12 +101,15 @@ Full reference: [api.casecomp.xyz/docs](https://api.casecomp.xyz/docs)
 # Sample data (no key needed)
 curl "https://api.casecomp.xyz/api/search?q=Umbreon+ex+SAR+217/187&demo=true"
 
+# Arbitrage — cross-source price comparison
+curl "https://api.casecomp.xyz/api/arbitrage?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true"
+
+# Price history
+curl "https://api.casecomp.xyz/api/price-history?q=Umbreon+ex+SAR+217/187&days=90&demo=true"
+
 # Live search (key required)
 curl -H "Authorization: Bearer $CASECOMP_KEY" \
   "https://api.casecomp.xyz/api/search?q=Pikachu+ex+SAR&source=magi&format=slab&slab_provider=PSA&slab_grade=10"
-
-# OpenAPI spec
-curl "https://api.casecomp.xyz/docs/spec.json"
 
 # Drop intelligence
 curl -H "Authorization: Bearer $CASECOMP_KEY" \
@@ -123,7 +130,7 @@ curl -H "Authorization: Bearer $CASECOMP_KEY" \
 
 ### Public endpoints (no key)
 
-`GET /api/health` | `GET /api/demo` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold
+`GET /api/health` | `GET /api/demo` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold/arbitrage/price-history
 
 ## Claude Code Skills
 
@@ -189,6 +196,9 @@ All caches use Firestore (shared across Cloud Run instances, persists across dep
 | `cache-translations` | permanent | EN-to-JP card name translations |
 | `cache-ebay-active` | 6 hours | eBay active listing results |
 | `cache-ebay-sold` | 24 hours | eBay sold comp results |
+| `price-history` | permanent | Sold comp prices over time |
+| `api-keys` | permanent | Developer API keys (hashed) |
+| `error-logs` | permanent | API errors with request IDs |
 
 ## Infrastructure
 
