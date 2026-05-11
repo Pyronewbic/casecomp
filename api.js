@@ -405,11 +405,10 @@ app.get("/api/health", async (req, res) => {
 
 function authMiddleware(req, res, next) {
   const key = process.env.CASECOMP_API_KEY;
+  const sandboxKey = process.env.CASECOMP_SANDBOX_KEY;
   if (!key) return next();
-  const auth = req.headers.authorization;
-  const query = req.query.key;
-  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : query;
-  if (!token || token !== key) {
+  const token = getRequestToken(req);
+  if (!token || (token !== key && token !== sandboxKey)) {
     return res.status(401).json({ error: "Invalid or missing API key" });
   }
   next();
