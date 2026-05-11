@@ -17,7 +17,7 @@ import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
 import { getRedisStatus, sha256 } from "./lib/data/redis-cache.js";
 import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/data/firestore.js";
-import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
+import { getDemoSearchResult, listDemoCards } from "./lib/data/demo.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
 import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";

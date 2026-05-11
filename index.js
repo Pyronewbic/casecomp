@@ -22,14 +22,14 @@ import {
   testGradingProvider,
   printSiteGradingHelp,
 } from "./lib/grading/grading.js";
-import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary, mergeAndWrite } from "./lib/output.js";
+import { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary, mergeAndWrite } from "./lib/search/output.js";
 import { buildEbaySearchQuery, describeListingSearch } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
 import { searchMagi } from "./lib/sources/magi.js";
 import { searchYahooAuctions } from "./lib/sources/yahooauctions.js";
 import { searchSnkrdunk } from "./lib/sources/snkrdunk.js";
 import { getPsaGradingSignal } from "./lib/grading/psa.js";
-import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
+import { getDemoSearchResult, listDemoCards } from "./lib/data/demo.js";
 
 export const CARDS = [
   "Giratina V Alt Art"
@@ -681,5 +681,5 @@ export {
   getCachedGrade,
   cacheGrade,
 } from "./lib/grading/grading.js";
-export { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary } from "./lib/output.js";
+export { writeMarkdown, writeJson, writePerCardJson, appendCombinedMarkdown, printSummary } from "./lib/search/output.js";
 export { buildEbaySearchQuery, describeListingSearch } from "./lib/search/listingQuery.js";

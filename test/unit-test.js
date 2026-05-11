@@ -18,7 +18,7 @@ import {
   querySeeksJapaneseMarket,
   filterToLikelyTcgCards,
 } from "../lib/search/filters.js";
-import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards } from "../lib/demo.js";
+import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards } from "../lib/data/demo.js";
 import { parseCardIdentity, buildCardId, SET_NAME_MAP } from "../lib/data/card-identity.js";
 
 let passed = 0;

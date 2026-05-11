@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Casecomp — Pokemon TCG Card Research</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="/logos/casecomp-logo.svg" type="image/svg+xml">
 </head>
@@ -16,6 +16,7 @@
     <div class="logo">
       <img src="/logos/casecomp-logo.svg" alt="Casecomp" width="36" height="36">
       <span>Casecomp</span>
+      <span class="beta-badge">Beta</span>
     </div>
     <nav>
       <a href="/docs" class="nav-link">API Docs</a>
@@ -24,20 +25,22 @@
 
   <main>
     <section class="hero">
-      <h1>Research any Pokemon card<br>in seconds</h1>
-      <p class="subtitle">Live prices from eBay, magi.camp, Yahoo Auctions &amp; SNKRDUNK. PSA grading signals. No account needed.</p>
+      <h1 class="fade-up">Research any Pokemon card<br>in seconds</h1>
+      <p class="subtitle fade-up">Live prices from eBay, magi.camp, Yahoo Auctions &amp; SNKRDUNK. PSA grading signals. No account needed.</p>
 
-      <form id="search-form" autocomplete="off">
-        <div class="search-bar">
-          <input type="text" id="search-input" placeholder="Umbreon VMAX Alt Art, Charizard Base Set..." autofocus>
-          <button type="submit" id="search-btn">Search</button>
-        </div>
-        <div class="search-hints">
-          Try: <button type="button" class="hint" data-q="Pikachu ex SAR 234/193 PSA 10">Pikachu ex SAR PSA 10 (Multi-Source Slab)</button>
-          <button type="button" class="hint" data-q="Mega Greninja ex SAR" data-source="snkrdunk" data-condition="A">Mega Greninja ex SAR (SNKRDUNK + AI Grade)</button>
-          <button type="button" class="hint" data-q="Umbreon ex SAR 217/187">Umbreon ex SAR 217/187 (eBay JP + AI Grade)</button>
-        </div>
-      </form>
+      <div class="search-sticky">
+        <form id="search-form" autocomplete="off">
+          <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Umbreon VMAX Alt Art, Charizard Base Set..." autofocus>
+            <button type="submit" id="search-btn">Search</button>
+          </div>
+          <div class="search-hints fade-up">
+            Try: <button type="button" class="hint" data-q="Pikachu ex SAR 234/193 PSA 10">Pikachu ex SAR PSA 10 (Multi-Source Slab)</button>
+            <button type="button" class="hint" data-q="Mega Greninja ex SAR" data-source="snkrdunk" data-condition="A">Mega Greninja ex SAR (SNKRDUNK + AI Grade)</button>
+            <button type="button" class="hint" data-q="Umbreon ex SAR 217/187">Umbreon ex SAR 217/187 (eBay JP + AI Grade)</button>
+          </div>
+        </form>
+      </div>
     </section>
 
     <section id="results" class="results hidden">
@@ -75,17 +78,17 @@
 
     <section id="empty-state" class="empty-state">
       <div class="features">
-        <div class="feature">
+        <div class="feature fade-up" style="--i: 0">
           <div class="feature-icon">$</div>
           <h3>Live Prices</h3>
           <p>Active listings and recent sold comps from eBay, magi.camp, Yahoo Auctions, and SNKRDUNK.</p>
         </div>
-        <div class="feature">
+        <div class="feature fade-up" style="--i: 1">
           <div class="feature-icon">PSA</div>
           <h3>Grading Signal</h3>
           <p>PSA population data, difficulty ratings, and PSA 10 probability to help you decide if grading is worth it.</p>
         </div>
-        <div class="feature">
+        <div class="feature fade-up" style="--i: 2">
           <div class="feature-icon">AI</div>
           <h3>AI Pre-Grade</h3>
           <p>Upload a photo and get an estimated PSA grade using AI analysis of centering, corners, edges, and surface.</p>

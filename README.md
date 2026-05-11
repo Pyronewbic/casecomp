@@ -56,24 +56,37 @@ yarn api                      # dashboard on localhost:3000
 api.js              Express API + static dashboard (public/)
 index.js            CLI entry point
 lib/
-  ebay.js           eBay Browse API, OAuth, ship-to filtering
-  grading.js        AI pre-grading (Claude/OpenAI), validation, caching
-  psa.js            PSA pop reports, cert lookup, grading signal
-  magi.js           magi.camp scraper + Haiku JP translation
-  yahooauctions.js  Yahoo Auctions JP scraper
-  snkrdunk.js       SNKRDUNK JSON API
-  filters.js        Language, relevance, slab detection, blocklist
-  listingQuery.js   eBay search query builder
-  firestore.js      Firestore: grade logs, drops, webhooks, cache
-  demo.js           Sample data (3 cards with real listings)
-  api-keys.js       Firestore-backed developer key management
-  price-history.js  Sold comp price tracking over time
+  sources/
+    ebay.js         eBay Browse API, OAuth, ship-to filtering
+    magi.js         magi.camp scraper (fetch + cheerio)
+    snkrdunk.js     SNKRDUNK JSON API
+    yahooauctions.js Yahoo Auctions JP scraper
+    tcgplayer.js    TCGPlayer price seeding
+  grading/
+    grading.js      AI pre-grading (per-subgrade, Claude/OpenAI)
+    psa.js          PSA pop reports, cert lookup, grading signal
+    psaTiers.js     PSA submission tier data
+  data/
+    firestore.js    Firestore: grade logs, drops, webhooks, cache
+    api-keys.js     Developer key management
+    card-identity.js Card identity: canonical IDs, set resolution
+    price-history.js Sold comp price tracking
+    demo.js         Sample data (3 multi-source cards)
+    cache.js        File-based cache (legacy)
+    redis-cache.js  Redis cache (optional)
+  search/
+    filters.js      Language, relevance, condition detection, outlier flagging
+    listingQuery.js  eBay search query builder
+    ebayCategories.js eBay category IDs
+    output.js       Markdown/JSON formatters (CLI)
   swagger.js        OpenAPI 3.0.3 spec
+public/             Root dashboard (search, grade, arbitrage, price history)
+public/admin/       Admin dashboard (keys, stats, errors)
 extension/          Chrome extension: queue auto-join, drop intel
 terraform/          GCP infra: Cloud Run ×2, Firestore, LB + CDN, Secret Manager
 test/
-  unit-test.js      63 unit tests (filters, grading, query, demo data)
-  api-test.js       42 API integration tests
+  unit-test.js      81 unit tests
+  api-test.js       62 API integration tests
 ```
 
 ## Web Dashboard
