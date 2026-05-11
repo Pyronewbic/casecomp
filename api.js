@@ -83,7 +83,7 @@ const apiLimiter = rateLimit({
 
 const demoLimiter = rateLimit({
   windowMs: 60_000,
-  max: 20,
+  max: 360,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
