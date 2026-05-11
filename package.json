@@ -13,6 +13,7 @@
     "test:unit": "node test/unit-test.js",
     "test:api": "node test/api-test.js",
     "test:live": "API_URL=https://api.casecomp.xyz node test/api-test.js",
+    "test:smoke": "node test/smoke-test.js",
     "scan": "node scan.js",
     "psa": "node scripts/psa-report.js",
     "deploy": "gcloud builds submit --config=cloudbuild.yml --project casecomp-495718 && gcloud run deploy casecomp-api --image gcr.io/casecomp-495718/casecomp-api --region asia-south1 --project casecomp-495718 --port 3000 --allow-unauthenticated",
