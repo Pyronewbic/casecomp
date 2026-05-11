@@ -567,7 +567,15 @@ app.post("/api/alerts", authMiddleware, async (req, res) => {
 });
 
 const PORT = process.env.API_PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Casecomp API listening on http://localhost:${PORT}`);
   console.log(`Swagger docs: http://localhost:${PORT}/docs`);
+  if (clientId && clientSecret) {
+    try {
+      await getToken();
+      console.log("eBay OAuth token warmed");
+    } catch (e) {
+      console.warn(`eBay token warmup failed: ${e.message}`);
+    }
+  }
 });
