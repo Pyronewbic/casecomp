@@ -1,5 +1,5 @@
-import { parseGradeJSON } from "../lib/grading.js";
-import { buildEbaySearchQuery, describeListingSearch } from "../lib/listingQuery.js";
+import { parseGradeJSON } from "../lib/grading/grading.js";
+import { buildEbaySearchQuery, describeListingSearch } from "../lib/search/listingQuery.js";
 import {
   detectLanguage,
   tokenizeQuery,
@@ -14,8 +14,9 @@ import {
   filterRelevantResults,
   querySeeksJapaneseMarket,
   filterToLikelyTcgCards,
-} from "../lib/filters.js";
+} from "../lib/search/filters.js";
 import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards } from "../lib/demo.js";
+import { parseCardIdentity, buildCardId, SET_NAME_MAP } from "../lib/data/card-identity.js";
 
 let passed = 0;
 let failed = 0;
@@ -490,6 +491,63 @@ test("PSA signals have tier + reason", () => {
     assert(r.psaSignal.totalPop > 0, `bad totalPop in ${key}`);
     assert(r.psaSignal.gem10Pct > 0, `bad gem10Pct in ${key}`);
   }
+});
+
+// ── Card identity ──
+
+console.log("\n\x1b[1m=== parseCardIdentity ===\x1b[0m");
+
+test("parses card with set code", () => {
+  const r = parseCardIdentity("Umbreon ex SAR 217/187 sv8a");
+  eq(r.cardId, "sv8a/217-187");
+  eq(r.rarity, "SAR");
+  assert(r.name.includes("Umbreon"));
+});
+
+test("resolves set from card number denominator", () => {
+  const r = parseCardIdentity("Pikachu ex SAR 234/193 PSA 10");
+  eq(r.cardId, "m2a/234-193");
+  eq(r.rarity, "SAR");
+});
+
+test("resolves set from set name", () => {
+  const r = parseCardIdentity("Umbreon ex Terastal Festival 217/187");
+  eq(r.cardId, "sv8a/217-187");
+});
+
+test("preserves Japanese names", () => {
+  const r = parseCardIdentity("ブラッキーex SAR 217/187");
+  eq(r.cardId, "sv8a/217-187");
+  assert(r.name.includes("ブラッキー"));
+});
+
+test("resolves SWSH era cards", () => {
+  const r = parseCardIdentity("Umbreon VMAX 215/203");
+  eq(r.cardId, "swsh7/215-203");
+});
+
+test("resolves Fusion Strike", () => {
+  const r = parseCardIdentity("Gengar VMAX Alt Art 271/264");
+  eq(r.cardId, "swsh8/271-264");
+});
+
+test("returns null cardId when no number", () => {
+  const r = parseCardIdentity("Charizard ex");
+  eq(r.cardId, null);
+  assert(r.name.includes("Charizard"));
+});
+
+test("buildCardId formats correctly", () => {
+  eq(buildCardId("sv8a", "217/187"), "sv8a/217-187");
+  eq(buildCardId("m4", "114/083"), "m4/114-083");
+  eq(buildCardId(null, "217/187"), null);
+});
+
+test("SET_NAME_MAP has entries for major sets", () => {
+  assert(SET_NAME_MAP["sv8a"], "missing sv8a");
+  assert(SET_NAME_MAP["swsh7"], "missing swsh7");
+  assert(SET_NAME_MAP["m4"], "missing m4");
+  assert(SET_NAME_MAP["sv2a"], "missing sv2a");
 });
 
 // ── Summary ──
