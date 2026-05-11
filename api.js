@@ -16,7 +16,7 @@ import { parseListingLanguagesFromInput } from "./lib/filters.js";
 import { buildEbaySearchQuery } from "./lib/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/ebayCategories.js";
 import { getRedisStatus, sha256 } from "./lib/redis-cache.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs } from "./lib/firestore.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/firestore.js";
 import { getDemoSearchResult, listDemoCards } from "./lib/demo.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/api-keys.js";
 import { recordSoldPrices, getPriceHistory } from "./lib/price-history.js";
@@ -239,9 +239,12 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
       const ebayQuery = buildEbaySearchQuery(q, config);
       const cp = cachePrefix(req);
       config._cachePrefix = cp;
-      const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
-      const soldRes = await searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false });
-      const psaSignal = await getPsaGradingSignal(q, { _cachePrefix: cp });
+      const soldTimeout = (p) => Promise.race([p, new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000))]);
+      const [activeRes, soldRes, psaSignal] = await Promise.all([
+        searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 }),
+        soldTimeout(searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })),
+        getPsaGradingSignal(q, { _cachePrefix: cp }),
+      ]);
       result = {
         query: q,
         source: "ebay",
@@ -305,7 +308,10 @@ app.get("/api/sold", apiAuthMiddleware, (req, res, next) => { req._errorType = "
     } else {
       const ebayQuery = buildEbaySearchQuery(q, config);
       config._cachePrefix = cachePrefix(req);
-      const soldRes = await searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false });
+      const soldRes = await Promise.race([
+        searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false }),
+        new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000)),
+      ]);
       sold = soldRes.items || [];
       soldSource = soldRes.source;
     }
@@ -389,6 +395,16 @@ app.get("/api/errors", authMiddleware, async (req, res) => {
     res.json({ errors, count: errors.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/errors — clear all error logs (owner only)
+app.delete("/api/errors", ownerOnly, async (req, res) => {
+  try {
+    const cleared = await clearErrorLogs();
+    res.json({ ok: true, cleared });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
