@@ -7,19 +7,28 @@ Initial public beta.
 ### Added
 - Web dashboard with AI pre-grading detail panel, PSA signal bar, source filters
 - Multi-source slab search: compare PSA 10 prices across eBay, magi.camp, Yahoo Auctions
-- AI pre-grading from listing photos (centering, corners, edges, surface + confidence)
+- Per-subgrade AI grading: centering, corners, edges, surface graded independently in parallel
+- Front + back image analysis with subgradeDetails (score, confidence, detail per attribute)
 - PSA tier recommendations (Value/Regular/Express) with reasoning per card value
-- REST API with CC_LIVE_ key auth, rate limiting (60/min auth, 20/min sample data), error monitoring
+- REST API with CC_LIVE_ key auth + CC_LIVE_SANDBOX_ public sandbox key
+- Rate limiting: 60/min auth, 20/min sample data, 5/min sandbox
 - Firestore caching with stale-while-revalidate, per-key cache isolation
 - Magi search migrated from Playwright to fetch+cheerio (~10x faster)
 - eBay sold scrape retry with backoff on 503
+- OAuth token pre-fetched on server startup
+- Security: helmet headers, error sanitization, request IDs, trust proxy
 - 105 tests (63 unit + 42 API integration)
-- GitHub Actions CI on push/PR
+- GitHub Actions CI on push/PR, auto-deploy on merge to main
 - Chrome extension: queue auto-join for Pokemon Center, Walmart, Costco, Target
 - Claude Code `/casecomp` skill for plain-English card search
+- GitHub release v1.0.0-beta.1 with Chrome extension zip
 
 ### Infrastructure
-- GCP Cloud Run (asia-south1), Firestore, HTTPS load balancer, managed SSL
-- Secret Manager for API keys (EBAY, ANTHROPIC, PSA, CASECOMP)
-- Cloud Monitoring alert policy (email on >5 errors/5min)
+- Cloud Run `casecomp-api` (API) + `casecomp-site` (frontend SSR with Cloud CDN)
+- HTTPS LB routes by host: casecomp.xyz → site, api.casecomp.xyz → API
+- Firestore, managed SSL certs, Secret Manager (incl. sandbox key)
+- Cloud Monitoring: error alerts + uptime check on /api/health
 - Terraform with GCS state backend
+- Workload Identity Federation for GitHub Actions → GCP (no stored keys)
+- Kaniko layer caching for Cloud Build
+- Branch protection on main: CI required before merge
