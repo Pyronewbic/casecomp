@@ -5,7 +5,12 @@
 Initial public beta.
 
 ### Added
-- Web dashboard with AI pre-grading detail panel, PSA signal bar, source filters
+- Consumer dashboard at /dashboard: search, arbitrage, price history, grade breakdown
+- Admin dashboard at /admin: stats KPIs, developer key CRUD, error log viewer
+- Cross-source arbitrage: /api/arbitrage compares prices across eBay, magi, SNKRDUNK
+- Price history: /api/price-history tracks sold comp prices over time
+- Scheduled price tracking: /api/track-prices for Cloud Scheduler
+- Developer API key management: create, rotate, revoke, delete via Firestore
 - Multi-source slab search: compare PSA 10 prices across eBay, magi.camp, Yahoo Auctions
 - Per-subgrade AI grading: centering, corners, edges, surface graded independently in parallel
 - Front + back image analysis with subgradeDetails (score, confidence, detail per attribute)
