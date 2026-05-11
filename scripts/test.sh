@@ -6,7 +6,7 @@ node --check index.js || exit 1
 node --check scan.js || exit 1
 node --check scripts/psa-report.js || exit 1
 node --check api.js || exit 1
-node --check lib/redis-cache.js || exit 1
+node --check lib/data/redis-cache.js || exit 1
 node --check lib/swagger.js || exit 1
 
 for f in \

@@ -341,8 +341,12 @@ function selectItem(itemId) {
     ${mainImg}
     ${thumbs}
     ${summaryHtml}
-    ${fieldsHtml}
+    <div class="detail-meta-row">
+      ${fieldsHtml}
+      <div id="card-identity" class="card-identity hidden"></div>
+    </div>
     ${gradeHtml}
+    <div id="arbitrage-container" class="arbitrage-container hidden"></div>
     <div id="price-chart-container" class="price-chart-container hidden">
       <div class="detail-grade-section-label">Price History</div>
       <canvas id="price-chart" height="120"></canvas>
@@ -360,7 +364,69 @@ function selectItem(itemId) {
     });
   });
 
+  loadCardIdentity(currentQuery);
   loadPriceChart(currentQuery);
+  loadArbitrage(currentQuery);
+}
+
+async function loadCardIdentity(query) {
+  const container = document.getElementById("card-identity");
+  if (!container) return;
+  try {
+    const res = await fetch(`/api/card?q=${encodeURIComponent(query)}&demo=true`);
+    if (!res.ok) return;
+    const card = await res.json();
+    if (!card.cardId) return;
+
+    container.classList.remove("hidden");
+    const names = card.names || {};
+    const nameHtml = Object.entries(names).map(([lang, name]) =>
+      `<span class="card-id-name"><span class="card-id-lang">${esc(lang)}</span> ${esc(name)}</span>`
+    ).join("");
+
+    const setName = card.setName || "";
+    container.innerHTML = `
+      <div class="card-id-row">
+        <span class="card-id-badge">${esc(card.cardId)}</span>
+        ${card.rarity ? `<span class="card-id-rarity">${esc(card.rarity)}</span>` : ""}
+        ${setName ? `<span class="card-id-set">${esc(setName)}</span>` : ""}
+      </div>
+      ${nameHtml ? `<div class="card-id-names">${nameHtml}</div>` : ""}
+    `;
+  } catch {}
+}
+
+async function loadArbitrage(query) {
+  const container = document.getElementById("arbitrage-container");
+  if (!container) return;
+  try {
+    const res = await fetch(`/api/arbitrage?q=${encodeURIComponent(query)}&demo=true`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const sources = data.sources || {};
+    const names = Object.keys(sources);
+    if (names.length < 2) return;
+
+    container.classList.remove("hidden");
+    const arb = data.arbitrage;
+
+    container.innerHTML = `
+      <div class="detail-grade-section-label">Cross-Source Prices</div>
+      <div class="arbitrage-sources">
+        ${names.sort((a, b) => sources[a].lowest - sources[b].lowest).map(s => {
+          const d = sources[s];
+          const isCheapest = arb && s === arb.cheapest.source;
+          return `<div class="arb-source${isCheapest ? " arb-cheapest" : ""}">
+            <div class="arb-source-name">${esc(s)}</div>
+            <div class="arb-source-price">${formatPrice(d.lowest, d.currency)}</div>
+            ${d.priceJPY ? `<div class="arb-source-jpy">¥${d.priceJPY.toLocaleString()}</div>` : ""}
+            <div class="arb-source-count">${d.count} listing${d.count !== 1 ? "s" : ""}</div>
+          </div>`;
+        }).join("")}
+      </div>
+      ${arb ? `<div class="arb-summary">${esc(arb.summary)}</div>` : ""}
+    `;
+  } catch {}
 }
 
 async function loadPriceChart(query) {

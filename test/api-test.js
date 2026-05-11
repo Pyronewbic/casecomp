@@ -380,6 +380,107 @@ async function run() {
     assert(res.status === 404);
   });
 
+  // ── Card identity ──
+
+  console.log("\n\x1b[1m=== api/card ===\x1b[0m");
+
+  await test("GET /api/card returns identity for demo card", async () => {
+    const { res, body } = await jsonNoAuth("/api/card?q=Umbreon+ex+SAR+217/187&demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.cardId === "sv8a/217-187", `expected sv8a/217-187, got ${body.cardId}`);
+    assert(body.rarity === "SAR");
+    assert(body.setName);
+  });
+
+  await test("GET /api/card returns parsed identity for unknown card", async () => {
+    const { res, body } = await jsonNoAuth("/api/card?q=Pikachu+ex+SAR+234/193&demo=true");
+    assert(res.status === 200);
+    assert(body.cardId === "m2a/234-193", `expected m2a/234-193, got ${body.cardId}`);
+  });
+
+  await test("GET /api/card requires q", async () => {
+    const { res } = await json("/api/card");
+    assert(res.status === 400);
+  });
+
+  // ── Arbitrage ──
+
+  console.log("\n\x1b[1m=== api/arbitrage ===\x1b[0m");
+
+  await test("GET /api/arbitrage returns cross-source comparison", async () => {
+    const { res, body } = await jsonNoAuth("/api/arbitrage?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(Object.keys(body.sources || {}).length >= 2, "expected 2+ sources");
+    assert(body.arbitrage, "expected arbitrage object");
+    assert(body.arbitrage.spread > 0, "expected positive spread");
+    assert(body.arbitrage.cheapest.source);
+  });
+
+  await test("GET /api/arbitrage requires q", async () => {
+    const { res } = await json("/api/arbitrage");
+    assert(res.status === 400);
+  });
+
+  // ── Price history ──
+
+  console.log("\n\x1b[1m=== api/price-history ===\x1b[0m");
+
+  await test("GET /api/price-history returns data for seeded card", async () => {
+    const { res, body } = await json("/api/price-history?q=Umbreon+ex+SAR+217/187&days=90");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(Array.isArray(body.history));
+    assert(body.query);
+  });
+
+  await test("GET /api/price-history requires q", async () => {
+    const { res } = await json("/api/price-history");
+    assert(res.status === 400);
+  });
+
+  await test("GET /api/price-history without key returns 401", async () => {
+    const { res } = await jsonNoAuth("/api/price-history?q=test");
+    if (API_KEY) assert(res.status === 401, `expected 401, got ${res.status}`);
+  });
+
+  // ── Track prices ──
+
+  console.log("\n\x1b[1m=== api/track-prices ===\x1b[0m");
+
+  await test("POST /api/track-prices records demo prices", async () => {
+    const { res, body } = await json("/api/track-prices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cards: ["Umbreon ex SAR 217/187"] }),
+    });
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.tracked >= 1);
+  });
+
+  await test("POST /api/track-prices without key returns 401", async () => {
+    const { res } = await jsonNoAuth("/api/track-prices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (API_KEY) assert(res.status === 401, `expected 401, got ${res.status}`);
+  });
+
+  // ── Delete errors ──
+
+  console.log("\n\x1b[1m=== api/errors (delete) ===\x1b[0m");
+
+  await test("DELETE /api/errors clears logs (owner only)", async () => {
+    const { res, body } = await json("/api/errors", { method: "DELETE" });
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.ok === true);
+    assert(typeof body.cleared === "number");
+  });
+
+  await test("DELETE /api/errors without key returns 403", async () => {
+    const { res } = await jsonNoAuth("/api/errors", { method: "DELETE" });
+    if (API_KEY) assert(res.status === 401 || res.status === 403, `expected 401/403, got ${res.status}`);
+  });
+
   // ── Demo data ──
 
   console.log("\n\x1b[1m=== demo data ===\x1b[0m");

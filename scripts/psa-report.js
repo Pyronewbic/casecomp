@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import "dotenv/config";
 import minimist from "minimist";
-import { getPsaGradingSignal } from "./lib/psa.js";
-import { PSA_TIERS } from "./lib/psaTiers.js";
+import { getPsaGradingSignal } from "../lib/grading/psa.js";
+import { PSA_TIERS } from "../lib/grading/psaTiers.js";
 
 const argv = minimist(process.argv.slice(2), {
   alias: { r: "raw-price", 9: "psa9-price", 1: "psa10-price" },
