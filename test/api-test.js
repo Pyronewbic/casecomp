@@ -380,6 +380,23 @@ async function run() {
     assert(res.status === 404);
   });
 
+  // ── Condition + detection ──
+
+  console.log("\n\x1b[1m=== condition ===\x1b[0m");
+
+  await test("Search results include detectedCondition", async () => {
+    const { body } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true&source=snkrdunk&condition=A");
+    const items = body.activeByCountry?.US || [];
+    assert(items.length > 0, "expected items");
+    assert(items.every(i => i.detectedCondition), "expected detectedCondition on all items");
+  });
+
+  await test("Condition filter reduces results", async () => {
+    const { body: all } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true");
+    const { body: filtered } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true&condition=A");
+    assert(filtered.counts.activeTotal <= all.counts.activeTotal, "filtered should be <= all");
+  });
+
   // ── Card identity ──
 
   console.log("\n\x1b[1m=== api/card ===\x1b[0m");

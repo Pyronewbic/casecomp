@@ -12,7 +12,7 @@ import { searchMagi } from "./lib/sources/magi.js";
 import { searchYahooAuctions } from "./lib/sources/yahooauctions.js";
 import { getPsaGradingSignal } from "./lib/grading/psa.js";
 import { gradeImage } from "./lib/grading/grading.js";
-import { parseListingLanguagesFromInput } from "./lib/search/filters.js";
+import { parseListingLanguagesFromInput, filterByCondition, detectCondition } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
 import { getRedisStatus, sha256 } from "./lib/data/redis-cache.js";
@@ -223,6 +223,11 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
   const wantDemo = req.query.demo === "true" || (!clientId && !clientSecret);
   if (wantDemo) {
     const demoResult = getDemoSearchResult(q, { source: req.query.source, condition: req.query.condition });
+    for (const country of Object.keys(demoResult.activeByCountry || {})) {
+      demoResult.activeByCountry[country] = demoResult.activeByCountry[country].map(item => ({
+        ...item, detectedCondition: item.detectedCondition || detectCondition(item),
+      }));
+    }
     if (demoResult.sold?.length) recordSoldPrices(q, demoResult.sold, demoResult.source).catch(() => {});
     return res.json(demoResult);
   }
@@ -271,6 +276,22 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
       for (const country of Object.keys(result.activeByCountry || {})) {
         result.activeByCountry[country] = result.activeByCountry[country].map(item => gradedMap.get(item.itemId) || item);
       }
+    }
+
+    // Add detected condition to each listing
+    for (const country of Object.keys(result.activeByCountry || {})) {
+      result.activeByCountry[country] = result.activeByCountry[country].map(item => ({
+        ...item,
+        detectedCondition: item.detectedCondition || detectCondition(item),
+      }));
+    }
+
+    // Filter by condition if requested
+    if (config.condition && result.activeByCountry) {
+      for (const country of Object.keys(result.activeByCountry)) {
+        result.activeByCountry[country] = filterByCondition(result.activeByCountry[country], config.condition);
+      }
+      result.counts.activeTotal = Object.values(result.activeByCountry).reduce((n, arr) => n + arr.length, 0);
     }
 
     if (result.sold?.length) recordSoldPrices(q, result.sold, result.source).catch(() => {});

@@ -15,6 +15,7 @@ Search any Pokemon card across four marketplaces in one query. Get live prices, 
 
 - **Multi-source search** — eBay, magi.camp, Yahoo Auctions JP, SNKRDUNK in one query
 - **Cross-source arbitrage** — compares lowest prices across sources, highlights spread
+- **Condition detection** — auto-detects card condition across sources (EN: NM/LP/MP, JP: 状態A/美品)
 - **AI pre-grading** — per-subgrade analysis (centering, corners, edges, surface) from listing photos
 - **Price history** — sold comp tracking over time with line charts and stats
 - **PSA grading signals** — population data, difficulty, gem 10%, recommended submission tier with reasoning
@@ -167,7 +168,7 @@ node index.js --grade-decision "Umbreon ex 217/187"             # PSA break-even
 | `--sold` | `10` | Sold comps count |
 | `--grade` | | AI pre-grading |
 | `--grade-decision` | | PSA break-even table |
-| `--condition` | `A`, `B`, `C`, `D` | SNKRDUNK condition |
+| `--condition` | `A`, `nm`, `lp`, `mp` | Condition filter (SNKRDUNK A/B/C/D, eBay NM/LP, magi 状態A/美品) |
 | `--refresh` | | Clear cache |
 | `--parallel` | | Concurrent card search |
 
@@ -212,7 +213,7 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-105 tests: 63 unit (filters, grading, query builder, demo data integrity) + 42 API (health, drops, webhooks, search, sold, PSA, grade, auth, demo validation).
+143 tests: 81 unit (filters, grading, query builder, card identity, condition detection, demo data) + 62 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, demo validation).
 
 ## Contributing
 
