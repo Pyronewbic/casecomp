@@ -533,14 +533,16 @@ async function run() {
     assert(psa.tierReason, "missing tierReason");
   });
 
-  await test("Umbreon demo: 5 active AI graded + 4 sold", async () => {
+  await test("Umbreon demo: 8 active (multi-source) + 7 sold", async () => {
     const { body } = await jsonNoAuth("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
     assert(body._demo === true, "not demo");
+    assert(body.source === "multi", `expected multi, got ${body.source}`);
     const items = body.activeByCountry?.US || [];
-    assert(items.length === 5, `expected 5 active, got ${items.length}`);
-    assert(body.sold.length === 4, `expected 4 sold, got ${body.sold.length}`);
-    for (const item of items) {
-      assert(item.grade && !item.grade.error, `missing grade on ${item.itemId}`);
+    assert(items.length === 8, `expected 8 active, got ${items.length}`);
+    assert(body.sold.length === 7, `expected 7 sold, got ${body.sold.length}`);
+    const graded = items.filter(i => i.grade && !i.grade.error);
+    assert(graded.length === 5, `expected 5 graded, got ${graded.length}`);
+    for (const item of graded) {
       assert(item.grade.notes, `missing notes on ${item.itemId}`);
       assert(item.imageUrl, `missing imageUrl on ${item.itemId}`);
     }
@@ -619,6 +621,92 @@ async function run() {
     const { body } = await jsonNoAuth("/docs/spec.json");
     assert(body.info?.version, "missing version");
     assert(body.info.version.includes("beta"), `expected beta version, got ${body.info.version}`);
+  });
+
+  // ── Share pages ──
+
+  await test("Share: /api/card/share/sv8a/217-187 returns Umbreon data", async () => {
+    const { body } = await jsonNoAuth("/api/card/share/sv8a/217-187");
+    assert(body.cardId === "sv8a/217-187", `expected sv8a/217-187, got ${body.cardId}`);
+    assert(body.identity?.name === "Umbreon ex", `expected Umbreon ex, got ${body.identity?.name}`);
+    assert(body.identity?.rarity === "SAR", `expected SAR, got ${body.identity?.rarity}`);
+    assert(body.price?.lowest > 0, "missing lowest price");
+    assert(body.price?.listingCount > 0, "no listings");
+    assert(body.price?.bySources && Object.keys(body.price.bySources).length >= 2, "expected 2+ sources");
+    assert(body.psaSignal?.totalPop > 0, "missing PSA signal");
+    assert(body.priceHistory?.history?.length >= 3, "expected 3+ price history points");
+  });
+
+  await test("Share: /api/card/share/m4/114-083 returns Greninja data", async () => {
+    const { body } = await jsonNoAuth("/api/card/share/m4/114-083");
+    assert(body.cardId === "m4/114-083");
+    assert(body.identity?.name === "Mega Greninja ex", `expected Mega Greninja ex, got ${body.identity?.name}`);
+    assert(body.price?.listingCount === 8, `expected 8 listings, got ${body.price?.listingCount}`);
+    assert(body.priceHistory?.history?.length === 6, `expected 6 history points`);
+  });
+
+  await test("Share: /api/card/share/m2a/234-193 returns Pikachu data", async () => {
+    const { body } = await jsonNoAuth("/api/card/share/m2a/234-193");
+    assert(body.cardId === "m2a/234-193");
+    assert(body.identity?.name === "Pikachu ex");
+    assert(body.price?.lowest > 0);
+  });
+
+  // ── Demo price history ──
+
+  await test("Demo price-history returns sold data with dates", async () => {
+    const { body } = await jsonNoAuth("/api/price-history?q=Umbreon+ex+SAR+217/187&days=90&demo=true");
+    assert(body._demo === true, "not demo");
+    assert(body.history?.length >= 3, `expected 3+ history points, got ${body.history?.length}`);
+    assert(body.stats?.avg > 0, "missing avg stat");
+    const dates = body.history.map(h => h.recordedAt);
+    const unique = new Set(dates);
+    assert(unique.size >= 3, "expected 3+ unique dates");
+  });
+
+  // ── Alerts ──
+
+  await test("POST /api/alerts creates arbitrage alert", async () => {
+    const { res, body } = await json("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "test-api@test.com", query: "Umbreon ex SAR", type: "arbitrage", spreadThreshold: 15 }) });
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    assert(body.ok === true);
+  });
+
+  await test("POST /api/alerts creates price alert", async () => {
+    const { res, body } = await json("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "test-api@test.com", query: "Pikachu ex SAR", type: "price", targetPrice: 500 }) });
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    assert(body.ok === true);
+  });
+
+  // ── Condition filter ──
+
+  await test("Demo condition filter: mint returns SNKRDUNK items", async () => {
+    const { body } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true&condition=mint");
+    const items = body.activeByCountry?.US || [];
+    assert(items.length === 5, `expected 5 mint, got ${items.length}`);
+    assert(items.every(i => (i.detectedCondition || "").toLowerCase() === "mint"), "not all mint");
+  });
+
+  await test("Demo condition filter: nm returns NM items", async () => {
+    const { body } = await jsonNoAuth("/api/search?q=Umbreon+ex+SAR+217/187&demo=true&condition=nm");
+    const items = body.activeByCountry?.US || [];
+    assert(items.length > 0, "expected NM items");
+    assert(items.every(i => (i.detectedCondition || "").toUpperCase() === "NM"), "not all NM");
+  });
+
+  // ── detectedCondition + outlier ──
+
+  await test("Demo items have detectedCondition", async () => {
+    const { body } = await jsonNoAuth("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
+    const items = body.activeByCountry?.US || [];
+    const withCond = items.filter(i => i.detectedCondition);
+    assert(withCond.length >= 5, `expected 5+ with detectedCondition, got ${withCond.length}`);
+  });
+
+  await test("Demo items have _priceOutlier field", async () => {
+    const { body } = await jsonNoAuth("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
+    const items = body.activeByCountry?.US || [];
+    assert(items.every(i => typeof i._priceOutlier === "boolean"), "missing _priceOutlier");
   });
 
   // ── Summary ──

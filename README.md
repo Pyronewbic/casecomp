@@ -85,8 +85,8 @@ public/admin/       Admin dashboard (keys, stats, errors)
 extension/          Chrome extension: queue auto-join, drop intel
 terraform/          GCP infra: Cloud Run ×2, Firestore, LB + CDN, Secret Manager
 test/
-  unit-test.js      81 unit tests
-  api-test.js       62 API integration tests
+  unit-test.js      92 unit tests
+  api-test.js       76 API integration tests
   smoke-test.js     40 Playwright smoke tests (dashboard UI)
 ```
 
@@ -233,7 +233,7 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-183 tests: 81 unit (filters, grading, query builder, card identity, condition detection, demo data) + 62 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, demo validation) + 40 Playwright smoke (dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport).
+208 tests: 92 unit (filters, grading, query builder, card identity, condition detection, demo data, resolveCardIdToQuery, findDemoByNumber) + 76 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, alerts, share pages, demo validation) + 40 Playwright smoke (dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport).
 
 ## Contributing
 

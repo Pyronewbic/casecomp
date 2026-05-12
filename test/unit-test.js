@@ -18,8 +18,8 @@ import {
   querySeeksJapaneseMarket,
   filterToLikelyTcgCards,
 } from "../lib/search/filters.js";
-import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards } from "../lib/data/demo.js";
-import { parseCardIdentity, buildCardId, SET_NAME_MAP } from "../lib/data/card-identity.js";
+import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards, findDemoByNumber } from "../lib/data/demo.js";
+import { parseCardIdentity, buildCardId, SET_NAME_MAP, resolveCardIdToQuery } from "../lib/data/card-identity.js";
 
 let passed = 0;
 let failed = 0;
@@ -618,6 +618,89 @@ test("SET_NAME_MAP has entries for major sets", () => {
   assert(SET_NAME_MAP["swsh7"], "missing swsh7");
   assert(SET_NAME_MAP["m4"], "missing m4");
   assert(SET_NAME_MAP["sv2a"], "missing sv2a");
+});
+
+// ── resolveCardIdToQuery ──
+
+console.log("\n\x1b[1m=== resolveCardIdToQuery ===\x1b[0m");
+
+test("resolves sv8a/217-187 to Terastal Festival query", () => {
+  const q = resolveCardIdToQuery("sv8a/217-187");
+  assert(q.includes("217/187"), "missing card number");
+  assert(q.includes("Terastal Festival"), "missing set name");
+});
+
+test("resolves m4/114-083 to Ninja Spinner query", () => {
+  const q = resolveCardIdToQuery("m4/114-083");
+  assert(q.includes("114/083"));
+  assert(q.includes("Ninja Spinner"));
+});
+
+test("returns input for invalid card ID", () => {
+  eq(resolveCardIdToQuery("not-a-card"), "not-a-card");
+});
+
+// ── findDemoByNumber ──
+
+console.log("\n\x1b[1m=== findDemoByNumber ===\x1b[0m");
+
+test("finds Umbreon by 217-187", () => {
+  const r = findDemoByNumber("217-187");
+  assert(r, "not found");
+  assert(r._demo);
+  assert(r.query.includes("Umbreon"));
+});
+
+test("finds Greninja by 114-083 (from listing titles)", () => {
+  const r = findDemoByNumber("114-083");
+  assert(r, "not found");
+  assert(r.query.includes("Greninja"));
+});
+
+test("finds Pikachu by 234-193", () => {
+  const r = findDemoByNumber("234-193");
+  assert(r, "not found");
+  assert(r.query.includes("Pikachu"));
+});
+
+test("returns null for unknown number", () => {
+  eq(findDemoByNumber("999-999"), null);
+});
+
+// ── Demo data: multi-source + sold dates ──
+
+console.log("\n\x1b[1m=== demo multi-source + sold dates ===\x1b[0m");
+
+test("all demo cards are multi-source", () => {
+  for (const query of listDemoCards()) {
+    const r = getDemoResult(query);
+    eq(r.source, "multi", `${query} should be multi-source`);
+  }
+});
+
+test("all demo sold have soldDate spanning 7+ days", () => {
+  for (const query of listDemoCards()) {
+    const r = getDemoResult(query);
+    const dates = (r.sold || []).map(s => s.soldDate).filter(Boolean);
+    assert(dates.length >= 3, `${query}: expected 3+ sold dates, got ${dates.length}`);
+    const sorted = dates.sort();
+    const first = new Date(sorted[0]);
+    const last = new Date(sorted[sorted.length - 1]);
+    const span = (last - first) / (1000 * 60 * 60 * 24);
+    assert(span >= 7, `${query}: date span ${span} days, expected 7+`);
+  }
+});
+
+test("Umbreon has detectedCondition on all listings", () => {
+  const r = getDemoResult("umbreon ex sar 217/187");
+  const items = r.activeByCountry?.US || [];
+  assert(items.every(i => i.detectedCondition), "not all have detectedCondition");
+});
+
+test("condition filter with detectedCondition works", () => {
+  const r = getDemoSearchResult("Mega Greninja ex SAR", { condition: "mint" });
+  const items = r.activeByCountry?.US || [];
+  assert(items.length === 5, `expected 5 mint, got ${items.length}`);
 });
 
 // ── Summary ──

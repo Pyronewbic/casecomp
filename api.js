@@ -12,7 +12,7 @@ import { searchMagi } from "./lib/sources/magi.js";
 import { searchYahooAuctions } from "./lib/sources/yahooauctions.js";
 import { getPsaGradingSignal } from "./lib/grading/psa.js";
 import { gradeImage } from "./lib/grading/grading.js";
-import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers } from "./lib/search/filters.js";
+import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers, filterRelevantResults } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
 import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/data/firestore.js";
@@ -242,6 +242,11 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
       result = await searchMagi(q, config);
     } else if (source === "yahoo") {
       result = await searchYahooAuctions(q, config);
+      for (const country of Object.keys(result.activeByCountry || {})) {
+        result.activeByCountry[country] = filterRelevantResults(result.activeByCountry[country], result.ebaySearchQuery || q).filtered;
+      }
+      if (result.sold?.length) result.sold = filterRelevantResults(result.sold, result.ebaySearchQuery || q).filtered;
+      result.counts = { activeTotal: Object.values(result.activeByCountry || {}).reduce((n, arr) => n + arr.length, 0), sold: result.sold?.length || 0 };
     } else {
       const ebayQuery = buildEbaySearchQuery(q, config);
       const cp = cachePrefix(req);
@@ -327,7 +332,7 @@ app.get("/api/sold", apiAuthMiddleware, (req, res, next) => { req._errorType = "
       soldSource = r.soldSource;
     } else if (source === "yahoo") {
       const r = await searchYahooAuctions(q, config);
-      sold = r.sold;
+      sold = filterRelevantResults(r.sold || [], r.ebaySearchQuery || q).filtered;
       soldSource = r.soldSource;
     } else {
       const ebayQuery = buildEbaySearchQuery(q, config);
@@ -525,8 +530,8 @@ v1.get("/comps", async (req, res) => {
       sold = r.sold || [];
     } else if (source === "yahoo") {
       const r = await searchYahooAuctions(query, config);
-      active = r.items || r.active || [];
-      sold = r.sold || [];
+      active = filterRelevantResults(r.items || r.active || Object.values(r.activeByCountry || {}).flat(), r.ebaySearchQuery || query).filtered;
+      sold = filterRelevantResults(r.sold || [], r.ebaySearchQuery || query).filtered;
     } else {
       const ebayQuery = buildEbaySearchQuery(query, config);
       config._cachePrefix = cachePrefix(req);
@@ -637,6 +642,16 @@ app.get("/api/card", apiAuthMiddleware, async (req, res) => {
 
     if (identity.cardId) {
       identity.setName = SET_NAME_MAP[identity.setCode] || identity.setCode;
+      if (identity.name && identity.setName && identity.name.includes(identity.setName)) {
+        identity.name = identity.name.replace(identity.setName, "").replace(/\s+/g, " ").trim();
+      }
+      if (identity.name) {
+        identity.name = identity.name
+          .replace(/\[.*?\]|\(.*?\)/g, "")
+          .replace(/\s*(Expansion Pack|High Class Pack|Booster|Collection)\b.*/i, "")
+          .replace(/\s+[A-Z]\s*[-—]\s*(Mint|NM|LP|MP|HP)\s*$/i, "")
+          .replace(/\s+/g, " ").trim();
+      }
     }
 
     res.json({ ...identity, stored: false });
@@ -868,8 +883,9 @@ app.post("/api/check-alerts", ownerOnly, async (req, res) => {
                 const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: alert.query, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
                 data = { activeByCountry: activeRes.itemsByCountry || {}, source: "ebay" };
               }
-              const items = [];
+              let items = [];
               for (const arr of Object.values(data.activeByCountry || {})) items.push(...arr);
+              if (source === "yahoo") items = filterRelevantResults(items, data.ebaySearchQuery || alert.query).filtered;
               if (items.length) {
                 const prices = items.map(i => i.totalCost || i.price).filter(Boolean).sort((a, b) => a - b);
                 pricesBySource[source] = { lowest: prices[0], count: prices.length };
@@ -944,11 +960,19 @@ app.post("/api/check-alerts", ownerOnly, async (req, res) => {
 
 // POST /api/track-prices — scheduled job to record prices for tracked cards
 app.post("/api/track-prices", authMiddleware, async (req, res) => {
-  const cards = req.body.cards || [
+  const defaultCards = [
     "Pikachu ex SAR 234/193 PSA 10",
     "Umbreon ex SAR 217/187",
     "Mega Greninja ex SAR",
   ];
+
+  let alertCards = [];
+  try {
+    const alerts = await getActiveAlerts();
+    alertCards = [...new Set(alerts.map(a => a.query).filter(Boolean))];
+  } catch {}
+
+  const cards = req.body?.cards || [...new Set([...defaultCards, ...alertCards])];
   const hasEbay = !!(clientId && clientSecret);
   const results = [];
   for (const card of cards) {
@@ -1050,8 +1074,9 @@ app.get("/api/arbitrage", apiAuthMiddleware, async (req, res) => {
           }
         }
 
-        const items = [];
+        let items = [];
         for (const arr of Object.values(data.activeByCountry || {})) items.push(...arr);
+        if (source === "yahoo" && !isDemo) items = filterRelevantResults(items, data.ebaySearchQuery || q).filtered;
         if (items.length) {
           const prices = items.map(i => i.totalCost || i.price).filter(Boolean).sort((a, b) => a - b);
           pricesBySource[source] = {
