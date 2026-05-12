@@ -316,6 +316,60 @@ resource "google_compute_global_forwarding_rule" "api_https" {
 
 # ── Monitoring ────────────────────────────────────────────────
 
+# ── Cloud Scheduler ───────────────────────────────────────────
+
+resource "google_project_service" "scheduler" {
+  service            = "cloudscheduler.googleapis.com"
+  disable_on_destroy = false
+}
+
+data "google_secret_manager_secret_version" "api_key" {
+  secret  = "CASECOMP_API_KEY"
+  project = var.project_id
+}
+
+resource "google_cloud_scheduler_job" "track_prices" {
+  name             = "casecomp-track-prices"
+  description      = "Record sold comps for tracked cards every 6 hours"
+  schedule         = "0 */6 * * *"
+  time_zone        = "Asia/Kolkata"
+  attempt_deadline = "120s"
+
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.api_domain}/api/track-prices"
+    headers = {
+      "Content-Type"  = "application/json"
+      "Authorization" = "Bearer ${data.google_secret_manager_secret_version.api_key.secret_data}"
+    }
+    body = base64encode("{}")
+  }
+
+  depends_on = [google_project_service.scheduler]
+}
+
+resource "google_cloud_scheduler_job" "check_alerts" {
+  name             = "casecomp-check-alerts"
+  description      = "Check price and arbitrage alerts every 6 hours"
+  schedule         = "30 */6 * * *"
+  time_zone        = "Asia/Kolkata"
+  attempt_deadline = "120s"
+
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.api_domain}/api/check-alerts"
+    headers = {
+      "Content-Type"  = "application/json"
+      "Authorization" = "Bearer ${data.google_secret_manager_secret_version.api_key.secret_data}"
+    }
+    body = base64encode("{}")
+  }
+
+  depends_on = [google_project_service.scheduler]
+}
+
+# ── Monitoring ────────────────────────────────────────────────
+
 resource "google_project_service" "monitoring" {
   service            = "monitoring.googleapis.com"
   disable_on_destroy = false

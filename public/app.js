@@ -867,18 +867,44 @@ const fadeObserver = new IntersectionObserver((entries) => {
 }, { threshold: 0.1 });
 document.querySelectorAll(".fade-up").forEach(el => fadeObserver.observe(el));
 
+document.querySelectorAll(".alert-type-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".alert-type-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const type = btn.dataset.type;
+    document.getElementById("alert-type").value = type;
+    document.getElementById("price-fields").classList.toggle("hidden", type !== "price");
+    document.getElementById("arb-fields").classList.toggle("hidden", type !== "arbitrage");
+    document.getElementById("alert-desc").textContent = type === "price"
+      ? "Get notified when the price drops below your target."
+      : "Get notified when the cross-source spread exceeds your threshold.";
+  });
+});
+
 alertForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = document.getElementById("alert-email").value.trim();
-  const price = parseFloat(document.getElementById("alert-price").value);
-  if (!email || !price || !currentQuery) return;
+  const type = document.getElementById("alert-type").value;
+  if (!email || !currentQuery) return;
+
+  const body = { email, query: currentQuery, type };
+  if (type === "price") {
+    body.targetPrice = parseFloat(document.getElementById("alert-price").value);
+    if (!body.targetPrice) return;
+  } else {
+    body.spreadThreshold = parseInt(document.getElementById("alert-spread").value) || 10;
+  }
+
   try {
     const res = await fetch("/api/alerts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, targetPrice: price, query: currentQuery }),
+      body: JSON.stringify(body),
     });
-    alertMsg.textContent = res.ok ? "Alert set! We'll email you when the price drops." : "Saved — we'll notify you when alerts go live.";
+    const msg = type === "price"
+      ? `Price alert set for ${formatPrice(body.targetPrice, "USD")}`
+      : `Arbitrage alert set for ${body.spreadThreshold}% spread`;
+    alertMsg.textContent = res.ok ? msg : "Saved — we'll notify you when alerts go live.";
     alertMsg.style.color = res.ok ? "var(--green)" : "var(--gold)";
   } catch {
     alertMsg.textContent = "Saved — we'll notify you when alerts go live.";
