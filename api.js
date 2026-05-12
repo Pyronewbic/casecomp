@@ -652,12 +652,43 @@ app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
   const { q } = req.query;
   if (!validateQuery(q, res)) return;
   const days = Math.min(365, Math.max(1, Number(req.query.days) || 90));
+
+  const wantDemo = req.query.demo === "true" || (!clientId && !clientSecret);
+  if (wantDemo) {
+    const demoResult = getDemoSearchResult(q, {});
+    const sold = demoResult.sold || [];
+    const history = sold.filter(s => s.soldDate && s.price).map(s => ({
+      price: s.price,
+      recordedAt: s.soldDate,
+      source: s.itemWebUrl?.includes("magi") ? "magi" : s.itemWebUrl?.includes("yahoo") ? "yahoo" : s.itemWebUrl?.includes("snkrdunk") ? "snkrdunk" : "ebay",
+    }));
+    const prices = history.map(h => h.price);
+    const stats = prices.length ? {
+      min: Math.min(...prices),
+      max: Math.max(...prices),
+      avg: Math.round(prices.reduce((s, p) => s + p, 0) / prices.length * 100) / 100,
+      count: prices.length,
+    } : null;
+    return res.json({ query: q, days, history, stats, _demo: true });
+  }
+
   try {
     let history = await getPriceHistory(q, { days });
+    let tcgData = null;
 
-    if (!history.length) {
-      const tcg = await seedFromTCGPlayer(q);
-      if (tcg) {
+    const tcg = await seedFromTCGPlayer(q);
+    if (tcg) {
+      tcgData = {
+        productId: tcg.productId,
+        name: tcg.name,
+        setName: tcg.setName,
+        marketPrice: tcg.price,
+        listedMedianPrice: tcg.listedMedianPrice,
+        printingType: tcg.printingType,
+        source: "tcgplayer",
+      };
+
+      if (!history.length) {
         await recordSoldPrices(q, [{
           itemId: `tcg_${tcg.productId}`,
           price: tcg.price,
@@ -676,7 +707,13 @@ app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
       avg: Math.round(prices.reduce((s, p) => s + p, 0) / prices.length * 100) / 100,
       count: prices.length,
     } : null;
-    res.json({ query: q, days, history, stats });
+
+    if (tcgData && stats) {
+      const ratio = tcgData.marketPrice / stats.avg;
+      if (ratio < 0.3 || ratio > 3) tcgData = null;
+    }
+
+    res.json({ query: q, days, history, stats, tcgplayer: tcgData });
   } catch (e) {
     logError("price-history", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
