@@ -51,6 +51,10 @@
           <div class="list-tabs">
             <button class="list-tab active" data-tab="active">Active Listings</button>
             <button class="list-tab" data-tab="sold">Recent Sold</button>
+            <select id="sort-select" class="sort-select">
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+            </select>
           </div>
           <div id="active-list" class="card-list"></div>
           <div id="sold-list" class="card-list hidden"></div>
