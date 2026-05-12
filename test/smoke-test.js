@@ -188,6 +188,45 @@ async function run() {
     await mobile.close();
     await page.close();
 
+    // --- Portfolio section ---
+    console.log("\n[Portfolio section]");
+    const portfolioPage = await browser.newPage();
+    await portfolioPage.goto(BASE);
+    assert(await portfolioPage.locator("#portfolio-section").isVisible(), "portfolio section visible on landing");
+    assert(await portfolioPage.locator("#portfolio-load").isVisible(), "portfolio load button visible");
+    await portfolioPage.close();
+
+    // --- Portfolio API endpoints ---
+    console.log("\n[Portfolio API]");
+    const apiPage = await browser.newPage();
+
+    const portfolioRes = await apiPage.goto(`${BASE}/api/portfolio?demo=true`);
+    assert(portfolioRes.status() === 200, "portfolio demo returns 200");
+    const portfolioBody = await portfolioRes.json();
+    assert(portfolioBody.cards?.length === 3, "demo portfolio has 3 cards");
+    assert(typeof portfolioBody.roiPercent === "number", "portfolio has roiPercent");
+
+    const historyRes = await apiPage.goto(`${BASE}/api/portfolio/history?demo=true&days=7`);
+    assert(historyRes.status() === 200, "portfolio history returns 200");
+    const historyBody = await historyRes.json();
+    assert(historyBody.history?.length === 7, "portfolio history returns 7 entries");
+
+    const csvCheck = await apiPage.evaluate(async (base) => {
+      const r = await fetch(`${base}/api/portfolio/export?format=csv&demo=true`);
+      return { status: r.status, ct: r.headers.get("content-type"), body: await r.text() };
+    }, BASE);
+    assert(csvCheck.status === 200, "portfolio CSV export returns 200");
+    assert(csvCheck.ct?.includes("text/csv"), "CSV export has text/csv content-type");
+    assert(csvCheck.body.includes("Card ID"), "CSV has header row");
+
+    const gradingRes = await apiPage.goto(`${BASE}/api/portfolio/grading-opportunities?demo=true`);
+    assert(gradingRes.status() === 200, "grading opportunities returns 200");
+    const gradingBody = await gradingRes.json();
+    assert(gradingBody.opportunities?.length === 2, "2 grading opportunities (Umbreon + Greninja)");
+    assert(gradingBody.skipped?.length === 1, "1 skipped (Pikachu PSA 10)");
+
+    await apiPage.close();
+
     // --- Static assets ---
     console.log("\n[Static assets]");
     const page2 = await browser.newPage();
