@@ -87,6 +87,8 @@ header {
   line-height: 1;
 }
 
+nav { display: flex; gap: 20px; }
+
 .nav-link {
   color: var(--muted);
   font-size: 14px;
@@ -697,6 +699,78 @@ main {
 .card-id-name { font-size: 11px; color: var(--text); }
 .card-id-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
 .card-id-lang { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-right: 2px; }
+
+.grading-roi {
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.roi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.roi-stat { text-align: center; }
+.roi-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.roi-value {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.roi-total { color: var(--gold); }
+.roi-psa-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+}
+.roi-psa-row b {
+  color: var(--text);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  margin-left: 3px;
+}
+.roi-psa-row b.easy { color: var(--green); }
+.roi-psa-row b.hard { color: var(--red); }
+.roi-psa-row b.moderate { color: var(--gold); }
+.roi-verdict {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.roi-verdict-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.roi-yes .roi-verdict-label { color: var(--green); background: rgba(124, 224, 168, 0.1); border: 1px solid rgba(124, 224, 168, 0.25); }
+.roi-no .roi-verdict-label { color: var(--red); background: rgba(255, 93, 93, 0.08); border: 1px solid rgba(255, 93, 93, 0.25); }
+.roi-verdict-detail {
+  font-size: 12px;
+  color: var(--muted);
+}
 
 .arbitrage-container { background: var(--inset); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
 .arbitrage-sources { display: flex; gap: 8px; margin-top: 8px; }

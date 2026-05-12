@@ -411,7 +411,8 @@ function selectItem(itemId) {
       ${gradeHtml}
     </div>
     <div class="detail-tab-panel${defaultTab === "prices" ? "" : " hidden"}" data-dtpanel="prices">
-      ${renderPsaInline(currentPsaSignal)}
+      ${slabLabel ? renderPsaInline(currentPsaSignal) : ""}
+      <div id="grading-roi" class="grading-roi hidden"></div>
       <div id="arbitrage-container" class="arbitrage-container hidden"></div>
       <div id="price-chart-container" class="price-chart-container hidden">
         <div class="detail-grade-section-label">Price History</div>
@@ -444,6 +445,7 @@ function selectItem(itemId) {
   loadCardIdentity(currentQuery);
   loadPriceChart(currentQuery);
   loadArbitrage(currentQuery);
+  loadGradingRoi(item);
 }
 
 async function loadCardIdentity(query) {
@@ -513,6 +515,62 @@ async function loadArbitrage(query) {
       ${savingsHtml}
     `;
   } catch {}
+}
+
+function loadGradingRoi(item) {
+  const container = document.getElementById("grading-roi");
+  if (!container) return;
+  if (!currentPsaSignal || item.listingGradeLabel) return;
+
+  const psa = currentPsaSignal;
+  const rawPrice = item.totalCost || item.price;
+  if (!rawPrice || !psa.estCost) return;
+
+  const gradingCost = parseFloat(psa.estCost.replace(/[^0-9.]/g, ""));
+  if (!gradingCost) return;
+
+  const gemPct = psa.gem10Pct || 0;
+  const totalCost = rawPrice + gradingCost;
+  const diffClass = psa.difficulty === "easy" ? "easy" : psa.difficulty === "hard" || psa.difficulty === "brutal" ? "hard" : "moderate";
+
+  container.classList.remove("hidden");
+  const profitable = gemPct >= 50;
+  const verdictClass = profitable ? "roi-yes" : "roi-no";
+  const verdict = profitable ? "Worth grading" : "Risky";
+
+  container.innerHTML = `
+    <div class="detail-grade-section-label">Grade This Card?</div>
+    <div class="roi-grid">
+      <div class="roi-stat">
+        <div class="roi-label">Raw Price</div>
+        <div class="roi-value">${formatPrice(rawPrice, "USD")}</div>
+      </div>
+      <div class="roi-stat">
+        <div class="roi-label">${esc(psa.tier)} Grading</div>
+        <div class="roi-value">${esc(psa.estCost)}</div>
+      </div>
+      <div class="roi-stat">
+        <div class="roi-label">Total Cost</div>
+        <div class="roi-value roi-total">${formatPrice(totalCost, "USD")}</div>
+      </div>
+      <div class="roi-stat">
+        <div class="roi-label">Gem Rate</div>
+        <div class="roi-value">${gemPct}%</div>
+      </div>
+    </div>
+    <div class="roi-psa-row">
+      <span>Pop <b>${psa.totalPop ? psa.totalPop.toLocaleString() : "—"}</b></span>
+      <span>Difficulty <b class="${diffClass}">${esc(psa.difficulty || "—")}</b></span>
+      <span>PSA 10 <b>${psa.pop10 ? psa.pop10.toLocaleString() : "—"}</b></span>
+      <span>PSA 9 <b>${psa.pop9 ? psa.pop9.toLocaleString() : "—"}</b></span>
+    </div>
+    <div class="roi-verdict ${verdictClass}">
+      <span class="roi-verdict-label">${verdict}</span>
+      <span class="roi-verdict-detail">${gemPct >= 50
+        ? `${gemPct}% gem rate at ${esc(psa.estCost)} grading — favorable odds`
+        : `${gemPct}% gem rate — high risk of PSA 9 or lower`}</span>
+    </div>
+  `;
 }
 
 async function loadPriceChart(query) {
