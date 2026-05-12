@@ -36,6 +36,12 @@
 - TCGPlayer search: full query first, fallback to simplified, price sanity check
 - Demo rate limit shown correctly as 360/min
 - PR template: added breaking changes + demo data check sections
+- Yahoo Auctions: relevance filtering applied (removes 1-yen box auctions, unrelated cards)
+- Card identity: cleaned up long names (strips pack names, condition text from titles)
+- track-prices: now also tracks cards from active alerts, not just 3 hardcoded defaults
+- Demo condition filter: checks detectedCondition in addition to raw condition field
+- Tests: 208 total (92 unit + 76 API + 40 smoke), up from 183
+- Removed dead code: Redis import from api.js, updateCardField from card-identity.js
 
 ## 1.0.0-beta.1 (2026-05-10)
 
