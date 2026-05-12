@@ -70,11 +70,21 @@
 
     <section id="alert-section" class="alert-section hidden">
       <div class="alert-box">
-        <h3>Get price alerts</h3>
-        <p>We'll email you when this card hits your target price.</p>
+        <h3>Set an alert</h3>
+        <div class="alert-type-toggle">
+          <button type="button" class="alert-type-btn active" data-type="price">Price Drop</button>
+          <button type="button" class="alert-type-btn" data-type="arbitrage">Arbitrage Spread</button>
+        </div>
+        <p id="alert-desc" class="alert-desc">Get notified when the price drops below your target.</p>
         <form id="alert-form">
+          <input type="hidden" id="alert-type" value="price">
           <input type="email" id="alert-email" placeholder="you@email.com" required>
-          <input type="number" id="alert-price" placeholder="Target price ($)" step="0.01" min="0" required>
+          <div id="price-fields">
+            <input type="number" id="alert-price" placeholder="Target price ($)" step="0.01" min="0">
+          </div>
+          <div id="arb-fields" class="hidden">
+            <input type="number" id="alert-spread" placeholder="Spread threshold (%)" value="10" min="1" max="100">
+          </div>
           <button type="submit">Set Alert</button>
         </form>
         <p id="alert-msg" class="alert-msg hidden"></p>
