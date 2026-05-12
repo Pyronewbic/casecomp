@@ -21,7 +21,7 @@ import { getDemoSearchResult, listDemoCards } from "./lib/data/demo.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
 import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
-import { getOrCreateCard, findCardByQuery, parseCardIdentity, SET_NAME_MAP } from "./lib/data/card-identity.js";
+import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -643,6 +643,61 @@ app.get("/api/card", apiAuthMiddleware, async (req, res) => {
     res.json({ ...identity, stored: false });
   } catch (e) {
     logError("card", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /api/card/share/:setCode/:number — bundled card data for share pages
+app.get("/api/card/share/:setCode/:number", async (req, res) => {
+  const cardId = `${req.params.setCode}/${req.params.number}`;
+  const searchQuery = resolveCardIdToQuery(cardId);
+  try {
+    const [card, search, priceData] = await Promise.all([
+      findCardByQuery(searchQuery).catch(() => null),
+      (async () => {
+        const demo = getDemoSearchResult(searchQuery, {});
+        return demo._demo ? demo : null;
+      })(),
+      (async () => {
+        const demo = getDemoSearchResult(searchQuery, {});
+        const sold = (demo.sold || []).filter(s => s.soldDate && s.price);
+        const history = sold.map(s => ({ price: s.price, recordedAt: s.soldDate }));
+        const prices = history.map(h => h.price);
+        return {
+          history,
+          stats: prices.length ? {
+            min: Math.min(...prices), max: Math.max(...prices),
+            avg: Math.round(prices.reduce((s, p) => s + p, 0) / prices.length * 100) / 100,
+            count: prices.length,
+          } : null,
+        };
+      })(),
+    ]);
+
+    const identity = card || parseCardIdentity(searchQuery);
+    if (identity.setCode) identity.setName = SET_NAME_MAP[identity.setCode] || identity.setCode;
+
+    const active = search ? Object.values(search.activeByCountry || {}).flat() : [];
+    const lowestPrice = active.length ? Math.min(...active.map(i => i.totalCost || i.price)) : null;
+    const lowestSource = lowestPrice && active.length
+      ? active.find(i => (i.totalCost || i.price) === lowestPrice)
+      : null;
+
+    res.json({
+      cardId,
+      identity,
+      price: {
+        lowest: lowestPrice,
+        source: lowestSource?.itemWebUrl?.includes("magi") ? "magi" : lowestSource?.itemWebUrl?.includes("yahoo") ? "yahoo" : lowestSource?.itemWebUrl?.includes("snkrdunk") ? "snkrdunk" : "ebay",
+        listingCount: active.length,
+        currency: active[0]?.priceCurrency || "USD",
+      },
+      psaSignal: search?.psaSignal || null,
+      priceHistory: priceData,
+      searchQuery,
+    });
+  } catch (e) {
+    logError("card-share", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
