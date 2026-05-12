@@ -21,6 +21,7 @@ let allItems = [];
 let allActive = [];
 let allSold = [];
 let activeSourceFilter = "all";
+let currentSort = "price-asc";
 let currentPsaSignal = null;
 
 document.querySelectorAll(".hint").forEach(h => {
@@ -42,6 +43,21 @@ document.querySelectorAll(".list-tab").forEach(tab => {
     soldList.classList.toggle("hidden", show !== "sold");
   });
 });
+
+document.getElementById("sort-select").addEventListener("change", (e) => {
+  currentSort = e.target.value;
+  applySourceFilter();
+});
+
+function sortItems(items) {
+  const sorted = [...items];
+  if (currentSort === "price-desc") {
+    sorted.sort((a, b) => (b.totalCost || b.price) - (a.totalCost || a.price));
+  } else {
+    sorted.sort((a, b) => (a.totalCost || a.price) - (b.totalCost || b.price));
+  }
+  return sorted;
+}
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -117,15 +133,21 @@ function render(data) {
   allActive = active;
   allSold = sold;
   activeSourceFilter = "all";
+  currentSort = "price-asc";
+  document.getElementById("sort-select").value = "price-asc";
 
   const isMulti = data.source === "multi";
   const sources = isMulti ? detectSources(active, sold) : [];
   renderSourceFilters(sources);
 
-  renderList(activeList, active);
-  renderList(soldList, sold);
+  renderList(activeList, sortItems(active));
+  renderList(soldList, sortItems(sold));
 
+  const activeTab = document.querySelector('.list-tab[data-tab="active"]');
   const soldTab = document.querySelector('.list-tab[data-tab="sold"]');
+  activeTab.textContent = `Active (${active.length})`;
+  soldTab.textContent = `Sold (${sold.length})`;
+
   if (hasGrades && soldTotal === 0) {
     soldTab.classList.add("hidden");
   } else {
@@ -187,12 +209,15 @@ function applySourceFilter() {
     ? () => true
     : (item) => itemSource(item.itemWebUrl) === activeSourceFilter;
 
-  const filteredActive = allActive.filter(filterFn);
-  const filteredSold = allSold.filter(filterFn);
+  const filteredActive = sortItems(allActive.filter(filterFn));
+  const filteredSold = sortItems(allSold.filter(filterFn));
   allItems = [...filteredActive, ...filteredSold];
 
   renderList(activeList, filteredActive);
   renderList(soldList, filteredSold);
+
+  document.querySelector('.list-tab[data-tab="active"]').textContent = `Active (${filteredActive.length})`;
+  document.querySelector('.list-tab[data-tab="sold"]').textContent = `Sold (${filteredSold.length})`;
 
   detailPanel.innerHTML = '<div class="detail-empty">Click a listing to inspect</div>';
   if (filteredActive.length) selectItem(filteredActive[0].itemId);
@@ -242,7 +267,26 @@ function renderList(container, items) {
     const price = formatPrice(item.price, item.priceCurrency);
     const imgSrc = item.imageUrl && !item.imageUrl.includes("placeholder") ? item.imageUrl : "";
     const imgHtml = imgSrc ? `<img class="thumb" src="${esc(imgSrc)}" alt="" loading="lazy">` : `<div class="thumb"></div>`;
-    const condition = item.condition ? `<span class="condition">${esc(item.condition)}</span>` : "";
+
+    let displayCond = item.condition || "";
+    if (!item.listingGradeLabel && item.detectedCondition) {
+      displayCond = item.detectedCondition;
+    } else if (displayCond === "Ungraded" || displayCond === "ungraded") {
+      displayCond = item.detectedCondition || "";
+    }
+    const useBadge = !item.condition && item.detectedCondition;
+    const conditionHtml = displayCond
+      ? `<span class="${useBadge ? "condition-badge" : "condition"}">${esc(displayCond)}</span>`
+      : "";
+
+    const shippingHtml = item.shippingLabel === "Free" || item.shippingLabel === "free"
+      ? '<span class="shipping shipping-free">Free shipping</span>'
+      : item.shippingLabel && item.shippingLabel !== "—"
+        ? `<span class="shipping">+ ${esc(item.shippingLabel)}</span>`
+        : "";
+
+    const outlierHtml = item._priceOutlier ? '<span class="price-outlier">Price outlier</span>' : "";
+
     const gradeChip = item.grade && !item.grade.error
       ? `<span class="grade-chip" style="color: ${gradeColor(item.grade.overall)}">${item.grade.overall.toFixed(1)}</span>`
       : item.listingGradeLabel
@@ -258,9 +302,11 @@ function renderList(container, items) {
           <div class="price-row">
             <span class="price">${price}</span>
             ${gradeChip}
+            ${shippingHtml}
             ${srcTag}
           </div>
-          ${condition}
+          ${conditionHtml}
+          ${outlierHtml}
         </div>
       </div>
     `;
@@ -319,10 +365,14 @@ function selectItem(itemId) {
   `;
 
   const fields = [];
-  const condVal = item.condition
-    ? (slabLabel ? `${item.condition} <span class="graded-badge">Graded</span>` : item.condition)
-    : (slabLabel ? `<span class="graded-badge">Graded</span>` : "");
-  if (condVal) fields.push({ label: "Condition", value: condVal, raw: true });
+  if (slabLabel) {
+    fields.push({ label: "Condition", value: `<span class="graded-badge">Graded</span>`, raw: true });
+  } else {
+    const condVal = (item.condition === "Ungraded" || item.condition === "ungraded")
+      ? (item.detectedCondition || "")
+      : (item.detectedCondition || item.condition || "");
+    if (condVal) fields.push({ label: "Condition", value: condVal });
+  }
   if (item.soldDate || item.endedDate) fields.push({ label: "Sold", value: item.soldDate || item.endedDate });
   if (item.priceJPY) fields.push({ label: "Price (JPY)", value: `¥${item.priceJPY.toLocaleString()}` });
   if (item.totalCost && item.totalCost !== item.price) fields.push({ label: "Item Price", value: formatPrice(item.price, item.priceCurrency) });
@@ -351,8 +401,8 @@ function selectItem(itemId) {
     ${summaryHtml}
     <div class="detail-meta-row">
       ${fieldsHtml}
-      <div id="card-identity" class="card-identity hidden"></div>
     </div>
+    <div id="card-identity" class="card-identity hidden"></div>
     <div class="detail-tabs">
       ${hasGrade ? `<button class="detail-tab${defaultTab === "grade" ? " active" : ""}" data-dtab="grade">Grade</button>` : ""}
       <button class="detail-tab${defaultTab === "prices" ? " active" : ""}" data-dtab="prices">Prices</button>
@@ -365,7 +415,7 @@ function selectItem(itemId) {
       <div id="arbitrage-container" class="arbitrage-container hidden"></div>
       <div id="price-chart-container" class="price-chart-container hidden">
         <div class="detail-grade-section-label">Price History</div>
-        <canvas id="price-chart" height="120"></canvas>
+        <canvas id="price-chart" height="140"></canvas>
         <div id="price-chart-stats" class="price-chart-stats"></div>
       </div>
     </div>
@@ -412,14 +462,13 @@ async function loadCardIdentity(query) {
     ).join("");
 
     const setName = card.setName || "";
-    container.innerHTML = `
-      <div class="card-id-row">
-        <span class="card-id-badge">${esc(card.cardId)}</span>
-        ${card.rarity ? `<span class="card-id-rarity">${esc(card.rarity)}</span>` : ""}
-        ${setName ? `<span class="card-id-set">${esc(setName)}</span>` : ""}
-      </div>
-      ${nameHtml ? `<div class="card-id-names">${nameHtml}</div>` : ""}
-    `;
+    const parts = [
+      `<span class="card-id-badge">${esc(card.cardId)}</span>`,
+      card.rarity ? `<span class="card-id-rarity">${esc(card.rarity)}</span>` : "",
+      setName ? `<span class="card-id-set">${esc(setName)}</span>` : "",
+      nameHtml ? `<span class="card-id-sep"></span>${nameHtml}` : "",
+    ].filter(Boolean).join("");
+    container.innerHTML = parts;
   } catch {}
 }
 
@@ -437,10 +486,19 @@ async function loadArbitrage(query) {
     container.classList.remove("hidden");
     const arb = data.arbitrage;
 
+    const sorted = names.sort((a, b) => sources[a].lowest - sources[b].lowest);
+    const savingsHtml = arb ? (() => {
+      const match = arb.summary.match(/\$[\d,.]+/);
+      const pctMatch = arb.summary.match(/(\d+%)\s*spread/);
+      const savings = match ? match[0] : "";
+      const spread = pctMatch ? pctMatch[1] : "";
+      return `<div class="arb-summary">${savings} cheaper on ${esc(arb.cheapest.source)}${spread ? `<span class="arb-summary-spread">${spread} spread</span>` : ""}</div>`;
+    })() : "";
+
     container.innerHTML = `
       <div class="detail-grade-section-label">Cross-Source Prices</div>
       <div class="arbitrage-sources">
-        ${names.sort((a, b) => sources[a].lowest - sources[b].lowest).map(s => {
+        ${sorted.map(s => {
           const d = sources[s];
           const isCheapest = arb && s === arb.cheapest.source;
           return `<div class="arb-source${isCheapest ? " arb-cheapest" : ""}">
@@ -448,10 +506,11 @@ async function loadArbitrage(query) {
             <div class="arb-source-price">${formatPrice(d.lowest, d.currency)}</div>
             ${d.priceJPY ? `<div class="arb-source-jpy">¥${d.priceJPY.toLocaleString()}</div>` : ""}
             <div class="arb-source-count">${d.count} listing${d.count !== 1 ? "s" : ""}</div>
+            ${isCheapest ? `<span class="arb-best-chip">Best Price</span>` : ""}
           </div>`;
         }).join("")}
       </div>
-      ${arb ? `<div class="arb-summary">${esc(arb.summary)}</div>` : ""}
+      ${savingsHtml}
     `;
   } catch {}
 }
@@ -481,7 +540,7 @@ async function loadPriceChart(query) {
     if (data.stats) {
       statsEl.innerHTML = `
         <span>Low: <b>${formatPrice(data.stats.min, "USD")}</b></span>
-        <span>Avg: <b>${formatPrice(data.stats.avg, "USD")}</b></span>
+        <span class="stat-avg">Avg: <b>${formatPrice(data.stats.avg, "USD")}</b></span>
         <span>High: <b>${formatPrice(data.stats.max, "USD")}</b></span>
         <span>${data.stats.count} sales</span>
       `;
@@ -492,7 +551,7 @@ async function loadPriceChart(query) {
 function drawPriceChart(canvas, points) {
   const ctx = canvas.getContext("2d");
   const w = canvas.parentElement.clientWidth;
-  const h = 120;
+  const h = 140;
   canvas.width = w;
   canvas.height = h;
   canvas.style.width = w + "px";
@@ -502,7 +561,7 @@ function drawPriceChart(canvas, points) {
   const max = Math.max(...prices) * 1.05;
   const range = max - min || 1;
 
-  const pad = { top: 10, right: 10, bottom: 20, left: 50 };
+  const pad = { top: 10, right: 10, bottom: 32, left: 50 };
   const cw = w - pad.left - pad.right;
   const ch = h - pad.top - pad.bottom;
 
@@ -556,6 +615,19 @@ function drawPriceChart(canvas, points) {
     ctx.arc(x, y, 3, 0, Math.PI * 2);
     ctx.fill();
   });
+
+  // X-axis date labels
+  const fmt = (d) => { const dt = new Date(d); return `${dt.getMonth() + 1}/${dt.getDate()}`; };
+  ctx.fillStyle = "rgba(138,138,154,0.6)";
+  ctx.font = "10px 'JetBrains Mono', monospace";
+  ctx.textAlign = "center";
+  const maxLabels = Math.min(points.length, 5);
+  const step = maxLabels > 1 ? (points.length - 1) / (maxLabels - 1) : 0;
+  for (let i = 0; i < maxLabels; i++) {
+    const idx = Math.round(i * step);
+    const x = pad.left + (idx / (points.length - 1 || 1)) * cw;
+    ctx.fillText(fmt(points[idx].recordedAt), x, h - 6);
+  }
 }
 
 function renderPsaInline(psa) {
