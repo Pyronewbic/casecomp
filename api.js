@@ -651,16 +651,25 @@ app.get("/api/card", apiAuthMiddleware, async (req, res) => {
 app.get("/api/card/share/:setCode/:number", async (req, res) => {
   const cardId = `${req.params.setCode}/${req.params.number}`;
   const searchQuery = resolveCardIdToQuery(cardId);
+  const numberQuery = req.params.number.replace("-", "/");
+
+  function findDemo() {
+    let d = getDemoSearchResult(searchQuery, {});
+    if (d._demo) return d;
+    d = getDemoSearchResult(numberQuery, {});
+    if (d._demo) return d;
+    return getDemoSearchResult(cardId.replace("-", "/"), {});
+  }
+
   try {
+    const demoResult = findDemo();
     const [card, search, priceData] = await Promise.all([
       findCardByQuery(searchQuery).catch(() => null),
       (async () => {
-        const demo = getDemoSearchResult(searchQuery, {});
-        return demo._demo ? demo : null;
+        return demoResult._demo ? demoResult : null;
       })(),
       (async () => {
-        const demo = getDemoSearchResult(searchQuery, {});
-        const sold = (demo.sold || []).filter(s => s.soldDate && s.price);
+        const sold = (demoResult.sold || []).filter(s => s.soldDate && s.price);
         const history = sold.map(s => ({ price: s.price, recordedAt: s.soldDate }));
         const prices = history.map(h => h.price);
         return {
