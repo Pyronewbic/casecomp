@@ -23,6 +23,8 @@ let allSold = [];
 let activeSourceFilter = "all";
 let currentSort = "price-asc";
 let currentPsaSignal = null;
+let currentMagiMarket = null;
+let pendingChartPoints = null;
 
 document.querySelectorAll(".hint").forEach(h => {
   h.addEventListener("click", () => {
@@ -432,6 +434,10 @@ function selectItem(itemId) {
       detailPanel.querySelectorAll(".detail-tab-panel").forEach(p => p.classList.add("hidden"));
       const panel = detailPanel.querySelector(`[data-dtpanel="${tab.dataset.dtab}"]`);
       if (panel) panel.classList.remove("hidden");
+      if (tab.dataset.dtab === "prices" && pendingChartPoints) {
+        const c = document.getElementById("price-chart");
+        if (c && c.parentElement.clientWidth > 0) drawPriceChart(c, pendingChartPoints);
+      }
     });
   });
 
@@ -489,6 +495,9 @@ async function loadArbitrage(query) {
 
     container.classList.remove("hidden");
     const arb = data.arbitrage;
+
+    const magiData = sources.magi || sources.Magi;
+    currentMagiMarket = magiData ? { lowest: magiData.lowest, priceJPY: magiData.priceJPY, count: magiData.count } : null;
 
     const sorted = names.sort((a, b) => sources[a].lowest - sources[b].lowest);
     const savingsHtml = arb ? (() => {
@@ -572,7 +581,56 @@ function loadGradingRoi(item) {
         ? `${gemPct}% gem rate at ${esc(psa.estCost)} grading — favorable odds`
         : `${gemPct}% gem rate — high risk of PSA 9 or lower`}</span>
     </div>
+    ${buildExpectedOutcome(item, psa)}
   `;
+}
+
+function buildExpectedOutcome(item, psa) {
+  const grade = item.grade && !item.grade.error ? item.grade : null;
+  if (!grade || grade.overall == null) return "";
+
+  const aiScore = grade.overall;
+  let expectedPsa, popAtGrade;
+  if (aiScore >= 9.5) {
+    expectedPsa = 10;
+    popAtGrade = psa.pop10;
+  } else if (aiScore >= 8.5) {
+    expectedPsa = 9;
+    popAtGrade = psa.pop9;
+  } else if (aiScore >= 7.5) {
+    expectedPsa = 8;
+    popAtGrade = null;
+  } else {
+    expectedPsa = Math.floor(aiScore);
+    popAtGrade = null;
+  }
+
+  const popStr = popAtGrade != null ? popAtGrade.toLocaleString() : null;
+
+  let scarcityLabel = "";
+  let scarcityClass = "";
+  if (popAtGrade != null) {
+    if (popAtGrade < 100) {
+      scarcityLabel = "Scarce";
+      scarcityClass = "scarce";
+    } else if (popAtGrade <= 1000) {
+      scarcityLabel = "Moderate scarcity";
+      scarcityClass = "moderate";
+    } else {
+      scarcityLabel = "Common";
+      scarcityClass = "common";
+    }
+  }
+
+  return `
+    <div class="roi-expected-outcome">
+      <div class="roi-expected-label">Expected Outcome</div>
+      <div class="roi-expected-row">
+        <span class="roi-expected-grade">Likely PSA ${expectedPsa}</span>
+        ${popStr ? `<span class="roi-expected-sep"></span><span class="roi-expected-pop">${popStr} exist</span>` : ""}
+        ${scarcityLabel ? `<span class="roi-expected-sep"></span><span class="roi-expected-scarcity ${scarcityClass}">${scarcityLabel}</span>` : ""}
+      </div>
+    </div>`;
 }
 
 async function loadPriceChart(query) {
@@ -582,7 +640,7 @@ async function loadPriceChart(query) {
   if (!container || !canvas) return;
 
   try {
-    const res = await fetch(`/api/price-history?q=${encodeURIComponent(query)}&days=90`);
+    const res = await fetch(`/api/price-history?q=${encodeURIComponent(query)}&days=90&demo=true`);
     if (!res.ok) return;
     const data = await res.json();
     if (!data.history?.length) return;
@@ -593,9 +651,10 @@ async function loadPriceChart(query) {
       .filter(h => h.price > 0)
       .sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
 
-    if (!points.length) return;
+    if (points.length < 3) return;
 
-    drawPriceChart(canvas, points);
+    pendingChartPoints = points;
+    if (canvas.parentElement.clientWidth > 0) drawPriceChart(canvas, points);
 
     if (data.stats) {
       statsEl.innerHTML = `
@@ -605,6 +664,22 @@ async function loadPriceChart(query) {
         <span>${data.stats.count} sales</span>
       `;
     }
+
+    if (data.tcgplayer?.marketPrice) {
+      const tcg = data.tcgplayer;
+      const tcgEl = document.createElement("div");
+      tcgEl.className = "tcg-market-ref";
+      tcgEl.innerHTML = `
+        <div class="tcg-market-label">TCGPlayer Market</div>
+        <div class="tcg-market-row">
+          <span class="tcg-market-price">${formatPrice(tcg.marketPrice, "USD")}</span>
+          ${tcg.listedMedianPrice ? `<span class="tcg-market-median">Median: ${formatPrice(tcg.listedMedianPrice, "USD")}</span>` : ""}
+        </div>
+        ${tcg.printingType ? `<div class="tcg-market-meta">${esc(tcg.printingType)}</div>` : ""}
+      `;
+      container.appendChild(tcgEl);
+    }
+
   } catch {}
 }
 
