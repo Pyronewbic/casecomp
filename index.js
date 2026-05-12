@@ -270,8 +270,7 @@ async function gradeItems(items, config, counters) {
   const results = await Promise.all(
     items.map(async (row) => {
       try {
-        const backImg = (row.additionalImages || [])[0];
-        const extraImages = backImg ? [backImg] : [];
+        const extraImages = row.additionalImages || [];
         const g = await gradeImage(row.imageUrl, config, extraImages);
         return { row, g, err: null };
       } catch (e) {
