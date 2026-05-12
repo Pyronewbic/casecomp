@@ -97,7 +97,7 @@ test/
 Three sample cards work without API keys (`?demo=true`):
 - Pikachu ex SAR PSA 10 (multi-source slab: eBay + magi + Yahoo)
 - Mega Greninja ex SAR (SNKRDUNK + AI grade)
-- Umbreon ex SAR 217/187 (eBay JP + AI grade)
+- Umbreon ex SAR 217/187 (eBay + magi + Yahoo + AI grade)
 
 ## REST API
 
@@ -133,6 +133,12 @@ curl -H "Authorization: Bearer $CASECOMP_KEY" \
 # Error monitoring
 curl -H "Authorization: Bearer $CASECOMP_KEY" \
   "https://api.casecomp.xyz/api/errors"
+
+# Set an arbitrage alert (notify when spread > 10%)
+curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@email.com","query":"Umbreon ex SAR 217/187","type":"arbitrage","spreadThreshold":10}' \
+  "https://api.casecomp.xyz/api/alerts"
 ```
 
 ### Rate limits
@@ -217,7 +223,7 @@ All caches use Firestore (shared across Cloud Run instances, persists across dep
 
 ## Infrastructure
 
-GCP (Terraform managed): Cloud Run `casecomp-api` (API) + `casecomp-site` (frontend SSR with Cloud CDN), Firestore, HTTPS LB, Secret Manager, Cloud Monitoring. Cloudflare handles SSL + edge caching for `casecomp.xyz` (~85ms TTFB). GCP managed SSL for `api.casecomp.xyz`. Same LB IP routes by host. See `terraform/`.
+GCP (Terraform managed): Cloud Run `casecomp-api` (API) + `casecomp-site` (frontend SSR with Cloud CDN), Firestore, HTTPS LB, Secret Manager, Cloud Monitoring, Cloud Scheduler. Cloudflare handles SSL + edge caching for `casecomp.xyz` (~85ms TTFB). GCP managed SSL for `api.casecomp.xyz`. Same LB IP routes by host. Cloud Scheduler runs `track-prices` and `check-alerts` every 6 hours. See `terraform/`.
 
 ## Chrome Extension
 

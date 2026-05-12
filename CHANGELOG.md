@@ -3,25 +3,39 @@
 ## Unreleased
 
 ### Added
-- Playwright smoke test suite (40 tests): dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport, static assets
+- Arbitrage alerts: notify when cross-source spread exceeds threshold (POST /api/alerts with type "arbitrage")
+- Price drop alerts: notify when price falls below target (POST /api/alerts with type "price")
+- check-alerts endpoint (owner-only): evaluates all active alerts against live data
+- Live price tracking: track-prices fetches real eBay sold + magi comps (was demo-only)
+- Cloud Scheduler: track-prices + check-alerts run every 6 hours
+- Grading ROI card: "Grade This Card?" panel with raw price, grading cost, total, gem rate, verdict
+- Population-aware expected outcome: maps AI pre-grade to likely PSA grade with scarcity indicator
+- TCGPlayer market price reference in price chart (with wrong-card sanity filter)
+- Ungraded listing indicators: dash chip on cards + "AI grading unavailable" note in detail panel
+- Playwright smoke test suite (40 tests): dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport
 - Sort dropdown on listing tabs (price ascending/descending)
 - Result counts in tab labels: "Active (6)" / "Sold (3)"
 - Condition badges on raw listing cards using detectedCondition from API
 - Price outlier warnings (flagPriceOutliers applied in API pipeline)
 - GRADED badge for slab listings in detail panel
 - Inline PSA stats in Prices tab with gem progress bar
-- Price chart x-axis date labels
+- Price chart x-axis date labels, redraws on tab switch (fixes blank canvas)
 - Arbitrage "Best Price" chip and savings summary
 - Fade-up entrance animations, sticky frosted header, sticky search bar
+- Alert form: toggle between Price Drop and Arbitrage Spread types
+- Developers nav link in dashboard header
 
 ### Changed
 - Dashboard UI synced with casecomp.xyz frontend: Inter Tight + JetBrains Mono fonts, pill-style tabs/hints, ghost view button
 - Moved lib/demo.js to lib/data/, lib/output.js to lib/search/
-- Umbreon demo data: added detectedCondition (NM/LP) based on AI grades
+- Umbreon demo data: now multi-source (eBay + magi + Yahoo) with detectedCondition NM/LP
+- All demo sold data spans 30+ days with realistic date spreads
 - Detail panel: prefer detectedCondition over "Ungraded"
 - Consistent shipping display with green "Free shipping"
-- CI: unit + smoke run in parallel, test gate job, removed duplicate dev push trigger
+- CI: unit + smoke run in parallel, both required by branch protection
+- TCGPlayer search: full query first, fallback to simplified, price sanity check
 - Demo rate limit shown correctly as 360/min
+- PR template: added breaking changes + demo data check sections
 
 ## 1.0.0-beta.1 (2026-05-10)
 
