@@ -786,6 +786,122 @@ async function run() {
     assert(ids.includes("m2a/234-193"), "missing Pikachu");
   });
 
+  // ── Portfolio history ──
+
+  console.log("\n\x1b[1m=== api/portfolio/history ===\x1b[0m");
+
+  await test("GET /api/portfolio/history?demo=true returns history array", async () => {
+    const { res, body } = await jsonNoAuth("/api/portfolio/history?demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body._demo === true, "not demo");
+    assert(Array.isArray(body.history), "history should be array");
+    assert(body.history.length > 0, "history should not be empty");
+  });
+
+  await test("GET /api/portfolio/history?demo=true&days=7 returns 7 entries", async () => {
+    const { res, body } = await jsonNoAuth("/api/portfolio/history?demo=true&days=7");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.history.length === 7, `expected 7 entries, got ${body.history.length}`);
+    assert(body.days === 7, `expected days=7, got ${body.days}`);
+  });
+
+  await test("History entries have date, totalValue, totalCost", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio/history?demo=true&days=5");
+    for (const entry of body.history) {
+      assert(entry.date, "missing date");
+      assert(typeof entry.totalValue === "number", "missing totalValue");
+      assert(typeof entry.totalCost === "number", "missing totalCost");
+    }
+  });
+
+  await test("GET /api/portfolio/summary?demo=true has gainers array", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio/summary?demo=true");
+    assert(Array.isArray(body.gainers), "gainers should be array");
+    assert(body.gainers.length > 0, "gainers should not be empty");
+    assert(body.gainers[0].cardId, "gainer missing cardId");
+    assert(typeof body.gainers[0].changePercent === "number", "gainer missing changePercent");
+  });
+
+  await test("GET /api/portfolio/summary?demo=true has losers array", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio/summary?demo=true");
+    assert(Array.isArray(body.losers), "losers should be array");
+    assert(body.losers.length > 0, "losers should not be empty");
+    assert(body.losers[0].cardId, "loser missing cardId");
+    assert(typeof body.losers[0].changePercent === "number", "loser missing changePercent");
+  });
+
+  // ── Portfolio export ──
+
+  console.log("\n\x1b[1m=== api/portfolio/export ===\x1b[0m");
+
+  await test("GET /api/portfolio/export?format=csv&demo=true returns text/csv", async () => {
+    const res = await fetch(`${BASE}/api/portfolio/export?format=csv&demo=true`);
+    assert(res.status === 200, `status ${res.status}`);
+    const ct = res.headers.get("content-type");
+    assert(ct && ct.includes("text/csv"), `expected text/csv, got ${ct}`);
+  });
+
+  await test("CSV response has Content-Disposition header", async () => {
+    const res = await fetch(`${BASE}/api/portfolio/export?format=csv&demo=true`);
+    const cd = res.headers.get("content-disposition");
+    assert(cd && cd.includes("casecomp-portfolio-"), `missing or bad Content-Disposition: ${cd}`);
+  });
+
+  await test("CSV has header row with Card ID column", async () => {
+    const res = await fetch(`${BASE}/api/portfolio/export?format=csv&demo=true`);
+    const text = await res.text();
+    const lines = text.split("\n");
+    assert(lines[0].includes("Card ID"), "header row missing Card ID");
+  });
+
+  await test("CSV has 3 data rows", async () => {
+    const res = await fetch(`${BASE}/api/portfolio/export?format=csv&demo=true`);
+    const text = await res.text();
+    const lines = text.split("\n").filter(l => l.trim());
+    assert(lines.length === 4, `expected 4 lines (1 header + 3 data), got ${lines.length}`);
+  });
+
+  await test("Rejects format=json with 400", async () => {
+    const res = await fetch(`${BASE}/api/portfolio/export?format=json&demo=true`);
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+  });
+
+  // ── Portfolio grading opportunities ──
+
+  console.log("\n\x1b[1m=== api/portfolio/grading-opportunities ===\x1b[0m");
+
+  await test("GET /api/portfolio/grading-opportunities?demo=true returns opportunities", async () => {
+    const { res, body } = await jsonNoAuth("/api/portfolio/grading-opportunities?demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(Array.isArray(body.opportunities), "opportunities should be array");
+    assert(Array.isArray(body.skipped), "skipped should be array");
+    assert(body._demo === true, "not demo");
+  });
+
+  await test("Pikachu PSA 10 is in skipped array", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio/grading-opportunities?demo=true");
+    const pikachu = body.skipped.find(s => s.cardId === "m2a/234-193");
+    assert(pikachu, "Pikachu PSA 10 should be skipped");
+    assert(pikachu.reason === "already_graded", `expected already_graded, got ${pikachu.reason}`);
+  });
+
+  await test("Umbreon is in opportunities with verdict", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio/grading-opportunities?demo=true");
+    const umbreon = body.opportunities.find(o => o.cardId === "sv8a/217-187");
+    assert(umbreon, "Umbreon should be in opportunities");
+    assert(umbreon.verdict, "missing verdict");
+    assert(["worth_grading", "marginal", "not_worth_grading"].includes(umbreon.verdict), `unexpected verdict: ${umbreon.verdict}`);
+  });
+
+  await test("Opportunities have expectedProfit field", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio/grading-opportunities?demo=true");
+    for (const opp of body.opportunities) {
+      if (opp.verdict !== "no_data") {
+        assert(typeof opp.expectedProfit === "number", `missing expectedProfit on ${opp.cardId}`);
+      }
+    }
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);

@@ -12,11 +12,12 @@ import { searchMagi } from "./lib/sources/magi.js";
 import { searchYahooAuctions } from "./lib/sources/yahooauctions.js";
 import { getPsaGradingSignal } from "./lib/grading/psa.js";
 import { gradeImage } from "./lib/grading/grading.js";
-import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers, filterRelevantResults } from "./lib/search/filters.js";
+import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers, filterRelevantResults, isGradedCard } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard } from "./lib/data/firestore.js";
-import { getDemoSearchResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds } from "./lib/data/firestore.js";
+import { getDemoSearchResult, getDemoResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
+import { csvEscape, csvRow } from "./lib/data/csv.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
 import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
@@ -1027,8 +1028,69 @@ async function enrichPortfolioCards(cards) {
   }));
 }
 
+function getDemoPortfolioHistory(days) {
+  const history = [];
+  let totalValue = 1525;
+  const totalCost = 1400;
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const date = d.toISOString().split("T")[0];
+    const modifier = 1 - ((i * 37 + 13) % 100) / 100 * 0.002 - 0.003;
+    history.unshift({ date, totalValue: Math.round(totalValue * 100) / 100, totalCost });
+    totalValue = totalValue * modifier;
+  }
+  return history;
+}
+
+function getDemoGainersLosers() {
+  return {
+    gainers: [
+      { cardId: "m4/114-083", query: "Mega Greninja ex SAR", currentPrice: 384, priceNDaysAgo: 298.46, changePercent: 28.65, changeDollars: 85.54 },
+      { cardId: "sv8a/217-187", query: "Umbreon ex SAR 217/187", currentPrice: 400, priceNDaysAgo: 385, changePercent: 3.90, changeDollars: 15 },
+    ],
+    losers: [
+      { cardId: "m2a/234-193", query: "Pikachu ex SAR 234/193 PSA 10", currentPrice: 741, priceNDaysAgo: 748, changePercent: -0.94, changeDollars: -7 },
+    ],
+  };
+}
+
+async function calculateGainersLosers(cards, lookbackDays) {
+  const cardChanges = await Promise.all(cards.map(async (card) => {
+    let priceNDaysAgo = card.purchasePrice;
+    try {
+      const history = await getPriceHistory(card.query, { days: lookbackDays });
+      if (history.length) {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - lookbackDays);
+        let closest = history[history.length - 1];
+        let closestDiff = Infinity;
+        for (const entry of history) {
+          const entryDate = new Date(entry.recordedAt || entry.date);
+          const diff = Math.abs(entryDate - cutoff);
+          if (diff < closestDiff) {
+            closestDiff = diff;
+            closest = entry;
+          }
+        }
+        priceNDaysAgo = closest.price;
+      }
+    } catch {}
+    const currentPrice = card.currentPrice || 0;
+    const changePercent = priceNDaysAgo > 0 ? Math.round(((currentPrice - priceNDaysAgo) / priceNDaysAgo) * 10000) / 100 : 0;
+    const changeDollars = Math.round((currentPrice - priceNDaysAgo) * 100) / 100;
+    return { cardId: card.cardId, query: card.query, currentPrice, priceNDaysAgo, changePercent, changeDollars };
+  }));
+  cardChanges.sort((a, b) => b.changePercent - a.changePercent);
+  return {
+    gainers: cardChanges.filter(c => c.changePercent > 0).slice(0, 3),
+    losers: cardChanges.filter(c => c.changePercent <= 0).slice(-3).reverse(),
+  };
+}
+
 app.get("/api/portfolio/summary", apiAuthMiddleware, async (req, res) => {
   const isDemo = req.query.demo === "true";
+  const lookbackDays = Math.min(90, Math.max(1, Number(req.query.lookback) || 7));
 
   try {
     let cards;
@@ -1049,14 +1111,168 @@ app.get("/api/portfolio/summary", apiAuthMiddleware, async (req, res) => {
       if (!worstPerformer || c.roi < worstPerformer.roi) worstPerformer = c;
     }
 
+    const { gainers, losers } = isDemo ? getDemoGainersLosers() : await calculateGainersLosers(cards, lookbackDays);
+
     res.json({
       totalCards: cards.reduce((n, c) => n + (c.quantity || 1), 0),
       uniqueCards: cards.length,
       ...stats,
       bestPerformer: bestPerformer ? { cardId: bestPerformer.cardId, query: bestPerformer.query, roi: bestPerformer.roi } : null,
       worstPerformer: worstPerformer ? { cardId: worstPerformer.cardId, query: worstPerformer.query, roi: worstPerformer.roi } : null,
+      gainers,
+      losers,
+      lookbackDays,
       _demo: isDemo || undefined,
     });
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.get("/api/portfolio/history", apiAuthMiddleware, async (req, res) => {
+  const isDemo = req.query.demo === "true";
+  const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+
+  try {
+    let history;
+    if (isDemo) {
+      history = getDemoPortfolioHistory(days);
+    } else {
+      const userId = portfolioUserId(req);
+      if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+      history = await getPortfolioSnapshots(userId, { days });
+    }
+
+    res.json({ history, days, _demo: isDemo || undefined });
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.get("/api/portfolio/export", apiAuthMiddleware, async (req, res) => {
+  const format = req.query.format;
+  if (format !== "csv") return res.status(400).json({ error: "Unsupported format. Only csv is supported." });
+
+  const isDemo = req.query.demo === "true";
+
+  try {
+    let cards;
+    if (isDemo) {
+      cards = getDemoPortfolioCards();
+    } else {
+      const userId = portfolioUserId(req);
+      if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+      const raw = await getPortfolio(userId);
+      cards = await enrichPortfolioCards(raw);
+    }
+
+    const header = csvRow(["Card ID", "Name", "Set", "Rarity", "Purchase Price", "Purchase Source", "Current Price", "ROI %", "Quantity", "Added Date"]);
+    const rows = cards.map(card => {
+      const identity = parseCardIdentity(card.query);
+      const setName = SET_NAME_MAP[identity.setCode] || identity.setCode || "";
+      return csvRow([
+        card.cardId,
+        identity.name || "",
+        setName,
+        identity.rarity || "",
+        card.purchasePrice != null ? card.purchasePrice.toFixed(2) : "0.00",
+        card.purchaseSource || "",
+        card.currentPrice != null ? card.currentPrice.toFixed(2) : "0.00",
+        card.roi != null ? card.roi.toFixed(2) : "0.00",
+        card.quantity || 1,
+        card.addedAt || "",
+      ]);
+    });
+
+    const date = new Date().toISOString().split("T")[0];
+    const csv = "﻿" + [header, ...rows].join("\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="casecomp-portfolio-${date}.csv"`);
+    res.send(csv);
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.get("/api/portfolio/grading-opportunities", apiAuthMiddleware, async (req, res) => {
+  const isDemo = req.query.demo === "true";
+
+  try {
+    let cards;
+    if (isDemo) {
+      cards = getDemoPortfolioCards();
+    } else {
+      const userId = portfolioUserId(req);
+      if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+      const raw = await getPortfolio(userId);
+      cards = await enrichPortfolioCards(raw);
+    }
+
+    const opportunities = [];
+    const skipped = [];
+
+    for (const card of cards) {
+      if (isGradedCard(card.query)) {
+        skipped.push({ cardId: card.cardId, query: card.query, reason: "already_graded" });
+        continue;
+      }
+
+      let psaSignal = null;
+      if (isDemo) {
+        const demoData = getDemoResult(card.query);
+        psaSignal = demoData?.psaSignal || null;
+      }
+
+      if (!psaSignal) {
+        opportunities.push({
+          cardId: card.cardId,
+          query: card.query,
+          currentRawPrice: card.currentPrice,
+          estimatedGradedValue: null,
+          gradingCost: null,
+          expectedProfit: null,
+          verdict: "no_data",
+          gem10Pct: null,
+          difficulty: null,
+          tier: null,
+          estCost: null,
+          totalPop: null,
+          pop10: null,
+        });
+        continue;
+      }
+
+      const gradingCost = parseFloat((psaSignal.estCost || "").replace(/[^0-9.]/g, "")) || 0;
+      const gem10Pct = psaSignal.gem10Pct || 0;
+      const multiplier = gem10Pct >= 50 ? 1.8 : gem10Pct >= 30 ? 1.3 : 1.1;
+      const estimatedGradedValue = Math.round(card.currentPrice * multiplier * 100) / 100;
+      const expectedProfit = Math.round((estimatedGradedValue - card.currentPrice - gradingCost) * 100) / 100;
+      const verdict = expectedProfit > 0 && gem10Pct >= 50 ? "worth_grading" : expectedProfit > 0 ? "marginal" : "not_worth_grading";
+
+      opportunities.push({
+        cardId: card.cardId,
+        query: card.query,
+        currentRawPrice: card.currentPrice,
+        estimatedGradedValue,
+        gradingCost,
+        expectedProfit,
+        verdict,
+        gem10Pct,
+        difficulty: psaSignal.difficulty || null,
+        tier: psaSignal.tier || null,
+        estCost: psaSignal.estCost || null,
+        totalPop: psaSignal.totalPop || null,
+        pop10: psaSignal.pop10 || null,
+      });
+    }
+
+    opportunities.sort((a, b) => (b.expectedProfit || 0) - (a.expectedProfit || 0));
+
+    res.json({ opportunities, skipped, _demo: isDemo || undefined });
   } catch (e) {
     logError("portfolio", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
@@ -1212,7 +1428,30 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
       results.push({ card, error: e.message, lastTracked: new Date().toISOString() });
     }
   }
-  res.json({ tracked: results.length, results });
+  let portfolioSnapshots = 0;
+  try {
+    const userIds = await listPortfolioUserIds();
+    const capped = userIds.slice(0, 100);
+    for (const uid of capped) {
+      try {
+        const raw = await getPortfolio(uid);
+        if (!raw.length) continue;
+        const enriched = await enrichPortfolioCards(raw);
+        const stats = calculatePortfolioStats(enriched);
+        const today = new Date().toISOString().split("T")[0];
+        await savePortfolioSnapshot(uid, {
+          date: today,
+          totalValue: stats.totalValue,
+          totalCost: stats.totalCost,
+          cardCount: enriched.length,
+          snapshotAt: new Date().toISOString(),
+        });
+        portfolioSnapshots++;
+      } catch {}
+    }
+  } catch {}
+
+  res.json({ tracked: results.length, results, portfolioSnapshots });
 });
 
 // GET /api/arbitrage — cross-source price comparison for a card

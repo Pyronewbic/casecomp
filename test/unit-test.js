@@ -18,10 +18,12 @@ import {
   filterRelevantResults,
   querySeeksJapaneseMarket,
   filterToLikelyTcgCards,
+  isGradedCard,
 } from "../lib/search/filters.js";
 import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards, findDemoByNumber } from "../lib/data/demo.js";
 import { parseCardIdentity, buildCardId, SET_NAME_MAP, resolveCardIdToQuery } from "../lib/data/card-identity.js";
 import { buildAlertEmailSubject, sendAlertEmail } from "../lib/data/email.js";
+import { csvEscape, csvRow } from "../lib/data/csv.js";
 
 let passed = 0;
 let failed = 0;
@@ -890,6 +892,102 @@ test("portfolio stats with quantity > 1", () => {
   const totalValue = cards.reduce((s, c) => s + c.currentPrice * c.quantity, 0);
   eq(totalCost, 300);
   eq(totalValue, 360);
+});
+
+// ── Portfolio history + gainers/losers ──
+
+console.log("\n\x1b[1m=== portfolio history + gainers/losers ===\x1b[0m");
+
+test("demo portfolio history generates correct number of days", () => {
+  function getDemoPortfolioHistory(days) {
+    const history = [];
+    let totalValue = 1525;
+    const totalCost = 1400;
+    for (let i = 0; i < days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const date = d.toISOString().split("T")[0];
+      const modifier = 1 - ((i * 37 + 13) % 100) / 100 * 0.002 - 0.003;
+      history.unshift({ date, totalValue: Math.round(totalValue * 100) / 100, totalCost });
+      totalValue = totalValue * modifier;
+    }
+    return history;
+  }
+  eq(getDemoPortfolioHistory(30).length, 30);
+  eq(getDemoPortfolioHistory(7).length, 7);
+  eq(getDemoPortfolioHistory(1).length, 1);
+});
+
+test("demo portfolio history totalCost stays constant", () => {
+  function getDemoPortfolioHistory(days) {
+    const history = [];
+    let totalValue = 1525;
+    const totalCost = 1400;
+    for (let i = 0; i < days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const date = d.toISOString().split("T")[0];
+      const modifier = 1 - ((i * 37 + 13) % 100) / 100 * 0.002 - 0.003;
+      history.unshift({ date, totalValue: Math.round(totalValue * 100) / 100, totalCost });
+      totalValue = totalValue * modifier;
+    }
+    return history;
+  }
+  const history = getDemoPortfolioHistory(30);
+  assert(history.every(h => h.totalCost === 1400), "totalCost should stay at 1400");
+});
+
+test("demo gainers/losers has correct order", () => {
+  const demo = {
+    gainers: [
+      { cardId: "m4/114-083", query: "Mega Greninja ex SAR", currentPrice: 384, priceNDaysAgo: 298.46, changePercent: 28.65, changeDollars: 85.54 },
+      { cardId: "sv8a/217-187", query: "Umbreon ex SAR 217/187", currentPrice: 400, priceNDaysAgo: 385, changePercent: 3.90, changeDollars: 15 },
+    ],
+    losers: [
+      { cardId: "m2a/234-193", query: "Pikachu ex SAR 234/193 PSA 10", currentPrice: 741, priceNDaysAgo: 748, changePercent: -0.94, changeDollars: -7 },
+    ],
+  };
+  eq(demo.gainers[0].cardId, "m4/114-083");
+  assert(demo.gainers[0].changePercent > demo.gainers[1].changePercent, "Greninja should be first gainer");
+  eq(demo.losers[0].cardId, "m2a/234-193");
+  assert(demo.losers[0].changePercent < 0, "Pikachu should be a loser");
+});
+
+// ── CSV export ──
+
+console.log("\n\x1b[1m=== csvEscape + csvRow ===\x1b[0m");
+
+test("csvEscape handles commas", () => {
+  eq(csvEscape("hello, world"), '"hello, world"');
+});
+
+test("csvEscape handles double quotes", () => {
+  eq(csvEscape('say "hi"'), '"say ""hi"""');
+});
+
+test("csvEscape handles null/undefined", () => {
+  eq(csvEscape(null), "");
+  eq(csvEscape(undefined), "");
+});
+
+test("csvRow joins fields", () => {
+  eq(csvRow(["a", "b", "c"]), "a,b,c");
+});
+
+// ── isGradedCard ──
+
+console.log("\n\x1b[1m=== isGradedCard ===\x1b[0m");
+
+test("isGradedCard detects PSA 10", () => {
+  assert(isGradedCard("Pikachu ex SAR 234/193 PSA 10"));
+});
+
+test("isGradedCard detects BGS 9.5", () => {
+  assert(isGradedCard("Umbreon ex BGS 9.5"));
+});
+
+test("isGradedCard rejects raw card query", () => {
+  assert(!isGradedCard("Umbreon ex SAR 217/187"));
 });
 
 // ── Summary ──
