@@ -17,7 +17,7 @@ import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
 import { getRedisStatus, sha256 } from "./lib/data/redis-cache.js";
 import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/data/firestore.js";
-import { getDemoSearchResult, listDemoCards } from "./lib/data/demo.js";
+import { getDemoSearchResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
 import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
@@ -654,11 +654,11 @@ app.get("/api/card/share/:setCode/:number", async (req, res) => {
   const numberQuery = req.params.number.replace("-", "/");
 
   function findDemo() {
-    let d = getDemoSearchResult(searchQuery, {});
-    if (d._demo) return d;
-    d = getDemoSearchResult(numberQuery, {});
-    if (d._demo) return d;
-    return getDemoSearchResult(cardId.replace("-", "/"), {});
+    const byNumber = findDemoByNumber(req.params.number);
+    if (byNumber) return byNumber;
+    const d = getDemoSearchResult(searchQuery, {});
+    if (d._demo && Object.values(d.activeByCountry || {}).flat().length > 0) return d;
+    return getDemoSearchResult(numberQuery, {});
   }
 
   try {
