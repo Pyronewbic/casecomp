@@ -31,6 +31,10 @@
 - Portfolio tracker: Firestore CRUD, 5 API endpoints (GET/POST/DELETE/PATCH /api/portfolio + /api/portfolio/summary)
 - Portfolio demo data: 3 cards (Umbreon, Greninja, Pikachu) with purchase prices and current values
 - Portfolio dashboard UI section with stats grid and card list showing ROI
+- Portfolio value history: GET /api/portfolio/history with daily snapshots, track-prices scheduler extension
+- Portfolio gainers/losers: extended summary with top 3 gainers/losers by price change %
+- Portfolio CSV export: GET /api/portfolio/export?format=csv with UTF-8 BOM, card identity enrichment
+- Portfolio grading opportunities: GET /api/portfolio/grading-opportunities flags ungraded cards worth grading
 
 ### Changed
 - Dashboard UI synced with casecomp.xyz frontend: Inter Tight + JetBrains Mono fonts, pill-style tabs/hints, ghost view button
@@ -47,7 +51,7 @@
 - Card identity: cleaned up long names (strips pack names, condition text from titles)
 - track-prices: now also tracks cards from active alerts, not just 3 hardcoded defaults
 - Demo condition filter: checks detectedCondition in addition to raw condition field
-- Tests: 224 total (108 unit + 76 API + 40 smoke), up from 183
+- Tests: 238 total (118 unit + 80 API + 40 smoke), up from 183
 - AI grading prompts: full PSA rubric (5-10), perspective correction, per-corner/edge detail, holo-specific surface guidance
 - Demo grades re-evaluated with improved prompts (more conservative scores, honest confidence)
 - Removed dead code: Redis import from api.js, updateCardField from card-identity.js
