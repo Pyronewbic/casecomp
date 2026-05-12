@@ -1265,3 +1265,33 @@ footer {
   .search-bar { flex-direction: column; }
   .search-bar button { padding: 12px; }
 }
+
+/* Portfolio */
+.portfolio-section { max-width: 900px; margin: 60px auto 0; }
+.portfolio-section h2 { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; color: var(--gold); letter-spacing: -0.02em; margin-bottom: 4px; }
+.portfolio-subtitle { color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-bottom: 20px; }
+.portfolio-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.portfolio-stat { background: var(--panel); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px; text-align: center; }
+.portfolio-stat .stat-label { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); margin-bottom: 6px; }
+.portfolio-stat .stat-value { font-family: 'Space Grotesk', sans-serif; font-size: 1.3rem; font-weight: 600; color: #fff; }
+.portfolio-stat .stat-value.positive { color: var(--green); }
+.portfolio-stat .stat-value.negative { color: var(--red); }
+.portfolio-cards { display: flex; flex-direction: column; gap: 8px; }
+.portfolio-card { background: var(--panel); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
+.portfolio-card-left { display: flex; flex-direction: column; gap: 2px; }
+.portfolio-card-name { font-family: 'Inter Tight', sans-serif; font-size: 0.95rem; color: #fff; font-weight: 500; }
+.portfolio-card-id { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+.portfolio-card-right { display: flex; align-items: center; gap: 16px; text-align: right; }
+.portfolio-card-prices { display: flex; flex-direction: column; gap: 1px; }
+.portfolio-card-current { font-family: 'Space Grotesk', sans-serif; font-size: 1.1rem; font-weight: 600; color: #fff; }
+.portfolio-card-purchase { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+.portfolio-roi { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+.portfolio-roi.positive { background: rgba(124,224,168,0.12); color: var(--green); }
+.portfolio-roi.negative { background: rgba(255,93,93,0.12); color: var(--red); }
+.portfolio-load-btn { display: block; margin: 20px auto 0; background: transparent; border: 1px solid var(--gold); color: var(--gold); font-family: 'Inter Tight', sans-serif; font-size: 0.9rem; padding: 10px 24px; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+.portfolio-load-btn:hover { background: rgba(217,182,118,0.1); }
+.portfolio-load-btn.hidden { display: none; }
+
+@media (max-width: 768px) {
+  .portfolio-stats { grid-template-columns: repeat(2, 1fr); }
+}
