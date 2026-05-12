@@ -16,7 +16,7 @@ import { parseListingLanguagesFromInput, filterByCondition, detectCondition, fla
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
 import { getRedisStatus, sha256 } from "./lib/data/redis-cache.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/data/firestore.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/data/firestore.js";
 import { getDemoSearchResult, listDemoCards } from "./lib/data/demo.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
 import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
@@ -720,15 +720,143 @@ app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/alerts — collect price alert signups
 app.post("/api/alerts", authMiddleware, async (req, res) => {
-  const { email, targetPrice, query } = req.body;
+  const { email, targetPrice, query, type, spreadThreshold } = req.body;
   if (!email || !query) return res.status(400).json({ error: "Missing email or query" });
+  const alertType = type === "arbitrage" ? "arbitrage" : "price";
   try {
-    await saveAlert({ email, targetPrice: targetPrice || null, query, createdAt: new Date().toISOString() });
+    const alert = {
+      email,
+      query,
+      type: alertType,
+      createdAt: new Date().toISOString(),
+    };
+    if (alertType === "price") {
+      alert.targetPrice = targetPrice || null;
+    } else {
+      alert.spreadThreshold = spreadThreshold != null ? Number(spreadThreshold) : 10;
+    }
+    await saveAlert(alert);
     res.json({ ok: true });
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.get("/api/alerts", authMiddleware, async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ error: "Missing email" });
+  try {
+    const alerts = await getAlertsByEmail(email);
+    res.json({ alerts, count: alerts.length });
+  } catch (e) {
+    logError("alerts", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.post("/api/check-alerts", ownerOnly, async (req, res) => {
+  try {
+    const alerts = await getActiveAlerts();
+    const triggered = [];
+    const checked = [];
+
+    for (const alert of alerts) {
+      try {
+        const now = new Date().toISOString();
+        await updateAlert(alert.id, { lastChecked: now });
+
+        if (alert.type === "arbitrage") {
+          const sources = ["ebay", "magi", "yahoo", "snkrdunk"];
+          const pricesBySource = {};
+
+          for (const source of sources) {
+            try {
+              let data;
+              const config = buildConfig({ source });
+              config._cachePrefix = "";
+              if (source === "snkrdunk") {
+                data = await searchSnkrdunk(alert.query, config);
+              } else if (source === "magi") {
+                data = await searchMagi(alert.query, config);
+              } else if (source === "yahoo") {
+                data = await searchYahooAuctions(alert.query, config);
+              } else {
+                const ebayQuery = buildEbaySearchQuery(alert.query, config);
+                const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: alert.query, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
+                data = { activeByCountry: activeRes.itemsByCountry || {}, source: "ebay" };
+              }
+              const items = [];
+              for (const arr of Object.values(data.activeByCountry || {})) items.push(...arr);
+              if (items.length) {
+                const prices = items.map(i => i.totalCost || i.price).filter(Boolean).sort((a, b) => a - b);
+                pricesBySource[source] = { lowest: prices[0], count: prices.length };
+              }
+            } catch {}
+          }
+
+          const sourceNames = Object.keys(pricesBySource);
+          if (sourceNames.length >= 2) {
+            const sorted = sourceNames.sort((a, b) => pricesBySource[a].lowest - pricesBySource[b].lowest);
+            const cheapest = sorted[0];
+            const most = sorted[sorted.length - 1];
+            const spread = Math.round((pricesBySource[most].lowest - pricesBySource[cheapest].lowest) * 100) / 100;
+            const spreadPct = Math.round((spread / pricesBySource[most].lowest) * 100);
+            const threshold = alert.spreadThreshold || 10;
+            if (spreadPct >= threshold) {
+              triggered.push({
+                alertId: alert.id,
+                type: "arbitrage",
+                email: alert.email,
+                query: alert.query,
+                cheapestSource: cheapest,
+                cheapestPrice: pricesBySource[cheapest].lowest,
+                mostExpensiveSource: most,
+                mostExpensivePrice: pricesBySource[most].lowest,
+                spread,
+                spreadPct,
+                threshold,
+              });
+            }
+          }
+
+          checked.push({ alertId: alert.id, type: "arbitrage", query: alert.query });
+        } else {
+          const config = buildConfig({});
+          config._cachePrefix = "";
+          const ebayQuery = buildEbaySearchQuery(alert.query, config);
+          let lowestPrice = null;
+
+          try {
+            const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: alert.query, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
+            const items = [];
+            for (const arr of Object.values(activeRes.itemsByCountry || {})) items.push(...arr);
+            const prices = items.map(i => i.totalCost || i.price).filter(Boolean).sort((a, b) => a - b);
+            if (prices.length) lowestPrice = prices[0];
+          } catch {}
+
+          if (lowestPrice != null && alert.targetPrice != null && lowestPrice <= alert.targetPrice) {
+            triggered.push({
+              alertId: alert.id,
+              type: "price",
+              email: alert.email,
+              query: alert.query,
+              currentPrice: lowestPrice,
+              targetPrice: alert.targetPrice,
+            });
+          }
+
+          checked.push({ alertId: alert.id, type: "price", query: alert.query, currentPrice: lowestPrice });
+        }
+      } catch (e) {
+        checked.push({ alertId: alert.id, query: alert.query, error: safeErrorMessage(e) });
+      }
+    }
+
+    res.json({ checked: checked.length, triggered: triggered.length, results: triggered, details: checked });
+  } catch (e) {
+    logError("check-alerts", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
@@ -740,18 +868,62 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
     "Umbreon ex SAR 217/187",
     "Mega Greninja ex SAR",
   ];
+  const hasEbay = !!(clientId && clientSecret);
   const results = [];
   for (const card of cards) {
     try {
-      const demoResult = getDemoSearchResult(card);
-      if (demoResult.sold?.length) {
-        await recordSoldPrices(card, demoResult.sold, demoResult.source);
-        results.push({ card, recorded: demoResult.sold.length });
-      } else {
-        results.push({ card, recorded: 0 });
+      let ebaySold = [];
+      let magiSold = [];
+      let usedDemo = false;
+
+      if (hasEbay) {
+        try {
+          const ebayQuery = buildEbaySearchQuery(card, {});
+          const soldRes = await Promise.race([
+            searchSold({ query: ebayQuery, relevanceQuery: card, languages: [], config: {}, refresh: false, noEbay: false, getToken, on401, soldBrowser: false }),
+            new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000)),
+          ]);
+          ebaySold = soldRes.items || [];
+          if (ebaySold.length) {
+            await recordSoldPrices(card, ebaySold, "ebay");
+          }
+        } catch (e) {
+          logError("track-prices", `eBay fetch failed for "${card}": ${e.message}`, "/api/track-prices");
+        }
       }
+
+      try {
+        const magiRes = await searchMagi(card, {});
+        magiSold = magiRes.sold || [];
+        if (magiSold.length) {
+          await recordSoldPrices(card, magiSold, "magi");
+        }
+      } catch (e) {
+        logError("track-prices", `Magi fetch failed for "${card}": ${e.message}`, "/api/track-prices");
+      }
+
+      if (!ebaySold.length && !magiSold.length) {
+        const demoResult = getDemoSearchResult(card);
+        if (demoResult.sold?.length) {
+          await recordSoldPrices(card, demoResult.sold, demoResult.source);
+          usedDemo = true;
+          ebaySold = demoResult.sold;
+        }
+      }
+
+      const total = ebaySold.length + magiSold.length;
+      results.push({
+        card,
+        recorded: total,
+        sources: {
+          ebay: ebaySold.length,
+          magi: magiSold.length,
+        },
+        usedDemo,
+        lastTracked: new Date().toISOString(),
+      });
     } catch (e) {
-      results.push({ card, error: e.message });
+      results.push({ card, error: e.message, lastTracked: new Date().toISOString() });
     }
   }
   res.json({ tracked: results.length, results });
