@@ -66,6 +66,7 @@ locals {
     "PSA_AUTH_TOKEN",
     "CASECOMP_API_KEY",
     "CASECOMP_SANDBOX_KEY",
+    "RESEND_API_KEY",
   ]
 }
 

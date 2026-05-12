@@ -15,10 +15,11 @@ import { gradeImage } from "./lib/grading/grading.js";
 import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers, filterRelevantResults } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/data/firestore.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard } from "./lib/data/firestore.js";
 import { getDemoSearchResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
 import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
+import { sendAlertEmail } from "./lib/data/email.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
 import { fileURLToPath } from "url";
@@ -42,7 +43,7 @@ app.use((req, res, next) => {
   req.requestId = crypto.randomUUID().slice(0, 8);
   res.setHeader("X-Request-Id", req.requestId);
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
@@ -857,10 +858,14 @@ app.post("/api/check-alerts", ownerOnly, async (req, res) => {
     const triggered = [];
     const checked = [];
 
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+
     for (const alert of alerts) {
       try {
         const now = new Date().toISOString();
         await updateAlert(alert.id, { lastChecked: now });
+
+        const recentlyTriggered = alert.lastTriggered && (Date.now() - new Date(alert.lastTriggered).getTime()) < SIX_HOURS_MS;
 
         if (alert.type === "arbitrage") {
           const sources = ["ebay", "magi", "yahoo", "snkrdunk"];
@@ -901,7 +906,7 @@ app.post("/api/check-alerts", ownerOnly, async (req, res) => {
             const spreadPct = Math.round((spread / pricesBySource[most].lowest) * 100);
             const threshold = alert.spreadThreshold || 10;
             if (spreadPct >= threshold) {
-              triggered.push({
+              const triggerData = {
                 alertId: alert.id,
                 type: "arbitrage",
                 email: alert.email,
@@ -913,7 +918,13 @@ app.post("/api/check-alerts", ownerOnly, async (req, res) => {
                 spread,
                 spreadPct,
                 threshold,
-              });
+              };
+              triggered.push(triggerData);
+              if (!recentlyTriggered) {
+                const emailResult = await sendAlertEmail(alert, triggerData).catch(() => ({ sent: false }));
+                const ts = new Date().toISOString();
+                await updateAlert(alert.id, { lastTriggered: ts, lastNotified: ts, lastEmailResult: emailResult }).catch(() => {});
+              }
             }
           }
 
@@ -933,14 +944,20 @@ app.post("/api/check-alerts", ownerOnly, async (req, res) => {
           } catch {}
 
           if (lowestPrice != null && alert.targetPrice != null && lowestPrice <= alert.targetPrice) {
-            triggered.push({
+            const triggerData = {
               alertId: alert.id,
               type: "price",
               email: alert.email,
               query: alert.query,
               currentPrice: lowestPrice,
               targetPrice: alert.targetPrice,
-            });
+            };
+            triggered.push(triggerData);
+            if (!recentlyTriggered) {
+              const emailResult = await sendAlertEmail(alert, triggerData).catch(() => ({ sent: false }));
+              const ts = new Date().toISOString();
+              await updateAlert(alert.id, { lastTriggered: ts, lastNotified: ts, lastEmailResult: emailResult }).catch(() => {});
+            }
           }
 
           checked.push({ alertId: alert.id, type: "price", query: alert.query, currentPrice: lowestPrice });
@@ -953,6 +970,171 @@ app.post("/api/check-alerts", ownerOnly, async (req, res) => {
     res.json({ checked: checked.length, triggered: triggered.length, results: triggered, details: checked });
   } catch (e) {
     logError("check-alerts", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// ============ Portfolio ============
+
+const DEMO_PORTFOLIO = [
+  { cardId: "sv8a/217-187", query: "Umbreon ex SAR 217/187", addedAt: "2026-04-20T10:00:00Z", purchasePrice: 370, purchaseSource: "ebay", quantity: 1, notes: "" },
+  { cardId: "m4/114-083", query: "Mega Greninja ex SAR", addedAt: "2026-04-22T14:30:00Z", purchasePrice: 310, purchaseSource: "snkrdunk", quantity: 1, notes: "" },
+  { cardId: "m2a/234-193", query: "Pikachu ex SAR 234/193 PSA 10", addedAt: "2026-04-25T09:15:00Z", purchasePrice: 720, purchaseSource: "magi", quantity: 1, notes: "" },
+];
+
+const DEMO_CURRENT_PRICES = {
+  "sv8a/217-187": { currentPrice: 400, source: "ebay" },
+  "m4/114-083": { currentPrice: 384, source: "snkrdunk" },
+  "m2a/234-193": { currentPrice: 741, source: "magi" },
+};
+
+function portfolioUserId(req) {
+  const token = getRequestToken(req);
+  if (!token) return isLocal ? "local-dev" : null;
+  return crypto.createHash("sha256").update(token).digest("hex").slice(0, 16);
+}
+
+function calculatePortfolioStats(cards) {
+  const totalCost = cards.reduce((sum, c) => sum + (c.purchasePrice || 0) * (c.quantity || 1), 0);
+  const totalValue = cards.reduce((sum, c) => sum + (c.currentPrice || 0) * (c.quantity || 1), 0);
+  const totalROI = totalValue - totalCost;
+  const roiPercent = totalCost > 0 ? Math.round((totalROI / totalCost) * 10000) / 100 : 0;
+  return { totalValue: Math.round(totalValue * 100) / 100, totalCost: Math.round(totalCost * 100) / 100, totalROI: Math.round(totalROI * 100) / 100, roiPercent };
+}
+
+function getDemoPortfolioCards() {
+  return DEMO_PORTFOLIO.map(card => {
+    const prices = DEMO_CURRENT_PRICES[card.cardId] || {};
+    const currentPrice = prices.currentPrice || 0;
+    const roi = card.purchasePrice > 0 ? Math.round(((currentPrice - card.purchasePrice) / card.purchasePrice) * 10000) / 100 : 0;
+    return { ...card, currentPrice, currentSource: prices.source || "", roi };
+  });
+}
+
+async function enrichPortfolioCards(cards) {
+  return Promise.all(cards.map(async (card) => {
+    let currentPrice = 0;
+    let currentSource = "";
+    try {
+      const history = await getPriceHistory(card.query, { days: 30 });
+      if (history.length) {
+        currentPrice = history[0].price;
+        currentSource = history[0].source || "";
+      }
+    } catch {}
+    const roi = card.purchasePrice > 0 ? Math.round(((currentPrice - card.purchasePrice) / card.purchasePrice) * 10000) / 100 : 0;
+    return { ...card, currentPrice, currentSource, roi };
+  }));
+}
+
+app.get("/api/portfolio/summary", apiAuthMiddleware, async (req, res) => {
+  const isDemo = req.query.demo === "true";
+
+  try {
+    let cards;
+    if (isDemo) {
+      cards = getDemoPortfolioCards();
+    } else {
+      const userId = portfolioUserId(req);
+      if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+      const raw = await getPortfolio(userId);
+      cards = await enrichPortfolioCards(raw);
+    }
+
+    const stats = calculatePortfolioStats(cards);
+    let bestPerformer = null;
+    let worstPerformer = null;
+    for (const c of cards) {
+      if (!bestPerformer || c.roi > bestPerformer.roi) bestPerformer = c;
+      if (!worstPerformer || c.roi < worstPerformer.roi) worstPerformer = c;
+    }
+
+    res.json({
+      totalCards: cards.reduce((n, c) => n + (c.quantity || 1), 0),
+      uniqueCards: cards.length,
+      ...stats,
+      bestPerformer: bestPerformer ? { cardId: bestPerformer.cardId, query: bestPerformer.query, roi: bestPerformer.roi } : null,
+      worstPerformer: worstPerformer ? { cardId: worstPerformer.cardId, query: worstPerformer.query, roi: worstPerformer.roi } : null,
+      _demo: isDemo || undefined,
+    });
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.get("/api/portfolio", apiAuthMiddleware, async (req, res) => {
+  const isDemo = req.query.demo === "true";
+
+  try {
+    let cards;
+    if (isDemo) {
+      cards = getDemoPortfolioCards();
+    } else {
+      const userId = portfolioUserId(req);
+      if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+      const raw = await getPortfolio(userId);
+      cards = await enrichPortfolioCards(raw);
+    }
+
+    const stats = calculatePortfolioStats(cards);
+    res.json({ cards, ...stats, _demo: isDemo || undefined });
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.post("/api/portfolio", authMiddleware, async (req, res) => {
+  const { cardId, query, purchasePrice, purchaseSource, quantity } = req.body;
+  if (!cardId || !/^[a-z0-9.]+\/[\d]+-[\d]+$/i.test(cardId)) {
+    return res.status(400).json({ error: "Invalid or missing cardId. Format: setCode/number-total (e.g. sv8a/217-187)" });
+  }
+
+  const userId = portfolioUserId(req);
+  if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+
+  try {
+    const card = await addToPortfolio(userId, {
+      cardId,
+      query: query || "",
+      purchasePrice: purchasePrice != null ? Number(purchasePrice) : 0,
+      purchaseSource: purchaseSource || "",
+      quantity: quantity != null ? Number(quantity) : 1,
+    });
+    res.status(201).json({ ok: true, card });
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.delete("/api/portfolio/:cardId", authMiddleware, async (req, res) => {
+  const cardId = decodeURIComponent(req.params.cardId);
+  const userId = portfolioUserId(req);
+  if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+
+  try {
+    const removed = await removeFromPortfolio(userId, cardId);
+    if (!removed) return res.status(404).json({ error: "Card not found in portfolio" });
+    res.json({ ok: true, cardId });
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.patch("/api/portfolio/:cardId", authMiddleware, async (req, res) => {
+  const cardId = decodeURIComponent(req.params.cardId);
+  const userId = portfolioUserId(req);
+  if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+
+  try {
+    const updated = await updatePortfolioCard(userId, cardId, req.body);
+    if (!updated) return res.status(404).json({ error: "Card not found in portfolio" });
+    res.json({ ok: true, card: updated });
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
