@@ -27,8 +27,3 @@ jobs:
       - run: npx playwright install chromium --with-deps
       - run: node test/smoke-test.js
 
-  test:
-    runs-on: ubuntu-latest
-    needs: [unit, smoke]
-    steps:
-      - run: echo "All tests passed"
