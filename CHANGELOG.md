@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Playwright smoke test suite (40 tests): dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport, static assets
+- Sort dropdown on listing tabs (price ascending/descending)
+- Result counts in tab labels: "Active (6)" / "Sold (3)"
+- Condition badges on raw listing cards using detectedCondition from API
+- Price outlier warnings (flagPriceOutliers applied in API pipeline)
+- GRADED badge for slab listings in detail panel
+- Inline PSA stats in Prices tab with gem progress bar
+- Price chart x-axis date labels
+- Arbitrage "Best Price" chip and savings summary
+- Fade-up entrance animations, sticky frosted header, sticky search bar
+
+### Changed
+- Dashboard UI synced with casecomp.xyz frontend: Inter Tight + JetBrains Mono fonts, pill-style tabs/hints, ghost view button
+- Moved lib/demo.js to lib/data/, lib/output.js to lib/search/
+- Umbreon demo data: added detectedCondition (NM/LP) based on AI grades
+- Detail panel: prefer detectedCondition over "Ungraded"
+- Consistent shipping display with green "Free shipping"
+- CI: unit + smoke run in parallel, test gate job, removed duplicate dev push trigger
+- Demo rate limit shown correctly as 360/min
+
 ## 1.0.0-beta.1 (2026-05-10)
 
 Initial public beta.
