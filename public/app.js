@@ -287,11 +287,12 @@ function renderList(container, items) {
 
     const outlierHtml = item._priceOutlier ? '<span class="price-outlier">Price outlier</span>' : "";
 
+    const hasMultiplePhotos = item.additionalImages?.length > 0;
     const gradeChip = item.grade && !item.grade.error
       ? `<span class="grade-chip" style="color: ${gradeColor(item.grade.overall)}">${item.grade.overall.toFixed(1)}</span>`
       : item.listingGradeLabel
         ? `<span class="slab-chip">${esc(item.listingGradeLabel)}</span>`
-        : "";
+        : `<span class="no-grade-chip" title="${hasMultiplePhotos ? "Not graded" : "Single photo"}">—</span>`;
     const srcTag = sourceTag(item.itemWebUrl);
 
     return `
@@ -411,6 +412,7 @@ function selectItem(itemId) {
       ${gradeHtml}
     </div>
     <div class="detail-tab-panel${defaultTab === "prices" ? "" : " hidden"}" data-dtpanel="prices">
+      ${!hasGrade && !slabLabel ? `<div class="no-grade-note">${images.length <= 1 ? "AI grading unavailable — single photo" : "AI grading unavailable"}</div>` : ""}
       ${slabLabel ? renderPsaInline(currentPsaSignal) : ""}
       <div id="grading-roi" class="grading-roi hidden"></div>
       <div id="arbitrage-container" class="arbitrage-container hidden"></div>
