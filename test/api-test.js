@@ -709,6 +709,83 @@ async function run() {
     assert(items.every(i => typeof i._priceOutlier === "boolean"), "missing _priceOutlier");
   });
 
+  // ── Portfolio ──
+
+  console.log("\n\x1b[1m=== api/portfolio ===\x1b[0m");
+
+  await test("GET /api/portfolio?demo=true returns demo portfolio", async () => {
+    const { res, body } = await jsonNoAuth("/api/portfolio?demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body._demo === true, "not demo");
+    assert(Array.isArray(body.cards), "cards should be array");
+    assert(body.cards.length === 3, `expected 3 cards, got ${body.cards.length}`);
+    for (const card of body.cards) {
+      assert(card.cardId, "missing cardId");
+      assert(card.query, "missing query");
+      assert(typeof card.purchasePrice === "number", "purchasePrice must be number");
+      assert(typeof card.currentPrice === "number", "currentPrice must be number");
+      assert(typeof card.roi === "number", "roi must be number");
+      assert(card.currentPrice > 0, `currentPrice must be positive: ${card.cardId}`);
+    }
+    assert(typeof body.totalValue === "number", "missing totalValue");
+    assert(typeof body.totalCost === "number", "missing totalCost");
+    assert(typeof body.totalROI === "number", "missing totalROI");
+    assert(typeof body.roiPercent === "number", "missing roiPercent");
+    assert(body.totalCost === 1400, `expected totalCost 1400, got ${body.totalCost}`);
+    assert(body.totalValue === 1525, `expected totalValue 1525, got ${body.totalValue}`);
+  });
+
+  await test("GET /api/portfolio/summary?demo=true returns summary", async () => {
+    const { res, body } = await jsonNoAuth("/api/portfolio/summary?demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body._demo === true, "not demo");
+    assert(body.totalCards === 3, `expected 3 totalCards, got ${body.totalCards}`);
+    assert(body.uniqueCards === 3, `expected 3 uniqueCards, got ${body.uniqueCards}`);
+    assert(typeof body.totalValue === "number", "missing totalValue");
+    assert(typeof body.totalCost === "number", "missing totalCost");
+    assert(typeof body.totalROI === "number", "missing totalROI");
+    assert(typeof body.roiPercent === "number", "missing roiPercent");
+    assert(body.bestPerformer, "missing bestPerformer");
+    assert(body.bestPerformer.cardId, "bestPerformer missing cardId");
+    assert(typeof body.bestPerformer.roi === "number", "bestPerformer missing roi");
+    assert(body.worstPerformer, "missing worstPerformer");
+  });
+
+  await test("GET /api/portfolio without key returns 401 (if key configured)", async () => {
+    const { res } = await jsonNoAuth("/api/portfolio");
+    if (API_KEY) {
+      assert(res.status === 401, `expected 401, got ${res.status}`);
+    }
+  });
+
+  await test("POST /api/portfolio without key returns 401 (if key configured)", async () => {
+    const { res } = await jsonNoAuth("/api/portfolio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "sv8a/217-187", query: "test" }),
+    });
+    if (API_KEY) {
+      assert(res.status === 401, `expected 401, got ${res.status}`);
+    }
+  });
+
+  await test("Demo portfolio Umbreon has positive ROI", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio?demo=true");
+    const umbreon = body.cards.find(c => c.cardId === "sv8a/217-187");
+    assert(umbreon, "missing Umbreon");
+    assert(umbreon.purchasePrice === 370, `expected 370, got ${umbreon.purchasePrice}`);
+    assert(umbreon.currentPrice === 400, `expected 400, got ${umbreon.currentPrice}`);
+    assert(umbreon.roi > 0, "expected positive ROI");
+  });
+
+  await test("Demo portfolio has all 3 demo cards", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio?demo=true");
+    const ids = body.cards.map(c => c.cardId);
+    assert(ids.includes("sv8a/217-187"), "missing Umbreon");
+    assert(ids.includes("m4/114-083"), "missing Greninja");
+    assert(ids.includes("m2a/234-193"), "missing Pikachu");
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);

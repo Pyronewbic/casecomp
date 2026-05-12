@@ -21,6 +21,7 @@ import {
 } from "../lib/search/filters.js";
 import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards, findDemoByNumber } from "../lib/data/demo.js";
 import { parseCardIdentity, buildCardId, SET_NAME_MAP, resolveCardIdToQuery } from "../lib/data/card-identity.js";
+import { buildAlertEmailSubject, sendAlertEmail } from "../lib/data/email.js";
 
 let passed = 0;
 let failed = 0;
@@ -781,6 +782,114 @@ test("graded demos have descriptive detail text", () => {
       assert(details.surface.detail.length > 30, `${item.itemId} surface detail too short`);
     }
   }
+});
+
+// ── Alert email ──
+
+console.log("\n\x1b[1m=== alert email ===\x1b[0m");
+
+test("buildAlertEmailSubject returns price subject", () => {
+  const alert = { type: "price", query: "Umbreon ex SAR 217/187" };
+  const triggerData = { currentPrice: 350 };
+  const subject = buildAlertEmailSubject(alert, triggerData);
+  eq(subject, "Price alert: Umbreon ex SAR 217/187 below $350");
+});
+
+test("buildAlertEmailSubject returns arbitrage subject", () => {
+  const alert = { type: "arbitrage", query: "Pikachu ex SAR" };
+  const triggerData = { spreadPct: 15 };
+  const subject = buildAlertEmailSubject(alert, triggerData);
+  eq(subject, "Arbitrage alert: Pikachu ex SAR spread 15%");
+});
+
+test("sendAlertEmail returns skipped when no API key", async () => {
+  const origKey = process.env.RESEND_API_KEY;
+  delete process.env.RESEND_API_KEY;
+  try {
+    const result = await sendAlertEmail(
+      { type: "price", email: "test@example.com", query: "Test Card" },
+      { currentPrice: 100 }
+    );
+    assert(result.skipped === true, "should have skipped");
+    eq(result.reason, "no_api_key");
+  } finally {
+    if (origKey) process.env.RESEND_API_KEY = origKey;
+  }
+});
+
+// ── Portfolio ──
+
+console.log("\n\x1b[1m=== portfolio ===\x1b[0m");
+
+test("cardId escaping replaces / with _", () => {
+  eq("sv8a/217-187".replace(/\//g, "_"), "sv8a_217-187");
+  eq("m4/114-083".replace(/\//g, "_"), "m4_114-083");
+  eq("m2a/234-193".replace(/\//g, "_"), "m2a_234-193");
+});
+
+test("ROI calculation: positive gain", () => {
+  const purchase = 370;
+  const current = 400;
+  const roi = Math.round(((current - purchase) / purchase) * 10000) / 100;
+  eq(roi, 8.11);
+});
+
+test("ROI calculation: negative loss", () => {
+  const purchase = 400;
+  const current = 370;
+  const roi = Math.round(((current - purchase) / purchase) * 10000) / 100;
+  eq(roi, -7.5);
+});
+
+test("ROI calculation: zero purchase returns 0", () => {
+  const purchase = 0;
+  const current = 400;
+  const roi = purchase > 0 ? Math.round(((current - purchase) / purchase) * 10000) / 100 : 0;
+  eq(roi, 0);
+});
+
+test("demo portfolio has 3 cards with valid fields", () => {
+  const DEMO_PORTFOLIO = [
+    { cardId: "sv8a/217-187", query: "Umbreon ex SAR 217/187", purchasePrice: 370, purchaseSource: "ebay", quantity: 1 },
+    { cardId: "m4/114-083", query: "Mega Greninja ex SAR", purchasePrice: 310, purchaseSource: "snkrdunk", quantity: 1 },
+    { cardId: "m2a/234-193", query: "Pikachu ex SAR 234/193 PSA 10", purchasePrice: 720, purchaseSource: "magi", quantity: 1 },
+  ];
+  eq(DEMO_PORTFOLIO.length, 3);
+  for (const card of DEMO_PORTFOLIO) {
+    assert(card.cardId, "missing cardId");
+    assert(card.query, "missing query");
+    assert(typeof card.purchasePrice === "number", "purchasePrice must be number");
+    assert(card.purchasePrice > 0, "purchasePrice must be positive");
+    assert(card.purchaseSource, "missing purchaseSource");
+    assert(card.quantity >= 1, "quantity must be >= 1");
+    assert(/^[a-z0-9.]+\/[\d]+-[\d]+$/i.test(card.cardId), `invalid cardId format: ${card.cardId}`);
+  }
+});
+
+test("portfolio stats calculation", () => {
+  const cards = [
+    { purchasePrice: 370, currentPrice: 400, quantity: 1 },
+    { purchasePrice: 310, currentPrice: 384, quantity: 1 },
+    { purchasePrice: 720, currentPrice: 741, quantity: 1 },
+  ];
+  const totalCost = cards.reduce((s, c) => s + c.purchasePrice * c.quantity, 0);
+  const totalValue = cards.reduce((s, c) => s + c.currentPrice * c.quantity, 0);
+  eq(totalCost, 1400);
+  eq(totalValue, 1525);
+  const totalROI = totalValue - totalCost;
+  eq(totalROI, 125);
+  const roiPercent = Math.round((totalROI / totalCost) * 10000) / 100;
+  eq(roiPercent, 8.93);
+});
+
+test("portfolio stats with quantity > 1", () => {
+  const cards = [
+    { purchasePrice: 100, currentPrice: 120, quantity: 3 },
+  ];
+  const totalCost = cards.reduce((s, c) => s + c.purchasePrice * c.quantity, 0);
+  const totalValue = cards.reduce((s, c) => s + c.currentPrice * c.quantity, 0);
+  eq(totalCost, 300);
+  eq(totalValue, 360);
 });
 
 // ── Summary ──

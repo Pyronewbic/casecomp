@@ -912,3 +912,56 @@ alertForm.addEventListener("submit", async (e) => {
   }
   alertMsg.classList.remove("hidden");
 });
+
+// ── Portfolio ──
+
+const portfolioLoadBtn = document.getElementById("portfolio-load");
+const portfolioStatsEl = document.getElementById("portfolio-stats");
+const portfolioCardsEl = document.getElementById("portfolio-cards");
+
+if (portfolioLoadBtn) {
+  portfolioLoadBtn.addEventListener("click", loadPortfolio);
+}
+
+async function loadPortfolio() {
+  portfolioLoadBtn?.classList.add("hidden");
+  portfolioCardsEl.innerHTML = "<p style='color:rgba(255,255,255,0.4);text-align:center;padding:20px'>Loading...</p>";
+  try {
+    const res = await fetch("/api/portfolio?demo=true");
+    const data = await res.json();
+    renderPortfolio(data);
+  } catch {
+    portfolioCardsEl.innerHTML = "<p style='color:var(--red);text-align:center;padding:20px'>Failed to load portfolio</p>";
+  }
+}
+
+function renderPortfolio(data) {
+  const roiClass = data.roiPercent >= 0 ? "positive" : "negative";
+  const roiSign = data.roiPercent >= 0 ? "+" : "";
+
+  portfolioStatsEl.innerHTML = `
+    <div class="portfolio-stat"><div class="stat-label">Cards</div><div class="stat-value">${data.cards.length}</div></div>
+    <div class="portfolio-stat"><div class="stat-label">Total Cost</div><div class="stat-value">${formatPrice(data.totalCost, "USD")}</div></div>
+    <div class="portfolio-stat"><div class="stat-label">Current Value</div><div class="stat-value">${formatPrice(data.totalValue, "USD")}</div></div>
+    <div class="portfolio-stat"><div class="stat-label">ROI</div><div class="stat-value ${roiClass}">${roiSign}${data.roiPercent}%</div></div>
+  `;
+  portfolioStatsEl.classList.remove("hidden");
+
+  portfolioCardsEl.innerHTML = data.cards.map(c => {
+    const cRoiClass = c.roi >= 0 ? "positive" : "negative";
+    const cRoiSign = c.roi >= 0 ? "+" : "";
+    return `<div class="portfolio-card">
+      <div class="portfolio-card-left">
+        <span class="portfolio-card-name">${c.query}</span>
+        <span class="portfolio-card-id">${c.cardId} &middot; ${c.purchaseSource}</span>
+      </div>
+      <div class="portfolio-card-right">
+        <div class="portfolio-card-prices">
+          <span class="portfolio-card-current">${formatPrice(c.currentPrice, "USD")}</span>
+          <span class="portfolio-card-purchase">Bought: ${formatPrice(c.purchasePrice, "USD")}</span>
+        </div>
+        <span class="portfolio-roi ${cRoiClass}">${cRoiSign}${c.roi}%</span>
+      </div>
+    </div>`;
+  }).join("");
+}
