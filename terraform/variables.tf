@@ -21,3 +21,4 @@ variable "container_image" {
 variable "alert_email" {
   sensitive = true
 }
+
