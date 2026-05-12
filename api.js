@@ -15,7 +15,6 @@ import { gradeImage } from "./lib/grading/grading.js";
 import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
-import { getRedisStatus, sha256 } from "./lib/data/redis-cache.js";
 import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs } from "./lib/data/firestore.js";
 import { getDemoSearchResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
@@ -435,13 +434,13 @@ app.delete("/api/errors", ownerOnly, async (req, res) => {
 
 // GET /api/health
 app.get("/api/health", async (req, res) => {
-  const [redisStatus, firestoreStatus] = await Promise.all([getRedisStatus(), getFirestoreStatus()]);
+  const firestoreStatus = await getFirestoreStatus();
   let ebayUsage = null;
   try { ebayUsage = await getEbayUsageToday(); } catch {}
   res.json({
     status: "ok",
     uptime: Math.floor(process.uptime()),
-    redis: redisStatus,
+    redis: { connected: false, status: "not configured" },
     firestore: firestoreStatus,
     ebay: { configured: !!(clientId && clientSecret), usageToday: ebayUsage, dailyCap: DAILY_CAP },
   });
@@ -685,12 +684,29 @@ app.get("/api/card/share/:setCode/:number", async (req, res) => {
 
     const identity = card || parseCardIdentity(searchQuery);
     if (identity.setCode) identity.setName = SET_NAME_MAP[identity.setCode] || identity.setCode;
+    if (search?.query) {
+      const fromQuery = parseCardIdentity(search.query);
+      if (!identity.rarity && fromQuery.rarity) identity.rarity = fromQuery.rarity;
+      if ((!identity.name || identity.name === identity.setName) && fromQuery.name) identity.name = fromQuery.name;
+    }
+    if (identity.name && identity.setName && identity.name.includes(identity.setName)) {
+      identity.name = identity.name.replace(identity.setName, "").replace(/\s+/g, " ").trim();
+    }
 
     const active = search ? Object.values(search.activeByCountry || {}).flat() : [];
     const lowestPrice = active.length ? Math.min(...active.map(i => i.totalCost || i.price)) : null;
     const lowestSource = lowestPrice && active.length
       ? active.find(i => (i.totalCost || i.price) === lowestPrice)
       : null;
+
+    const sourceMap = {};
+    for (const item of active) {
+      const src = item.itemWebUrl?.includes("magi") ? "magi" : item.itemWebUrl?.includes("yahoo") ? "yahoo" : item.itemWebUrl?.includes("snkrdunk") ? "snkrdunk" : "ebay";
+      if (!sourceMap[src]) sourceMap[src] = { count: 0, lowest: Infinity };
+      sourceMap[src].count++;
+      const p = item.totalCost || item.price;
+      if (p < sourceMap[src].lowest) sourceMap[src].lowest = p;
+    }
 
     res.json({
       cardId,
@@ -700,10 +716,11 @@ app.get("/api/card/share/:setCode/:number", async (req, res) => {
         source: lowestSource?.itemWebUrl?.includes("magi") ? "magi" : lowestSource?.itemWebUrl?.includes("yahoo") ? "yahoo" : lowestSource?.itemWebUrl?.includes("snkrdunk") ? "snkrdunk" : "ebay",
         listingCount: active.length,
         currency: active[0]?.priceCurrency || "USD",
+        bySources: sourceMap,
       },
       psaSignal: search?.psaSignal || null,
       priceHistory: priceData,
-      searchQuery,
+      searchQuery: search?.query || searchQuery,
     });
   } catch (e) {
     logError("card-share", e.message, req.originalUrl, req.requestId);
