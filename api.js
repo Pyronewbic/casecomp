@@ -184,8 +184,7 @@ async function storeGradeLog(record) {
 async function gradeItems(items, config, cardName, source) {
   return Promise.all(items.map(async (row) => {
     try {
-      const backImg = (row.additionalImages || [])[0];
-      const extraImages = backImg ? [backImg] : [];
+      const extraImages = row.additionalImages || [];
       const g = await gradeImage(row.imageUrl, config, extraImages);
       if (g && !g.error) {
         await storeGradeLog({
