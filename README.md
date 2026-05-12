@@ -86,7 +86,7 @@ public/admin/       Admin dashboard (keys, stats, errors)
 extension/          Chrome extension: queue auto-join, drop intel
 terraform/          GCP infra: Cloud Run ×2, Firestore, LB + CDN, Secret Manager
 test/
-  unit-test.js      108 unit tests
+  unit-test.js      118 unit tests
   api-test.js       76 API integration tests
   smoke-test.js     40 Playwright smoke tests (dashboard UI)
 ```
@@ -140,6 +140,13 @@ curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
   -H "Content-Type: application/json" \
   -d '{"email":"you@email.com","query":"Umbreon ex SAR 217/187","type":"arbitrage","spreadThreshold":10}' \
   "https://api.casecomp.xyz/api/alerts"
+
+# Portfolio (sample data)
+curl "https://api.casecomp.xyz/api/portfolio?demo=true"
+curl "https://api.casecomp.xyz/api/portfolio/summary?demo=true"
+curl "https://api.casecomp.xyz/api/portfolio/history?days=30&demo=true"
+curl "https://api.casecomp.xyz/api/portfolio/export?format=csv&demo=true"
+curl "https://api.casecomp.xyz/api/portfolio/grading-opportunities?demo=true"
 ```
 
 ### Rate limits
@@ -234,7 +241,7 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-224 tests: 108 unit (filters, grading, query builder, card identity, condition detection, demo data, resolveCardIdToQuery, findDemoByNumber, image preprocessing, image resolution, email alerts, portfolio ROI) + 76 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, alerts, share pages, demo validation, portfolio) + 40 Playwright smoke (dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport).
+238 tests: 118 unit (filters, grading, query builder, card identity, condition detection, demo data, image preprocessing, email alerts, portfolio ROI, CSV, gainers/losers, grading opportunities) + 80 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, alerts, share pages, demo validation, portfolio CRUD, portfolio history/export/grading) + 40 Playwright smoke (dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport).
 
 ## Contributing
 
