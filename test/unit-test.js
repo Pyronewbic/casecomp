@@ -1,4 +1,5 @@
 import { parseGradeJSON } from "../lib/grading/grading.js";
+import { cornerCropsToImageBlocks } from "../lib/grading/preprocessing.js";
 import { buildEbaySearchQuery, describeListingSearch } from "../lib/search/listingQuery.js";
 import {
   filterByCondition,
@@ -701,6 +702,85 @@ test("condition filter with detectedCondition works", () => {
   const r = getDemoSearchResult("Mega Greninja ex SAR", { condition: "mint" });
   const items = r.activeByCountry?.US || [];
   assert(items.length === 5, `expected 5 mint, got ${items.length}`);
+});
+
+// ── cornerCropsToImageBlocks ──
+
+console.log("\n\x1b[1m=== cornerCropsToImageBlocks ===\x1b[0m");
+
+test("converts crops to Anthropic image blocks", () => {
+  const crops = [
+    { name: "top-left", base64: "abc123", mediaType: "image/jpeg" },
+    { name: "top-right", base64: "def456", mediaType: "image/jpeg" },
+  ];
+  const blocks = cornerCropsToImageBlocks(crops);
+  eq(blocks.length, 2);
+  eq(blocks[0].type, "image");
+  eq(blocks[0].source.type, "base64");
+  eq(blocks[0].source.media_type, "image/jpeg");
+  eq(blocks[0].source.data, "abc123");
+});
+
+test("returns empty array for empty input", () => {
+  const blocks = cornerCropsToImageBlocks([]);
+  eq(blocks.length, 0);
+});
+
+// ── Demo image resolution ──
+
+console.log("\n\x1b[1m=== demo image resolution ===\x1b[0m");
+
+test("eBay demo images use s-l1600 resolution", () => {
+  for (const query of listDemoCards()) {
+    const r = getDemoResult(query);
+    const items = r.activeByCountry?.US || [];
+    for (const item of items) {
+      if (item.imageUrl?.includes("ebayimg.com")) {
+        assert(item.imageUrl.includes("s-l1600"), `${item.itemId} still uses low-res: ${item.imageUrl}`);
+      }
+    }
+    for (const s of r.sold || []) {
+      if (s.imageUrl?.includes("ebayimg.com")) {
+        assert(s.imageUrl.includes("s-l1600"), `sold ${s.itemId} still uses low-res`);
+      }
+    }
+  }
+});
+
+test("no s-l500 URLs remain in demo data", () => {
+  for (const query of listDemoCards()) {
+    const r = getDemoResult(query);
+    const json = JSON.stringify(r);
+    assert(!json.includes("s-l500"), `${query} still has s-l500 URLs`);
+  }
+});
+
+// ── Demo grade confidence (conservative with new prompts) ──
+
+console.log("\n\x1b[1m=== demo grade confidence ===\x1b[0m");
+
+test("graded demo listings have conservative confidence", () => {
+  for (const key of ["mega greninja ex sar", "umbreon ex sar 217/187"]) {
+    const r = getDemoResult(key);
+    const items = (r.activeByCountry?.US || []).filter(i => i.grade);
+    for (const item of items) {
+      assert(item.grade.confidence <= 0.7, `${item.itemId} confidence ${item.grade.confidence} too high for listing photos`);
+    }
+  }
+});
+
+test("graded demos have descriptive detail text", () => {
+  for (const key of ["mega greninja ex sar", "umbreon ex sar 217/187"]) {
+    const r = getDemoResult(key);
+    const items = (r.activeByCountry?.US || []).filter(i => i.grade);
+    for (const item of items) {
+      const details = item.grade.subgradeDetails;
+      assert(details.centering.detail.length > 30, `${item.itemId} centering detail too short`);
+      assert(details.corners.detail.length > 30, `${item.itemId} corners detail too short`);
+      assert(details.edges.detail.length > 30, `${item.itemId} edges detail too short`);
+      assert(details.surface.detail.length > 30, `${item.itemId} surface detail too short`);
+    }
+  }
 });
 
 // ── Summary ──

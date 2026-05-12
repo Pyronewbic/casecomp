@@ -24,6 +24,9 @@
 - Fade-up entrance animations, sticky frosted header, sticky search bar
 - Alert form: toggle between Price Drop and Arbitrage Spread types
 - Developers nav link in dashboard header
+- AI grading: corner crop preprocessing via sharp (8 magnified crops from front+back for corners subgrade)
+- AI grading: all listing images passed to centering/edges/surface (corners uses front+back + crops only)
+- eBay image resolution upgrade: s-l500 (500px) to s-l1600 (full resolution)
 
 ### Changed
 - Dashboard UI synced with casecomp.xyz frontend: Inter Tight + JetBrains Mono fonts, pill-style tabs/hints, ghost view button
@@ -40,7 +43,9 @@
 - Card identity: cleaned up long names (strips pack names, condition text from titles)
 - track-prices: now also tracks cards from active alerts, not just 3 hardcoded defaults
 - Demo condition filter: checks detectedCondition in addition to raw condition field
-- Tests: 208 total (92 unit + 76 API + 40 smoke), up from 183
+- Tests: 214 total (98 unit + 76 API + 40 smoke), up from 183
+- AI grading prompts: full PSA rubric (5-10), perspective correction, per-corner/edge detail, holo-specific surface guidance
+- Demo grades re-evaluated with improved prompts (more conservative scores, honest confidence)
 - Removed dead code: Redis import from api.js, updateCardField from card-identity.js
 
 ## 1.0.0-beta.1 (2026-05-10)
