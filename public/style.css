@@ -310,6 +310,22 @@ main {
   color: var(--gold);
   background: var(--gold-dim);
 }
+.sort-select {
+  margin-left: auto;
+  background: var(--inset);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.sort-select:focus { border-color: rgba(217, 182, 118, 0.3); color: var(--text); }
+.sort-select option { background: var(--panel); color: var(--text); }
 
 .source-filters {
   display: flex;
@@ -651,11 +667,12 @@ main {
 }
 .gem-bar-track {
   flex: 1;
-  height: 5px;
+  height: 6px;
   background: rgba(255,255,255,0.06);
   border-radius: 3px;
   overflow: hidden;
-  max-width: 60px;
+  min-width: 40px;
+  max-width: 80px;
 }
 .gem-bar-fill {
   height: 100%;
@@ -663,34 +680,59 @@ main {
   border-radius: 3px;
 }
 
-.card-identity { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-.card-id-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
 .card-id-badge { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gold); background: var(--gold-dim); padding: 3px 8px; border-radius: 4px; font-weight: 600; }
-.card-id-rarity { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 700; color: var(--text); background: var(--inset); border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px; }
+.card-id-rarity { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; font-weight: 700; color: var(--text); background: var(--panel); border: 1px solid var(--border); padding: 2px 6px; border-radius: 3px; }
 .card-id-set { font-size: 11px; color: var(--muted); }
-.card-id-num { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
-.card-id-names { margin-top: 4px; display: flex; gap: 10px; }
 .card-id-name { font-size: 11px; color: var(--text); }
+.card-id-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
 .card-id-lang { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-right: 2px; }
 
-.arbitrage-container { background: var(--inset); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+.arbitrage-container { background: var(--inset); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
 .arbitrage-sources { display: flex; gap: 8px; margin-top: 8px; }
 .arb-source { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px; text-align: center; }
-.arb-source.arb-cheapest { border-color: var(--green); background: rgba(124, 224, 168, 0.05); }
+.arb-source.arb-cheapest { border-color: var(--green); background: rgba(124, 224, 168, 0.08); }
+.arb-best-chip { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--green); background: rgba(124, 224, 168, 0.12); border: 1px solid rgba(124, 224, 168, 0.3); padding: 2px 7px; border-radius: 3px; margin-top: 6px; display: inline-block; }
 .arb-source-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
 .arb-cheapest .arb-source-name { color: var(--green); }
 .arb-source-price { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 18px; font-weight: 700; color: var(--text); }
 .arb-cheapest .arb-source-price { color: var(--green); }
 .arb-source-jpy { font-size: 10px; color: var(--muted); }
 .arb-source-count { font-size: 10px; color: var(--muted); margin-top: 2px; }
-.arb-summary { margin-top: 8px; font-size: 11px; color: var(--gold); text-align: center; }
+.arb-summary {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+  text-align: center;
+}
+.arb-summary-spread {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 6px;
+}
 
 .price-chart-container {
   background: var(--inset);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .price-chart-container canvas {
   width: 100%;
@@ -699,7 +741,9 @@ main {
 .price-chart-stats {
   display: flex;
   gap: 16px;
-  margin-top: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--muted);
 }
@@ -707,24 +751,31 @@ main {
   color: var(--text);
   font-family: 'Space Grotesk', system-ui, sans-serif;
 }
+.price-chart-stats .stat-avg b {
+  color: var(--gold);
+  font-size: 13px;
+}
 
 .detail-actions {
   display: flex;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 8px;
 }
 .detail-actions a {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 16px;
-  background: var(--gold);
-  color: var(--bg);
+  background: transparent;
+  color: var(--gold);
+  border: 1px solid rgba(217, 182, 118, 0.25);
   border-radius: 6px;
   font-family: 'Space Grotesk', system-ui, sans-serif;
   font-size: 13px;
-  font-weight: 600;
-  transition: opacity 0.2s;
+  font-weight: 500;
+  transition: all 0.2s;
 }
-.detail-actions a:hover { opacity: 0.85; text-decoration: none; }
+.detail-actions a:hover { border-color: var(--gold); background: rgba(217, 182, 118, 0.06); text-decoration: none; }
 
 .listing-card .thumb {
   width: 72px;
@@ -774,6 +825,33 @@ main {
   font-size: 12px;
   color: var(--muted);
 }
+.condition-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--inset);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.price-outlier {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--red);
+  background: rgba(255, 93, 93, 0.08);
+  border: 1px solid rgba(255, 93, 93, 0.25);
+  padding: 1px 6px;
+  border-radius: 3px;
+  display: inline-block;
+  margin-top: 4px;
+}
+.shipping-free { color: var(--green); }
 
 .listing-card .sold-date {
   font-size: 11px;
