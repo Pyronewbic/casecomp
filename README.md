@@ -87,6 +87,7 @@ terraform/          GCP infra: Cloud Run ×2, Firestore, LB + CDN, Secret Manage
 test/
   unit-test.js      81 unit tests
   api-test.js       62 API integration tests
+  smoke-test.js     40 Playwright smoke tests (dashboard UI)
 ```
 
 ## Web Dashboard
@@ -139,7 +140,7 @@ curl -H "Authorization: Bearer $CASECOMP_KEY" \
 | Endpoint | Limit |
 |----------|-------|
 | Authenticated (`CC_LIVE_` key) | 60 req/min |
-| Sample data (`?demo=true`) | 20 req/min |
+| Sample data (`?demo=true`) | 360 req/min |
 | Health, docs, static | No limit |
 
 ### Public endpoints (no key)
@@ -226,11 +227,11 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-143 tests: 81 unit (filters, grading, query builder, card identity, condition detection, demo data) + 62 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, demo validation).
+183 tests: 81 unit (filters, grading, query builder, card identity, condition detection, demo data) + 62 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, demo validation) + 40 Playwright smoke (dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport).
 
 ## Contributing
 
-Contributions welcome. Fork the repo, create a branch, and open a PR against `dev`. Run `yarn test` before submitting — all 105 tests must pass.
+Contributions welcome. Fork the repo, create a branch, and open a PR against `dev`. Run `yarn test` before submitting — all tests must pass.
 
 For bug reports or feature requests, open an [issue](https://github.com/Pyronewbic/casecomp/issues).
 
