@@ -771,6 +771,51 @@ main {
   font-size: 12px;
   color: var(--muted);
 }
+.roi-expected-outcome {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.roi-expected-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.roi-expected-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+}
+.roi-expected-grade {
+  font-weight: 700;
+  color: var(--gold);
+}
+.roi-expected-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+.roi-expected-pop {
+  color: var(--text);
+}
+.roi-expected-scarcity {
+  font-weight: 600;
+}
+.roi-expected-scarcity.scarce { color: var(--green); }
+.roi-expected-scarcity.moderate { color: var(--gold); }
+.roi-expected-scarcity.common { color: var(--muted); }
 
 .arbitrage-container { background: var(--inset); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
 .arbitrage-sources { display: flex; gap: 8px; margin-top: 8px; }
@@ -828,6 +873,58 @@ main {
 .price-chart-stats .stat-avg b {
   color: var(--gold);
   font-size: 13px;
+}
+
+.tcg-market-ref {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(217, 182, 118, 0.04);
+  border: 1px solid rgba(217, 182, 118, 0.18);
+  border-radius: 6px;
+}
+.tcg-market-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+.tcg-market-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.tcg-market-price {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.tcg-market-median {
+  font-size: 12px;
+  color: var(--muted);
+}
+.tcg-market-median b {
+  color: var(--text);
+}
+.tcg-market-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.jp-market-ref {
+  border-color: rgba(124, 224, 168, 0.15);
+  background: rgba(124, 224, 168, 0.03);
+}
+.jp-market-source {
+  font-size: 9px;
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 6px;
 }
 
 .detail-actions {
