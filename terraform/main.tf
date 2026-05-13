@@ -56,7 +56,7 @@ resource "google_binary_authorization_policy" "default" {
 
   default_admission_rule {
     evaluation_mode  = "ALWAYS_ALLOW"
-    enforcement_mode = "DRYRUN_AUDIT_LOG_ONLY"
+    enforcement_mode = "ENFORCED_BLOCK_AND_AUDIT_LOG"
   }
 
   depends_on = [google_project_service.binaryauthorization]
@@ -164,6 +164,10 @@ resource "google_cloud_run_v2_service" "api" {
     use_default = true
   }
 
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image, client, client_version]
+  }
+
   depends_on = [
     google_project_service.run,
     google_secret_manager_secret_iam_member.cloud_run_access,
@@ -252,6 +256,10 @@ resource "google_cloud_run_v2_service" "site" {
 
   binary_authorization {
     use_default = true
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image, client, client_version]
   }
 
   depends_on = [
