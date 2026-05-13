@@ -22,6 +22,7 @@ Search any Pokemon card across four marketplaces in one query. Get live prices, 
 - **Slab comparison** - compare PSA 10 / BGS 9.5 / TAG 10 prices across sources
 - **Dashboard** - search, arbitrage, price history, grade breakdown at `/dashboard`
 - **Admin** - API key management, stats KPIs, error log at `/admin`
+- **Set browser** - browse 238 sets with logos, rarity filters, collection tracking (owned/missing)
 - **REST API** - authenticated endpoints with rate limiting, per-key caching, OpenAPI spec
 - **Claude Code skill** - `/casecomp` for plain-English card search
 - **Chrome extension** - queue auto-join for Pokemon Center, Walmart, Costco, Target drops
@@ -71,6 +72,7 @@ lib/
     firestore.js    Firestore: grade logs, drops, webhooks, cache
     api-keys.js     Developer key management
     card-identity.js Card identity: canonical IDs, set resolution
+    card-database.js TCGdex card DB (29K cards), set browser, rarity
     price-history.js Sold comp price tracking
     demo.js         Sample data (3 multi-source cards)
     cache.js        File-based cache (legacy)
@@ -86,9 +88,9 @@ public/admin/       Admin dashboard (keys, stats, errors)
 extension/          Chrome extension: queue auto-join, drop intel
 terraform/          GCP infra: Cloud Run ×2, Firestore, LB + CDN, Secret Manager
 test/
-  unit-test.js      128 unit tests
-  api-test.js       76 API integration tests
-  smoke-test.js     40 Playwright smoke tests (dashboard UI)
+  unit-test.js      130 unit tests
+  api-test.js       96 API integration tests
+  smoke-test.js     74 Playwright smoke tests (dashboard UI)
 ```
 
 ## Web Dashboard
@@ -147,6 +149,13 @@ curl "https://api.casecomp.xyz/api/portfolio/summary?demo=true"
 curl "https://api.casecomp.xyz/api/portfolio/history?days=30&demo=true"
 curl "https://api.casecomp.xyz/api/portfolio/export?format=csv&demo=true"
 curl "https://api.casecomp.xyz/api/portfolio/grading-opportunities?demo=true"
+
+# Set browser
+curl "https://api.casecomp.xyz/api/sets"
+curl "https://api.casecomp.xyz/api/sets/sv06"
+
+# Collection tracking (which cards in a set do I own?)
+curl "https://api.casecomp.xyz/api/portfolio/set/sv8a?demo=true"
 ```
 
 ### Rate limits
@@ -159,7 +168,7 @@ curl "https://api.casecomp.xyz/api/portfolio/grading-opportunities?demo=true"
 
 ### Public endpoints (no key)
 
-`GET /api/health` | `GET /api/demo` | `GET /api/sitemap` | `GET /api/autocomplete` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold/arbitrage/price-history
+`GET /api/health` | `GET /api/demo` | `GET /api/sitemap` | `GET /api/autocomplete` | `GET /api/sets` | `GET /api/sets/:setCode` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold/arbitrage/price-history
 
 ## Claude Code Skills
 
