@@ -15,6 +15,7 @@
 - Pagination: 25 listings per page with "Show more" button
 - Autocomplete suppressed on hint chip clicks
 - Card-centric view: GET /api/card/view/:setCode/:number returns raw + graded data with PSA + grading ROI comparison
+- Public sitemap: GET /api/sitemap returns all indexable URLs (static + card pages), supports ?format=xml for Google
 - eBay relevance filtering: blocklist expanded (art case, sleeves, playmat, booster, etc.), applied to active+sold
 - Arbitrage alerts: notify when cross-source spread exceeds threshold (POST /api/alerts with type "arbitrage")
 - Price drop alerts: notify when price falls below target (POST /api/alerts with type "price")

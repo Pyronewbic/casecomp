@@ -159,7 +159,7 @@ curl "https://api.casecomp.xyz/api/portfolio/grading-opportunities?demo=true"
 
 ### Public endpoints (no key)
 
-`GET /api/health` | `GET /api/demo` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold/arbitrage/price-history
+`GET /api/health` | `GET /api/demo` | `GET /api/sitemap` | `GET /api/autocomplete` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold/arbitrage/price-history
 
 ## Claude Code Skills
 
