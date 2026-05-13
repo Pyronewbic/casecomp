@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  security-events: write
 
 env:
   PROJECT_ID: casecomp-495718
@@ -16,6 +17,8 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
     steps:
       - uses: actions/checkout@v5
 
@@ -44,11 +47,87 @@ jobs:
             esac
           done
 
+      - name: Get image digest
+        id: digest
+        run: |
+          DIGEST=$(gcloud container images describe ${{ env.IMAGE }}:latest \
+            --project ${{ env.PROJECT_ID }} \
+            --format='value(image_summary.digest)')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "Image digest: $DIGEST"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (keyless)
+        run: |
+          cosign sign --yes \
+            --oidc-issuer=https://token.actions.githubusercontent.com \
+            "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}"
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE }} \
-            --image ${{ env.IMAGE }} \
+            --image "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}" \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
             --port 3000 \
             --allow-unauthenticated
+
+      - name: Verify signature
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp="github.com/Pyronewbic/casecomp" \
+            "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}" || true
+
+  scan:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/129850122606/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: casecomp-deploy@casecomp-495718.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Pull image
+        run: |
+          gcloud auth configure-docker --quiet
+          docker pull "${{ env.IMAGE }}@${{ needs.deploy.outputs.digest }}"
+
+      - name: Generate SBOM (Syft)
+        uses: anchore/sbom-action@v0
+        with:
+          image: "${{ env.IMAGE }}@${{ needs.deploy.outputs.digest }}"
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Vulnerability scan (Grype)
+        uses: anchore/scan-action@v6
+        id: grype
+        with:
+          sbom: sbom.spdx.json
+          fail-build: false
+          severity-cutoff: critical
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.spdx.json
+          retention-days: 90
+
+      - name: Upload Grype report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grype-report-${{ github.sha }}
+          path: ${{ steps.grype.outputs.sarif }}
+          retention-days: 90
+
+      - name: Upload SARIF to GitHub Security
+        if: always() && steps.grype.outputs.sarif != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.grype.outputs.sarif }}
