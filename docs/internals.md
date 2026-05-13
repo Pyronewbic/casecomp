@@ -107,6 +107,21 @@ Use `--refresh` to delete all cache files before a run.
 5. Overall = minimum of all subgrades (matches PSA methodology).
 6. Falls back to single combined prompt for non-Claude providers or missing back image.
 
+## Security pipeline
+
+Deploy workflow: Build (Kaniko) → Get digest → Sign (cosign keyless) → Deploy (by digest) → Scan (parallel).
+
+| Tool | Stage | What |
+|------|-------|------|
+| Kaniko v1.23.2 | Build | Pinned version, `--reproducible`, dual tags (latest + SHA) |
+| Cosign | Post-build | Keyless signing via GitHub OIDC → Sigstore Rekor |
+| Syft | Post-deploy | SBOM generation (SPDX JSON), 90-day artifact retention |
+| Grype | Post-deploy | CVE scan from SBOM, SARIF → GitHub Security tab |
+| CodeQL | PR + weekly | SAST for JavaScript/TypeScript |
+| Binary Auth | Cloud Run | GCP policy, DRYRUN audit mode (logs unsigned deploys) |
+
+The scan job runs in parallel after deploy — adds zero time to the deploy critical path. CodeQL runs on PRs only (~60s).
+
 ## Scheduled tasks
 
 Cloud Scheduler runs two jobs every 6 hours:

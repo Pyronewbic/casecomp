@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Added
+- Set browser: GET /api/sets (238 sets with logos, era groups, card count breakdown) and GET /api/sets/:setCode (cards with rarity)
+- Collection tracking: GET /api/portfolio/set/:setCode returns owned cardIds for progress bars and owned/missing indicators
+- Set metadata from TCGdex: 236 named, 154 with logos, official/secret card count split
+- Rarity data from TCGdex rarity-filter endpoints (~4K cards tagged: SAR, IR, UR, HR, SR, AR, RR, ACE, CR)
+- Era classification: Scarlet & Violet, Sword & Shield, Sun & Moon, XY, Pokemon TCG Pocket, Diamond & Pearl, Black & White, Classic
+- Sigstore container signing: cosign keyless signing via GitHub OIDC, deploy by image digest
+- SBOM generation: Syft SPDX JSON uploaded as build artifact (90 day retention)
+- Grype vulnerability scanning: SARIF report uploaded to GitHub Security tab
+- Binary Authorization: DRYRUN audit policy on both Cloud Run services
+- CodeQL SAST: static analysis on PRs + weekly schedule
+- Terraform CI: plan posted as PR comment, auto-apply on merge to main
 - Card autocomplete: GET /api/autocomplete with TCGdex EN+JP database (29K cards), card preview images, EN→JP name mapping
 - Search filters: format (raw/slab), multi-select source pills, condition dropdown, slab provider+grade selectors
 - Autocomplete dropdown on dashboard: card thumbnails, card preview panel on hover, keyboard navigation
@@ -77,7 +88,13 @@
 - Card identity: cleaned up long names (strips pack names, condition text from titles)
 - track-prices: now also tracks cards from active alerts, not just 3 hardcoded defaults
 - Demo condition filter: checks detectedCondition in addition to raw condition field
-- Tests: 290 total (128 unit + 88 API + 74 smoke), up from 183
+- Tests: 300 total (130 unit + 96 API + 74 smoke), up from 183
+- PR template: type, endpoints, checks, infrastructure, frontend impact, deploy notes
+- Kaniko pinned to v1.23.2 with --reproducible builds, dual tags (latest + SHA)
+- Deploy by image digest instead of :latest tag
+- Health endpoint: eBay usage stats hidden from non-owner requests
+- PSA endpoint: demo mode returns canned data (was making live API calls)
+- All error responses use safeErrorMessage() (fixed 3 places leaking raw e.message)
 - AI grading prompts: full PSA rubric (5-10), perspective correction, per-corner/edge detail, holo-specific surface guidance
 - Demo grades re-evaluated with improved prompts (more conservative scores, honest confidence)
 - Removed dead code: Redis import from api.js, updateCardField from card-identity.js
