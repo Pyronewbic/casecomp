@@ -19,7 +19,7 @@ import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, g
 import { getDemoSearchResult, getDemoResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
 import { csvEscape, csvRow } from "./lib/data/csv.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
-import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
+import { recordSoldPrices, getPriceHistory, computePriceTrend } from "./lib/data/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
@@ -1003,7 +1003,8 @@ app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
       avg: Math.round(prices.reduce((s, p) => s + p, 0) / prices.length * 100) / 100,
       count: prices.length,
     } : null;
-    return res.json({ query: q, days, history, stats, _demo: true });
+    const trend = computePriceTrend(history);
+    return res.json({ query: q, days, history, stats, trend, _demo: true });
   }
 
   try {
@@ -1047,7 +1048,8 @@ app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
       if (ratio < 0.3 || ratio > 3) tcgData = null;
     }
 
-    res.json({ query: q, days, history, stats, tcgplayer: tcgData });
+    const trend = computePriceTrend(history);
+    res.json({ query: q, days, history, stats, trend, tcgplayer: tcgData });
   } catch (e) {
     logError("price-history", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });

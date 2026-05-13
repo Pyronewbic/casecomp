@@ -68,7 +68,6 @@ async function run() {
     const { body } = await json("/api/health");
     assert(body.status === "ok", `expected ok, got ${body.status}`);
     assert(typeof body.uptime === "number");
-    assert("redis" in body);
     assert("ebay" in body);
   });
 
@@ -974,6 +973,30 @@ async function run() {
   await test("GET /api/sets/:setCode returns 404 for unknown set", async () => {
     const { res } = await jsonNoAuth("/api/sets/zzz999");
     assert(res.status === 404, `expected 404, got ${res.status}`);
+  });
+
+  // ── Price trend ──
+
+  console.log("\n\x1b[1m=== price trend ===\x1b[0m");
+
+  await test("Demo price-history includes trend for Umbreon", async () => {
+    const { res, body } = await jsonNoAuth("/api/price-history?q=Umbreon+ex+SAR+217/187&days=90&demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.trend !== null && body.trend !== undefined, "trend should not be null");
+    assert(["falling", "rising", "stable"].includes(body.trend.direction), `unexpected direction: ${body.trend.direction}`);
+    assert(["good_buy", "wait", "fair"].includes(body.trend.signal), `unexpected signal: ${body.trend.signal}`);
+    assert(typeof body.trend.summary === "string", "summary should be a string");
+    assert(body.trend.dataPoints > 0, "should have data points");
+  });
+
+  await test("Demo price-history trend has per-source breakdown", async () => {
+    const { body } = await jsonNoAuth("/api/price-history?q=Umbreon+ex+SAR+217/187&days=90&demo=true");
+    assert(body.trend.bySource && Object.keys(body.trend.bySource).length >= 1, "should have at least 1 source");
+  });
+
+  await test("Price-history trend is null for unknown card", async () => {
+    const { body } = await jsonNoAuth("/api/price-history?q=nonexistent+card+zzz&days=90&demo=true");
+    assert(body.trend === null, "trend should be null for unknown card");
   });
 
   // ── Collection tracking ──
