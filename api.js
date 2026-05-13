@@ -15,7 +15,7 @@ import { gradeImage } from "./lib/grading/grading.js";
 import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers, filterRelevantResults, isGradedCard } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds } from "./lib/data/firestore.js";
+import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds, trackSearchFrequency, getTopSearchedCards } from "./lib/data/firestore.js";
 import { getDemoSearchResult, getDemoResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
 import { csvEscape, csvRow } from "./lib/data/csv.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
@@ -69,10 +69,8 @@ function isOwnerKey(req) {
   return getRequestToken(req) === key;
 }
 
-function cachePrefix(req) {
-  if (isOwnerKey(req)) return "";
-  const token = getRequestToken(req);
-  return token.slice(0, 16) + "_";
+function cachePrefix() {
+  return "";
 }
 
 const apiLimiter = rateLimit({
@@ -230,6 +228,11 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
       })));
     }
     if (demoResult.sold?.length) recordSoldPrices(q, demoResult.sold, demoResult.source).catch(() => {});
+    const demoIdentity = parseCardIdentity(q);
+    if (demoIdentity.cardId) {
+      demoResult.cardId = demoIdentity.cardId;
+      demoResult.cardIdentity = { name: demoIdentity.name, setCode: demoIdentity.setCode, rarity: demoIdentity.rarity, setName: SET_NAME_MAP[demoIdentity.setCode] || null };
+    }
     return res.json(demoResult);
   }
 
@@ -253,30 +256,34 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
       const ebayQuery = buildEbaySearchQuery(q, config);
       const cp = cachePrefix(req);
       config._cachePrefix = cp;
-      const soldTimeout = (p) => Promise.race([p, new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000))]);
-      const [activeRes, soldRes] = await Promise.all([
-        searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 }),
-        soldTimeout(searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })),
-      ]);
+      const activeRes = await searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 });
       const filteredByCountry = {};
       for (const [country, items] of Object.entries(activeRes.itemsByCountry || {})) {
         filteredByCountry[country] = filterRelevantResults(items, q).filtered;
       }
-      const filteredSold = filterRelevantResults(soldRes.items || [], q).filtered;
+
+      searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false }).catch(() => {});
       getPsaGradingSignal(q, { _cachePrefix: cp }).catch(() => null);
+
       result = {
         query: q,
         source: "ebay",
         listingFormat: config.listingFormat,
         activeByCountry: filteredByCountry,
-        sold: filteredSold,
-        soldSource: soldRes.source,
+        sold: [],
+        soldSource: "pending",
         psaSignal: null,
         counts: {
           activeTotal: Object.values(filteredByCountry).reduce((n, arr) => n + arr.length, 0),
-          sold: filteredSold.length,
+          sold: 0,
         },
       };
+    }
+
+    const identity = parseCardIdentity(q);
+    if (identity.cardId) {
+      result.cardId = identity.cardId;
+      result.cardIdentity = { name: identity.name, setCode: identity.setCode, rarity: identity.rarity, setName: SET_NAME_MAP[identity.setCode] || null };
     }
 
     if (config.aiGrading.enabled) {
@@ -307,6 +314,7 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
 
     if (result.sold?.length) recordSoldPrices(q, result.sold, result.source).catch(() => {});
     getOrCreateCard(q, { source: result.source, lang: config.language }).catch(() => {});
+    trackSearchFrequency(q).catch(() => {});
     res.json(result);
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
@@ -917,6 +925,8 @@ app.get("/api/card/view/:setCode/:number", apiAuthMiddleware, async (req, res) =
       spreadPercent: Math.round(((slabMedian - rawMedian) / rawMedian) * 100),
       verdict: slabMedian > rawMedian + gradingCost ? "worth_grading" : "not_worth_grading",
     } : null;
+
+    trackSearchFrequency(searchQuery).catch(() => {});
 
     res.json({
       cardId,
@@ -1656,8 +1666,50 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
     }
   } catch {}
 
+  const alreadyWarmed = new Set(cards.map(c => c.toLowerCase().trim()));
+  let portfolioWarmed = 0;
+  let frequencyWarmed = 0;
+
+  if (hasEbay) {
+    try {
+      const userIds = await listPortfolioUserIds();
+      const uniquePortfolioQueries = new Set();
+      for (const uid of userIds.slice(0, 100)) {
+        try {
+          const raw = await getPortfolio(uid);
+          for (const card of raw) {
+            if (card.query && !alreadyWarmed.has(card.query.toLowerCase().trim())) {
+              uniquePortfolioQueries.add(card.query);
+            }
+          }
+        } catch {}
+      }
+      const portfolioCards = [...uniquePortfolioQueries].slice(0, 20);
+      for (const q of portfolioCards) {
+        try {
+          const ebayQuery = buildEbaySearchQuery(q, {});
+          await searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: ["US", "IN"], languages: [], config: { _cachePrefix: "" }, refresh: false, noEbay: false, getToken, on401 }).catch(() => null);
+          alreadyWarmed.add(q.toLowerCase().trim());
+          portfolioWarmed++;
+        } catch {}
+      }
+    } catch {}
+
+    try {
+      const topSearched = await getTopSearchedCards(10 + alreadyWarmed.size);
+      const toWarm = topSearched.filter(s => !alreadyWarmed.has(s.query.toLowerCase().trim())).slice(0, 10);
+      for (const entry of toWarm) {
+        try {
+          const ebayQuery = buildEbaySearchQuery(entry.query, {});
+          await searchActive({ query: ebayQuery, relevanceQuery: entry.query, deliveryCountries: ["US", "IN"], languages: [], config: { _cachePrefix: "" }, refresh: false, noEbay: false, getToken, on401 }).catch(() => null);
+          frequencyWarmed++;
+        } catch {}
+      }
+    } catch {}
+  }
+
   refreshCardDatabase().catch(() => {});
-  res.json({ tracked: results.length, results, portfolioSnapshots });
+  res.json({ tracked: results.length, results, portfolioSnapshots, portfolioWarmed, frequencyWarmed });
 });
 
 // GET /api/arbitrage — cross-source price comparison for a card

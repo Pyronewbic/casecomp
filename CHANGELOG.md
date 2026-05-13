@@ -16,6 +16,18 @@
 - Autocomplete suppressed on hint chip clicks
 - Card-centric view: GET /api/card/view/:setCode/:number returns raw + graded data with PSA + grading ROI comparison
 - Public sitemap: GET /api/sitemap returns all indexable URLs (static + card pages), supports ?format=xml for Google
+- TCGdex card database cached in Firestore (24h TTL, instant startup, background refresh)
+- PSA negative caching: "not found" results cached 7 days (no more DuckDuckGo retries for JP SARs)
+- Search frequency tracking + pre-warm: top searched + portfolio cards pre-cached by scheduler
+- eBay ship-to verification skipped (worldwide by default) — search 30s → 200ms
+- eBay sold decoupled: returns active immediately, sold fires in background
+- Seller feedback filtering: feedbackScore <5 or feedbackPercentage <90% removed
+- Expanded blocklist: digital codes, mystery packs, playsets, grading supplies
+- Price floor: listings below 20% of median flagged as suspicious
+- Korean filter: auto-detected from JP set codes and card number denominators
+- Auto-derived 186 set totals from TCGdex (248 total sets, was 30 hardcoded)
+- cardId + cardIdentity added to search responses
+- Leading zero handling in card number denominators (114/083 → m4)
 - eBay relevance filtering: blocklist expanded (art case, sleeves, playmat, booster, etc.), applied to active+sold
 - Arbitrage alerts: notify when cross-source spread exceeds threshold (POST /api/alerts with type "arbitrage")
 - Price drop alerts: notify when price falls below target (POST /api/alerts with type "price")
