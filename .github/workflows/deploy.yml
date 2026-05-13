@@ -56,6 +56,9 @@ jobs:
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
           echo "Image digest: $DIGEST"
 
+      - name: Configure Docker auth for GCR
+        run: gcloud auth configure-docker --quiet
+
       - uses: sigstore/cosign-installer@v3
 
       - name: Sign image (keyless)
