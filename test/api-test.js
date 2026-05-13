@@ -976,6 +976,37 @@ async function run() {
     assert(res.status === 404, `expected 404, got ${res.status}`);
   });
 
+  // ── Collection tracking ──
+
+  console.log("\n\x1b[1m=== collection tracking ===\x1b[0m");
+
+  await test("GET /api/portfolio/set/sv8a?demo=true returns Umbreon as owned", async () => {
+    const { res, body } = await jsonNoAuth("/api/portfolio/set/sv8a?demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.setCode === "sv8a", `expected sv8a, got ${body.setCode}`);
+    assert(body.ownedCount === 1, `expected 1 owned, got ${body.ownedCount}`);
+    assert(body.ownedCardIds.includes("sv8a/217-187"), "missing Umbreon cardId");
+    assert(body.totalCards > 0, "totalCards should be positive");
+  });
+
+  await test("GET /api/portfolio/set/swsh7?demo=true returns 0 owned for unrelated set", async () => {
+    const { res, body } = await jsonNoAuth("/api/portfolio/set/swsh7?demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.ownedCount === 0, `expected 0 owned, got ${body.ownedCount}`);
+    assert(body.ownedCardIds.length === 0, "should be empty array");
+    assert(body.totalCards > 0, "totalCards should be positive");
+  });
+
+  await test("GET /api/portfolio/set/zzz999?demo=true returns 404", async () => {
+    const { res } = await jsonNoAuth("/api/portfolio/set/zzz999?demo=true");
+    assert(res.status === 404, `expected 404, got ${res.status}`);
+  });
+
+  await test("Collection response has _demo flag", async () => {
+    const { body } = await jsonNoAuth("/api/portfolio/set/sv8a?demo=true");
+    assert(body._demo === true, "missing _demo flag");
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);
