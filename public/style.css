@@ -1302,6 +1302,27 @@ footer {
 .filter-select { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: var(--inset); color: #fff; cursor: pointer; -webkit-appearance: menulist; appearance: menulist; position: relative; z-index: 50; }
 @media (max-width: 768px) { .search-filters { gap: 8px; } .filter-group { flex-wrap: wrap; } }
 
+/* Card view */
+.card-view-tabs-wrap { max-width: 1200px; margin: 0 auto 16px; }
+.card-view-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.card-view-tab { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; padding: 8px 16px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.08); background: transparent; color: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+.card-view-tab:hover { border-color: rgba(217,182,118,0.3); color: rgba(255,255,255,0.8); }
+.card-view-tab.active { background: rgba(217,182,118,0.12); border-color: var(--gold); color: var(--gold); }
+.card-view-roi { background: var(--panel); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.roi-header { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; color: var(--gold); margin-bottom: 12px; letter-spacing: -0.02em; }
+.roi-compare { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.roi-col { text-align: center; }
+.roi-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+.roi-price { font-family: 'Space Grotesk', sans-serif; font-size: 1.2rem; font-weight: 600; color: #fff; }
+.roi-price.positive { color: var(--green); }
+.roi-price.negative { color: var(--red); }
+.roi-arrow { font-size: 1.2rem; color: rgba(255,255,255,0.3); }
+.roi-verdict { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; margin-top: 12px; padding: 6px 12px; border-radius: 6px; display: inline-block; }
+.roi-verdict.positive { background: rgba(124,224,168,0.12); color: var(--green); }
+.roi-verdict.negative { background: rgba(255,93,93,0.12); color: var(--red); }
+
+.arb-single-source { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: rgba(255,255,255,0.5); padding: 12px 0; }
+
 .show-more-btn { display: block; width: 100%; padding: 10px; margin-top: 8px; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: var(--gold); font-family: 'Inter Tight', sans-serif; font-size: 0.85rem; cursor: pointer; transition: background 0.15s; }
 .show-more-btn:hover { background: rgba(217,182,118,0.08); }
 
