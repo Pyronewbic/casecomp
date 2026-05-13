@@ -29,6 +29,7 @@ let acResults = [];
 
 input.addEventListener("input", () => {
   clearTimeout(acDebounce);
+  if (suppressAc) return;
   const q = input.value.trim();
   if (q.length < 2) { hideAc(); return; }
   acDebounce = setTimeout(() => fetchAc(q), 150);
@@ -184,13 +185,17 @@ let currentPsaSignal = null;
 let currentMagiMarket = null;
 let pendingChartPoints = null;
 
+let suppressAc = false;
 document.querySelectorAll(".hint").forEach(h => {
   h.addEventListener("click", () => {
+    suppressAc = true;
     input.value = h.dataset.q;
     currentSource = h.dataset.source || "";
     currentCondition = h.dataset.condition || "";
     forceDemo = true;
+    hideAc();
     form.dispatchEvent(new Event("submit"));
+    setTimeout(() => { suppressAc = false; }, 300);
   });
 });
 
@@ -221,7 +226,8 @@ document.querySelectorAll('.filter-pill[data-format]').forEach(btn => {
     btn.classList.add("active");
     currentFormat = btn.dataset.format;
     document.getElementById("slab-options").classList.toggle("hidden", currentFormat !== "slab");
-    triggerFilterSearch();
+    displayedActiveCount = 25; displayedSoldCount = 25;
+    if (allActive.length) applySourceFilter(); else triggerFilterSearch();
   });
 });
 
@@ -259,7 +265,8 @@ document.querySelectorAll('.source-pill:not([data-source="all"])').forEach(btn =
 
 document.getElementById("condition-filter").addEventListener("change", (e) => {
   currentFilterCondition = e.target.value;
-  triggerFilterSearch();
+  displayedActiveCount = 25; displayedSoldCount = 25;
+  if (allActive.length) applySourceFilter(); else triggerFilterSearch();
 });
 
 document.getElementById("slab-provider").addEventListener("change", () => triggerFilterSearch());
@@ -268,6 +275,8 @@ document.getElementById("slab-grade").addEventListener("change", () => triggerFi
 function triggerFilterSearch() {
   const q = currentQuery || input.value.trim();
   if (!q) return;
+  displayedActiveCount = 25;
+  displayedSoldCount = 25;
   const sources = [...activeSources];
   if (sources.length === 1) {
     let url = `/api/search?q=${encodeURIComponent(q)}&source=${sources[0]}`;
@@ -317,6 +326,8 @@ function sortItems(items) {
   const sorted = [...items];
   if (currentSort === "price-desc") {
     sorted.sort((a, b) => (b.totalCost || b.price) - (a.totalCost || a.price));
+  } else if (currentSort === "grade-desc") {
+    sorted.sort((a, b) => (b.grade?.overall || 0) - (a.grade?.overall || 0));
   } else {
     sorted.sort((a, b) => (a.totalCost || a.price) - (b.totalCost || b.price));
   }
@@ -477,17 +488,44 @@ function renderSourceFilters(sources) {
   });
 }
 
+let displayedActiveCount = 25;
+let displayedSoldCount = 25;
+
+function clientFilter(item) {
+  if (currentFormat === "raw" && item.listingGradeLabel && item.listingGradeLabel !== "Ungraded") return false;
+  if (currentFormat === "slab") {
+    const provider = document.getElementById("slab-provider").value;
+    const grade = document.getElementById("slab-grade").value;
+    const label = (item.listingGradeLabel || "").toUpperCase();
+    if (!label.includes(provider.toUpperCase()) || !label.includes(grade)) return false;
+  }
+  if (currentFilterCondition) {
+    const cond = currentFilterCondition.toLowerCase();
+    const detected = (item.detectedCondition || "").toLowerCase();
+    const raw = (item.condition || "").toLowerCase();
+    if (!detected.includes(cond) && !raw.includes(cond)) return false;
+  }
+  return true;
+}
+
 function applySourceFilter() {
-  const filterFn = activeSourceFilter === "all"
+  const sourceFilterFn = activeSourceFilter === "all"
     ? () => true
     : (item) => itemSource(item.itemWebUrl) === activeSourceFilter;
 
-  const filteredActive = sortItems(allActive.filter(filterFn));
-  const filteredSold = sortItems(allSold.filter(filterFn));
+  const filteredActive = sortItems(allActive.filter(i => sourceFilterFn(i) && clientFilter(i)));
+  const filteredSold = sortItems(allSold.filter(i => sourceFilterFn(i) && clientFilter(i)));
   allItems = [...filteredActive, ...filteredSold];
 
-  renderList(activeList, filteredActive);
-  renderList(soldList, filteredSold);
+  renderList(activeList, filteredActive.slice(0, displayedActiveCount));
+  renderList(soldList, filteredSold.slice(0, displayedSoldCount));
+
+  if (filteredActive.length > displayedActiveCount) {
+    activeList.insertAdjacentHTML("beforeend", `<button class="show-more-btn" onclick="displayedActiveCount+=25;applySourceFilter()">Show more (${filteredActive.length - displayedActiveCount} remaining)</button>`);
+  }
+  if (filteredSold.length > displayedSoldCount) {
+    soldList.insertAdjacentHTML("beforeend", `<button class="show-more-btn" onclick="displayedSoldCount+=25;applySourceFilter()">Show more (${filteredSold.length - displayedSoldCount} remaining)</button>`);
+  }
 
   document.querySelector('.list-tab[data-tab="active"]').textContent = `Active (${filteredActive.length})`;
   document.querySelector('.list-tab[data-tab="sold"]').textContent = `Sold (${filteredSold.length})`;
