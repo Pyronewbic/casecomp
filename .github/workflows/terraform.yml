@@ -1,0 +1,98 @@
+name: Terraform
+on:
+  pull_request:
+    paths: [terraform/**]
+  push:
+    branches: [main]
+    paths: [terraform/**]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  TF_DIR: terraform
+  TF_VERSION: 1.12.2
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/129850122606/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: casecomp-deploy@casecomp-495718.iam.gserviceaccount.com
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_DIR }}
+
+      - name: Validate
+        run: terraform validate
+        working-directory: ${{ env.TF_DIR }}
+
+      - name: Format check
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.TF_DIR }}
+
+      - name: Plan
+        id: plan
+        run: terraform plan -no-color -input=false -out=tfplan 2>&1 | tee plan.txt
+        working-directory: ${{ env.TF_DIR }}
+
+      - name: Post plan to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('${{ env.TF_DIR }}/plan.txt', 'utf8');
+            const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n... truncated' : plan;
+            const body = `### Terraform Plan
+            \`\`\`
+            ${truncated}
+            \`\`\`
+            *Merge to main to apply.*`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number
+            });
+            const existing = comments.find(c => c.body?.startsWith('### Terraform Plan'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body
+              });
+            }
+
+  apply:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/129850122606/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: casecomp-deploy@casecomp-495718.iam.gserviceaccount.com
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_DIR }}
+
+      - name: Apply
+        run: terraform apply -auto-approve -input=false
+        working-directory: ${{ env.TF_DIR }}
