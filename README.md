@@ -7,24 +7,24 @@
 
 **[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Dashboard](https://api.casecomp.xyz/dashboard)** | **[Admin](https://api.casecomp.xyz/admin)** | **[Changelog](CHANGELOG.md)**
 
-Search any Pokemon card across four marketplaces in one query. Get live prices, AI condition estimates, and PSA grading signals — instead of manually checking eBay, magi.camp, Yahoo Auctions, and SNKRDUNK separately.
+Search any Pokemon card across four marketplaces in one query. Get live prices, AI condition estimates, and PSA grading signals instead of manually checking eBay, magi.camp, Yahoo Auctions, and SNKRDUNK separately.
 
 ![eBay Pokémon card search demo](docs/demo.gif)
 
 ### Features
 
-- **Multi-source search** — eBay, magi.camp, Yahoo Auctions JP, SNKRDUNK in one query
-- **Cross-source arbitrage** — compares lowest prices across sources, highlights spread
-- **Condition detection** — auto-detects card condition across sources (EN: NM/LP/MP, JP: 状態A/美品)
-- **AI pre-grading** — per-subgrade analysis (centering, corners, edges, surface) from listing photos
-- **Price history** — sold comp tracking over time with line charts and stats
-- **PSA grading signals** — population data, difficulty, gem 10%, recommended submission tier with reasoning
-- **Slab comparison** — compare PSA 10 / BGS 9.5 / TAG 10 prices across sources with filter pills
-- **Dashboard** — search, arbitrage, price history, grade breakdown at `/dashboard`
-- **Admin** — API key management, stats KPIs, error log at `/admin`
-- **REST API** — authenticated endpoints with rate limiting, per-key caching, OpenAPI spec
-- **Claude Code skill** — `/casecomp` for plain-English card search
-- **Chrome extension** — queue auto-join for Pokemon Center, Walmart, Costco, Target drops
+- **Multi-source search** - eBay, magi.camp, Yahoo Auctions JP, SNKRDUNK in one query
+- **Cross-source arbitrage** - compares lowest prices across sources, highlights spread
+- **Condition detection** - auto-detects card condition across sources (EN: NM/LP/MP, JP: 状態A/美品)
+- **AI pre-grading** - per-subgrade analysis (centering, corners, edges, surface) from listing photos
+- **Price history** - sold comp tracking over time with line charts and stats
+- **PSA grading signals** - population data, difficulty, gem 10%, recommended submission tier
+- **Slab comparison** - compare PSA 10 / BGS 9.5 / TAG 10 prices across sources
+- **Dashboard** - search, arbitrage, price history, grade breakdown at `/dashboard`
+- **Admin** - API key management, stats KPIs, error log at `/admin`
+- **REST API** - authenticated endpoints with rate limiting, per-key caching, OpenAPI spec
+- **Claude Code skill** - `/casecomp` for plain-English card search
+- **Chrome extension** - queue auto-join for Pokemon Center, Walmart, Costco, Target drops
 
 ---
 
@@ -93,7 +93,7 @@ test/
 
 ## Web Dashboard
 
-[api.casecomp.xyz](https://api.casecomp.xyz) — interactive search with detail panel, AI grade breakdown, PSA signal bar, source filters.
+[api.casecomp.xyz](https://api.casecomp.xyz) - interactive search with detail panel, AI grade breakdown, PSA signal bar, source filters.
 
 Three sample cards work without API keys (`?demo=true`):
 - Pikachu ex SAR PSA 10 (multi-source slab: eBay + magi + Yahoo)
@@ -117,7 +117,7 @@ Full reference: [api.casecomp.xyz/docs](https://api.casecomp.xyz/docs)
 # Sample data (no key needed)
 curl "https://api.casecomp.xyz/api/search?q=Umbreon+ex+SAR+217/187&demo=true"
 
-# Arbitrage — cross-source price comparison
+# Arbitrage - cross-source price comparison
 curl "https://api.casecomp.xyz/api/arbitrage?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true"
 
 # Price history
@@ -163,7 +163,7 @@ curl "https://api.casecomp.xyz/api/portfolio/grading-opportunities?demo=true"
 
 ## Claude Code Skills
 
-**`/casecomp`** — search for cards in plain English. Claude parses intent and runs the CLI with the right flags.
+**`/casecomp`** - search for cards in plain English. Claude parses intent and runs the CLI with the right flags.
 
 ```
 /casecomp Umbreon ex 217/187 PSA 10 japanese
@@ -203,7 +203,7 @@ node index.js --grade-decision "Umbreon ex 217/187"             # PSA break-even
 ## Environment
 
 ```
-EBAY_CLIENT_ID=         # required — developer.ebay.com
+EBAY_CLIENT_ID=         # required - developer.ebay.com
 EBAY_CLIENT_SECRET=     # required
 ANTHROPIC_API_KEY=      # AI grading + magi translation
 PSA_AUTH_TOKEN=         # PSA pop reports
@@ -241,11 +241,17 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-290 tests: 128 unit (filters, grading, query builder, card identity, condition detection, demo data, image preprocessing, email alerts, portfolio ROI, CSV, gainers/losers, grading opportunities, autocomplete matching) + 88 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, alerts, share pages, demo validation, portfolio CRUD, portfolio history/export/grading, card view) + 74 Playwright smoke (dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters).
+290 tests across three layers. CI runs unit + smoke in parallel, both required by branch protection.
+
+| Suite | Count | Command | Covers |
+|-------|------:|---------|--------|
+| **Unit** | 128 | `yarn test:unit` | Filters, grading, query builder, card identity, condition detection, image preprocessing, email alerts, portfolio ROI, CSV export, autocomplete matching |
+| **API** | 88 | `yarn test:api` | Search, sold, PSA, grade, auth, admin keys, arbitrage, price history, alerts, share pages, portfolio CRUD, card view, demo validation |
+| **Smoke** | 74 | `yarn test:smoke` | Dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters |
 
 ## Contributing
 
-Contributions welcome. Fork the repo, create a branch, and open a PR against `dev`. Run `yarn test` before submitting — all tests must pass.
+Contributions welcome. Fork the repo, create a branch, and open a PR against `dev`. Run `yarn test` before submitting - all tests must pass.
 
 For bug reports or feature requests, open an [issue](https://github.com/Pyronewbic/casecomp/issues).
 

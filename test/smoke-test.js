@@ -153,7 +153,7 @@ async function run() {
 
     // Click second hint (Greninja — has AI grade)
     console.log("Grade tab:");
-    await page.locator('.hint[data-q="Mega Greninja ex SAR"]').click();
+    await page.locator('.hint[data-q="Mega Greninja ex SAR 114/083"]').click();
     await page.waitForSelector(".listing-card", { timeout: 10000 });
 
     const gradeTab = page.locator('.detail-tab[data-dtab="grade"]');
