@@ -1512,6 +1512,40 @@ app.get("/api/portfolio/grading-opportunities", apiAuthMiddleware, async (req, r
   }
 });
 
+app.get("/api/portfolio/set/:setCode", apiAuthMiddleware, async (req, res) => {
+  const isDemo = req.query.demo === "true";
+  const setCode = req.params.setCode.toLowerCase();
+
+  try {
+    const setData = getSetWithCards(setCode);
+    if (!setData) return res.status(404).json({ error: "Set not found" });
+
+    const setCardIds = new Set(setData.cards.map(c => c.cardId).filter(Boolean));
+
+    let portfolioCards;
+    if (isDemo) {
+      portfolioCards = DEMO_PORTFOLIO;
+    } else {
+      const userId = portfolioUserId(req);
+      if (!userId) return res.status(401).json({ error: "Invalid or missing API key" });
+      portfolioCards = await getPortfolio(userId);
+    }
+
+    const ownedCardIds = portfolioCards.map(c => c.cardId).filter(id => setCardIds.has(id));
+
+    res.json({
+      setCode,
+      ownedCardIds,
+      ownedCount: ownedCardIds.length,
+      totalCards: setData.totalCards,
+      _demo: isDemo || undefined,
+    });
+  } catch (e) {
+    logError("portfolio", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
 app.get("/api/portfolio", apiAuthMiddleware, async (req, res) => {
   const isDemo = req.query.demo === "true";
 
