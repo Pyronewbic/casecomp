@@ -34,11 +34,52 @@
           <div class="search-bar">
             <input type="text" id="search-input" placeholder="Umbreon VMAX Alt Art, Charizard Base Set..." autofocus>
             <button type="submit" id="search-btn">Search</button>
+            <div id="autocomplete-dropdown" class="autocomplete-dropdown hidden"></div>
+            <div id="ac-preview" class="ac-preview hidden"></div>
           </div>
           <div class="search-hints fade-up">
             Try: <button type="button" class="hint" data-q="Pikachu ex SAR 234/193 PSA 10">Pikachu ex SAR PSA 10 (Multi-Source Slab)</button>
             <button type="button" class="hint" data-q="Mega Greninja ex SAR" data-source="snkrdunk" data-condition="A">Mega Greninja ex SAR (SNKRDUNK + AI Grade)</button>
             <button type="button" class="hint" data-q="Umbreon ex SAR 217/187">Umbreon ex SAR 217/187 (eBay JP + AI Grade)</button>
+          </div>
+          <div id="search-filters" class="search-filters">
+            <div class="filter-group">
+              <span class="filter-label">Format</span>
+              <button class="filter-pill active" data-format="raw">Raw</button>
+              <button class="filter-pill" data-format="slab">Slab</button>
+            </div>
+            <div id="slab-options" class="filter-group hidden">
+              <span class="filter-label">Provider</span>
+              <select id="slab-provider" class="filter-select">
+                <option value="PSA">PSA</option>
+                <option value="BGS">BGS</option>
+                <option value="CGC">CGC</option>
+                <option value="TAG">TAG</option>
+              </select>
+              <select id="slab-grade" class="filter-select">
+                <option value="10">10</option>
+                <option value="9.5">9.5</option>
+                <option value="9">9</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Source</span>
+              <button class="filter-pill source-pill active" data-source="all">All</button>
+              <button class="filter-pill source-pill" data-source="ebay">eBay</button>
+              <button class="filter-pill source-pill" data-source="magi">magi</button>
+              <button class="filter-pill source-pill" data-source="yahoo">Yahoo</button>
+              <button class="filter-pill source-pill" data-source="snkrdunk">SNKRDUNK</button>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Condition</span>
+              <select id="condition-filter" class="filter-select">
+                <option value="">Any</option>
+                <option value="mint">Mint</option>
+                <option value="nm">NM</option>
+                <option value="lp">LP</option>
+                <option value="mp">MP</option>
+              </select>
+            </div>
           </div>
         </form>
       </div>
