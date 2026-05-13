@@ -39,6 +39,29 @@ resource "google_project_service" "cloudbuild" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "binaryauthorization" {
+  service            = "binaryauthorization.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "containeranalysis" {
+  service            = "containeranalysis.googleapis.com"
+  disable_on_destroy = false
+}
+
+# ── Binary Authorization ──────────────────────────────────────
+
+resource "google_binary_authorization_policy" "default" {
+  global_policy_evaluation_mode = "ENABLE"
+
+  default_admission_rule {
+    evaluation_mode  = "ALWAYS_ALLOW"
+    enforcement_mode = "DRYRUN_AUDIT_LOG_ONLY"
+  }
+
+  depends_on = [google_project_service.binaryauthorization]
+}
+
 # ── Firestore ─────────────────────────────────────────────────
 
 resource "google_firestore_database" "default" {
@@ -137,9 +160,14 @@ resource "google_cloud_run_v2_service" "api" {
     }
   }
 
+  binary_authorization {
+    use_default = true
+  }
+
   depends_on = [
     google_project_service.run,
     google_secret_manager_secret_iam_member.cloud_run_access,
+    google_binary_authorization_policy.default,
   ]
 }
 
@@ -222,7 +250,14 @@ resource "google_cloud_run_v2_service" "site" {
     }
   }
 
-  depends_on = [google_project_service.run]
+  binary_authorization {
+    use_default = true
+  }
+
+  depends_on = [
+    google_project_service.run,
+    google_binary_authorization_policy.default,
+  ]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "site_public" {
@@ -300,8 +335,8 @@ resource "google_compute_managed_ssl_certificate" "site_cert" {
 }
 
 resource "google_compute_target_https_proxy" "api_proxy" {
-  name             = "cardscrapebot-https-proxy"
-  url_map          = google_compute_url_map.api_urlmap.id
+  name    = "cardscrapebot-https-proxy"
+  url_map = google_compute_url_map.api_urlmap.id
   ssl_certificates = [
     google_compute_managed_ssl_certificate.api_cert.id,
     google_compute_managed_ssl_certificate.site_cert.id,
