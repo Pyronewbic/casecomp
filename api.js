@@ -204,7 +204,7 @@ async function gradeItems(items, config, cardName, source) {
       }
       return { ...row, grade: g };
     } catch (e) {
-      return { ...row, grade: { error: e.message } };
+      return { ...row, grade: { error: safeErrorMessage(e) } };
     }
   }));
 }
@@ -372,6 +372,10 @@ app.get("/api/psa", apiAuthMiddleware, (req, res, next) => { req._errorType = "p
   const { q } = req.query;
   if (!validateQuery(q, res)) return;
   try {
+    if (req.query.demo === "true") {
+      const demo = getDemoSearchResult(q, {});
+      return res.json({ query: q, signal: demo.psaSignal || null, _demo: true });
+    }
     const signal = await getPsaGradingSignal(q);
     res.json({ query: q, signal });
   } catch (e) {
@@ -438,7 +442,7 @@ app.get("/api/errors", authMiddleware, async (req, res) => {
     const errors = await getErrorLogs({ limit });
     res.json({ errors, count: errors.length });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
 
@@ -457,12 +461,12 @@ app.get("/api/health", async (req, res) => {
   const firestoreStatus = await getFirestoreStatus();
   let ebayUsage = null;
   try { ebayUsage = await getEbayUsageToday(); } catch {}
+  const isOwner = getRequestToken(req) === process.env.CASECOMP_API_KEY;
   res.json({
     status: "ok",
     uptime: Math.floor(process.uptime()),
-    redis: { connected: false, status: "not configured" },
     firestore: firestoreStatus,
-    ebay: { configured: !!(clientId && clientSecret), usageToday: ebayUsage, dailyCap: DAILY_CAP },
+    ebay: { configured: !!(clientId && clientSecret), ...(isOwner ? { usageToday: ebayUsage, dailyCap: DAILY_CAP } : {}) },
   });
 });
 
@@ -1697,7 +1701,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
         lastTracked: new Date().toISOString(),
       });
     } catch (e) {
-      results.push({ card, error: e.message, lastTracked: new Date().toISOString() });
+      results.push({ card, error: safeErrorMessage(e), lastTracked: new Date().toISOString() });
     }
   }
   let portfolioSnapshots = 0;
