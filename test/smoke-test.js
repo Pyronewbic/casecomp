@@ -250,6 +250,28 @@ async function run() {
 
     await acPage.close();
 
+    // --- Search filters ---
+    console.log("\n[Search filters]");
+    const filterPage = await browser.newPage();
+    await filterPage.goto(BASE);
+    const filters = filterPage.locator("#search-filters");
+    assert(await filters.isVisible(), "search filters visible on landing");
+    const formatPills = await filterPage.locator('.filter-pill[data-format]').count();
+    assert(formatPills === 2, "2 format pills (Raw/Slab)");
+    const sourcePills = await filterPage.locator('.source-pill').count();
+    assert(sourcePills === 5, "5 source pills (All + 4 sources)");
+    const condSelect = filterPage.locator('#condition-filter');
+    assert(await condSelect.isVisible(), "condition dropdown visible");
+    const sortSelect = filterPage.locator('#sort-select');
+    const sortOptions = await sortSelect.locator('option').count();
+    assert(sortOptions === 3, "3 sort options (price asc/desc + grade)");
+
+    const slabOpts = filterPage.locator('#slab-options');
+    assert(await slabOpts.evaluate(el => el.classList.contains('hidden')), "slab options hidden by default");
+    await filterPage.locator('.filter-pill[data-format="slab"]').click();
+    assert(!(await slabOpts.evaluate(el => el.classList.contains('hidden'))), "slab options visible after clicking Slab");
+    await filterPage.close();
+
     // --- Static assets ---
     console.log("\n[Static assets]");
     const page2 = await browser.newPage();
