@@ -241,7 +241,7 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-287 tests: 128 unit (filters, grading, query builder, card identity, condition detection, demo data, image preprocessing, email alerts, portfolio ROI, CSV, gainers/losers, grading opportunities, autocomplete matching) + 85 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, alerts, share pages, demo validation, portfolio CRUD, portfolio history/export/grading, card view) + 74 Playwright smoke (dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters).
+290 tests: 128 unit (filters, grading, query builder, card identity, condition detection, demo data, image preprocessing, email alerts, portfolio ROI, CSV, gainers/losers, grading opportunities, autocomplete matching) + 88 API (health, drops, webhooks, search, sold, PSA, grade, auth, admin keys, arbitrage, price-history, condition, alerts, share pages, demo validation, portfolio CRUD, portfolio history/export/grading, card view) + 74 Playwright smoke (dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters).
 
 ## Contributing
 

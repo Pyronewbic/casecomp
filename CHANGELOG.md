@@ -64,7 +64,7 @@
 - Card identity: cleaned up long names (strips pack names, condition text from titles)
 - track-prices: now also tracks cards from active alerts, not just 3 hardcoded defaults
 - Demo condition filter: checks detectedCondition in addition to raw condition field
-- Tests: 287 total (128 unit + 85 API + 74 smoke), up from 183
+- Tests: 290 total (128 unit + 88 API + 74 smoke), up from 183
 - AI grading prompts: full PSA rubric (5-10), perspective correction, per-corner/edge detail, holo-specific surface guidance
 - Demo grades re-evaluated with improved prompts (more conservative scores, honest confidence)
 - Removed dead code: Redis import from api.js, updateCardField from card-identity.js
