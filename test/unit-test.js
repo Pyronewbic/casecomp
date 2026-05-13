@@ -25,6 +25,7 @@ import { parseCardIdentity, buildCardId, SET_NAME_MAP, resolveCardIdToQuery } fr
 import { buildAlertEmailSubject, sendAlertEmail } from "../lib/data/email.js";
 import { csvEscape, csvRow } from "../lib/data/csv.js";
 import { matchesQuery, searchCards, getAllSets, getSetWithCards } from "../lib/data/card-database.js";
+import { computePriceTrend } from "../lib/data/price-history.js";
 
 let passed = 0;
 let failed = 0;
@@ -1054,6 +1055,77 @@ test("getAllSets: returns empty array when no cards loaded", () => {
 
 test("getSetWithCards: returns null for nonexistent set", () => {
   eq(getSetWithCards("zzz999"), null);
+});
+
+// ── Price trend ──
+
+console.log("\n\x1b[1m=== price trend ===\x1b[0m");
+
+const now = new Date("2026-05-10T12:00:00Z");
+function daysAgo(n) { return new Date(now.getTime() - n * 86400000).toISOString(); }
+function mkHistory(points) { return points.map(([daysBack, price, source]) => ({ price, recordedAt: daysAgo(daysBack), source: source || "ebay" })); }
+
+test("computePriceTrend: returns null for empty history", () => {
+  eq(computePriceTrend([]), null);
+});
+
+test("computePriceTrend: returns null for < 3 data points", () => {
+  eq(computePriceTrend(mkHistory([[1, 100], [5, 95]]), now), null);
+});
+
+test("computePriceTrend: returns null when all dates are the same", () => {
+  const same = [{ price: 100, recordedAt: daysAgo(1), source: "ebay" }, { price: 105, recordedAt: daysAgo(1), source: "ebay" }, { price: 110, recordedAt: daysAgo(1), source: "magi" }];
+  eq(computePriceTrend(same, now), null);
+});
+
+test("computePriceTrend: detects rising trend", () => {
+  const h = mkHistory([[1, 400], [2, 395], [3, 390], [10, 350], [20, 340], [30, 330]]);
+  const t = computePriceTrend(h, now);
+  eq(t.direction, "rising");
+  eq(t.signal, "wait");
+  eq(t.change7d.percent > 0, true);
+});
+
+test("computePriceTrend: detects falling trend", () => {
+  const h = mkHistory([[1, 330], [2, 335], [3, 340], [10, 390], [20, 400], [30, 410]]);
+  const t = computePriceTrend(h, now);
+  eq(t.direction, "falling");
+  eq(t.signal, "good_buy");
+});
+
+test("computePriceTrend: detects stable trend", () => {
+  const h = mkHistory([[1, 400], [2, 398], [3, 402], [10, 399], [20, 401], [30, 400]]);
+  const t = computePriceTrend(h, now);
+  eq(t.direction, "stable");
+  eq(t.signal, "fair");
+});
+
+test("computePriceTrend: per-source breakdown", () => {
+  const h = mkHistory([[1, 400, "ebay"], [2, 395, "ebay"], [10, 380, "ebay"], [1, 350, "magi"], [2, 355, "magi"], [10, 370, "magi"]]);
+  const t = computePriceTrend(h, now);
+  eq("ebay" in t.bySource, true);
+  eq("magi" in t.bySource, true);
+});
+
+test("computePriceTrend: summary contains direction", () => {
+  const h = mkHistory([[1, 400], [2, 395], [3, 390], [10, 350], [20, 340], [30, 330]]);
+  const t = computePriceTrend(h, now);
+  eq(t.summary.includes("Up"), true);
+});
+
+test("computePriceTrend: bestSource tracks source with most negative 7d change", () => {
+  const h = mkHistory([[1, 380, "ebay"], [2, 385, "ebay"], [5, 370, "ebay"], [1, 300, "magi"], [2, 305, "magi"], [5, 360, "magi"]]);
+  const t = computePriceTrend(h, now);
+  eq(typeof t.bestSource, "string");
+  eq(t.bySource[t.bestSource].change7d.percent < 0, true);
+});
+
+test("computePriceTrend: handles all data older than 7 days", () => {
+  const h = mkHistory([[0.5, 400], [1, 398], [1.5, 402], [10, 350], [20, 340]]);
+  const t = computePriceTrend(h, now);
+  eq(t !== null, true);
+  eq(t.change30d !== null, true);
+  eq(typeof t.direction, "string");
 });
 
 // ── Summary ──
