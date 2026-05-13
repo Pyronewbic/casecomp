@@ -902,6 +902,44 @@ async function run() {
     }
   });
 
+  // ── Card view (raw + graded) ──
+
+  console.log("\n\x1b[1m=== api/card/view ===\x1b[0m");
+
+  await test("GET /api/card/view/sv8a/217-187?demo=true returns raw + graded", async () => {
+    const { res, body } = await jsonNoAuth("/api/card/view/sv8a/217-187?demo=true");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.cardId === "sv8a/217-187", `cardId ${body.cardId}`);
+    assert(body.raw, "missing raw");
+    assert(body.graded, "missing graded");
+    assert(body.identity, "missing identity");
+  });
+
+  await test("Umbreon raw has 8 active listings", async () => {
+    const { body } = await jsonNoAuth("/api/card/view/sv8a/217-187?demo=true");
+    assert(body.raw.counts.active === 8, `expected 8 raw active, got ${body.raw.counts.active}`);
+    assert(body.raw.counts.sold === 7, `expected 7 raw sold, got ${body.raw.counts.sold}`);
+  });
+
+  await test("Umbreon has PSA signal", async () => {
+    const { body } = await jsonNoAuth("/api/card/view/sv8a/217-187?demo=true");
+    assert(body.psaSignal, "missing psaSignal");
+    assert(body.psaSignal.totalPop > 0, "totalPop should be positive");
+  });
+
+  await test("Pikachu graded has 6 active slabs", async () => {
+    const { body } = await jsonNoAuth("/api/card/view/m2a/234-193?demo=true");
+    assert(body.graded.counts.active === 6, `expected 6 graded active, got ${body.graded.counts.active}`);
+    assert(body.graded.counts.sold === 5, `expected 5 graded sold, got ${body.graded.counts.sold}`);
+  });
+
+  await test("Card view has priceRange for listings", async () => {
+    const { body } = await jsonNoAuth("/api/card/view/sv8a/217-187?demo=true");
+    assert(body.raw.priceRange, "missing raw priceRange");
+    assert(typeof body.raw.priceRange.low === "number", "missing low");
+    assert(typeof body.raw.priceRange.median === "number", "missing median");
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);

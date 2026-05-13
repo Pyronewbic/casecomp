@@ -14,6 +14,7 @@
 - Sort by grade (high to low) added to sort dropdown
 - Pagination: 25 listings per page with "Show more" button
 - Autocomplete suppressed on hint chip clicks
+- Card-centric view: GET /api/card/view/:setCode/:number returns raw + graded data with PSA + grading ROI comparison
 - eBay relevance filtering: blocklist expanded (art case, sleeves, playmat, booster, etc.), applied to active+sold
 - Arbitrage alerts: notify when cross-source spread exceeds threshold (POST /api/alerts with type "arbitrage")
 - Price drop alerts: notify when price falls below target (POST /api/alerts with type "price")
@@ -63,7 +64,7 @@
 - Card identity: cleaned up long names (strips pack names, condition text from titles)
 - track-prices: now also tracks cards from active alerts, not just 3 hardcoded defaults
 - Demo condition filter: checks detectedCondition in addition to raw condition field
-- Tests: 278 total (128 unit + 80 API + 70 smoke), up from 183
+- Tests: 287 total (128 unit + 85 API + 74 smoke), up from 183
 - AI grading prompts: full PSA rubric (5-10), perspective correction, per-corner/edge detail, holo-specific surface guidance
 - Demo grades re-evaluated with improved prompts (more conservative scores, honest confidence)
 - Removed dead code: Redis import from api.js, updateCardField from card-identity.js

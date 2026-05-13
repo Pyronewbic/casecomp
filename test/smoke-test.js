@@ -272,6 +272,17 @@ async function run() {
     assert(!(await slabOpts.evaluate(el => el.classList.contains('hidden'))), "slab options visible after clicking Slab");
     await filterPage.close();
 
+    // --- Card view API ---
+    console.log("\n[Card view API]");
+    const cvPage = await browser.newPage();
+    const cvRes = await cvPage.goto(`${BASE}/api/card/view/sv8a/217-187?demo=true`);
+    assert(cvRes.status() === 200, "card view returns 200");
+    const cvBody = await cvRes.json();
+    assert(cvBody.raw?.counts?.active === 8, "card view raw has 8 active");
+    assert(cvBody.graded !== undefined, "card view has graded section");
+    assert(cvBody.psaSignal !== null, "card view has PSA signal");
+    await cvPage.close();
+
     // --- Static assets ---
     console.log("\n[Static assets]");
     const page2 = await browser.newPage();
