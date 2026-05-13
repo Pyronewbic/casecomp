@@ -170,6 +170,16 @@ curl "https://api.casecomp.xyz/api/portfolio/set/sv8a?demo=true"
 
 `GET /api/health` | `GET /api/demo` | `GET /api/sitemap` | `GET /api/autocomplete` | `GET /api/sets` | `GET /api/sets/:setCode` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold/arbitrage/price-history
 
+## Security
+
+- **Container signing** - Sigstore cosign keyless signing via GitHub OIDC, logged to Rekor transparency log
+- **Deploy by digest** - immutable image SHA, not mutable `:latest` tag
+- **SBOM** - Syft SPDX JSON generated per deploy, uploaded as build artifact
+- **Vulnerability scanning** - Grype scans SBOM for CVEs, SARIF uploaded to GitHub Security tab
+- **SAST** - CodeQL static analysis on every PR + weekly schedule
+- **Binary Authorization** - GCP policy on both Cloud Run services (audit mode)
+- **Reproducible builds** - Kaniko `--reproducible` flag, pinned version
+
 ## Claude Code Skills
 
 **`/casecomp`** - search for cards in plain English. Claude parses intent and runs the CLI with the right flags.
