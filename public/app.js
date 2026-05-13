@@ -121,28 +121,19 @@ async function searchByCardId(card) {
   alertSection.classList.add("hidden");
 
   const [setCode, number] = card.cardId.split("/");
-  const shareUrl = `/api/card/share/${setCode}/${number}`;
-  const searchName = card.name || card.nameJa || "";
+  const viewBase = `/api/card/view/${setCode}/${number}?demo=true`;
 
   try {
-    const shareRes = await fetch(shareUrl);
-    if (shareRes.ok) {
-      const shareData = await shareRes.json();
-      if (shareData.psaSignal) currentPsaSignal = shareData.psaSignal;
-
-      const searchQ = shareData.searchQuery || `${searchName} ${number.replace("-", "/")}`;
-      const searchRes = await fetch(`/api/search?q=${encodeURIComponent(searchQ)}&demo=true`);
-      if (searchRes.ok) {
-        const data = await searchRes.json();
-        if (data.psaSignal == null && shareData.psaSignal) data.psaSignal = shareData.psaSignal;
-        isDemo = !!data._demo;
-        render(data);
-        btn.disabled = false;
-        btn.textContent = "Search";
-
-        fetchLiveSources(searchName, card).catch(() => {});
-        return;
-      }
+    const res = await fetch(`${viewBase}&format=raw`);
+    if (res.ok) {
+      const data = await res.json();
+      isDemo = !!data._demo;
+      currentPsaSignal = data.psaSignal || null;
+      data._viewBase = viewBase;
+      renderCardView(data);
+      btn.disabled = false;
+      btn.textContent = "Search";
+      return;
     }
   } catch {}
 
@@ -150,6 +141,125 @@ async function searchByCardId(card) {
   let url = `/api/search?q=${encodeURIComponent(input.value.trim())}&grade=true`;
   if (lang) url += `&lang=${lang}`;
   searchUrl(url, input.value.trim());
+}
+
+function renderCardView(data) {
+  inCardView = true;
+  resultsSection.classList.remove("hidden");
+  document.getElementById("search-filters").classList.add("hidden");
+
+  const id = data.identity || {};
+  const rawCount = data.raw?.counts?.active || 0;
+  const gradedCount = data.graded?.counts?.active || 0;
+  const rawSold = data.raw?.counts?.sold || 0;
+  const gradedSold = data.graded?.counts?.sold || 0;
+
+  resultsHeader.innerHTML = `
+    <h2>${esc(id.name || "")} ${id.rarity ? `<span class="demo-badge">${esc(id.rarity)}</span>` : ""} ${data._demo ? '<span class="demo-badge">Sample Data</span>' : ""}</h2>
+    <p class="meta">${esc(id.setName || "")} &middot; ${esc(data.cardId || "")}</p>
+  `;
+
+  renderPsa(data.psaSignal);
+
+  const roi = data.gradingRoi;
+  const roiHtml = roi ? buildRoiHtml(roi) : "";
+
+  function buildRoiHtml(roi) { return `
+    <div class="card-view-roi">
+      <div class="roi-header">Should you grade?</div>
+      <div class="roi-compare">
+        <div class="roi-col">
+          <div class="roi-label">Raw Median</div>
+          <div class="roi-price">${formatPrice(roi.rawMedian, "USD")}</div>
+        </div>
+        <div class="roi-arrow">→</div>
+        <div class="roi-col">
+          <div class="roi-label">Graded Median</div>
+          <div class="roi-price">${formatPrice(roi.slabMedian, "USD")}</div>
+        </div>
+        <div class="roi-col">
+          <div class="roi-label">Grading Cost</div>
+          <div class="roi-price">-${formatPrice(roi.gradingCost, "USD")}</div>
+        </div>
+        <div class="roi-col">
+          <div class="roi-label">Expected Profit</div>
+          <div class="roi-price ${roi.expectedProfit > 0 ? "positive" : "negative"}">${roi.expectedProfit > 0 ? "+" : ""}${formatPrice(roi.expectedProfit, "USD")}</div>
+        </div>
+      </div>
+      <div class="roi-verdict ${roi.verdict === "worth_grading" ? "positive" : "negative"}">${roi.verdict === "worth_grading" ? "Worth Grading" : "Not Worth Grading"} &middot; ${roi.spreadPercent}% spread</div>
+    </div>
+  `; }
+
+  const viewTabsHtml = `
+    <div class="card-view-tabs">
+      <button class="card-view-tab active" data-view="raw">Raw (${rawCount} active, ${rawSold} sold)</button>
+      <button class="card-view-tab" data-view="graded">Graded (${gradedCount} active, ${gradedSold} sold)</button>
+    </div>
+    ${roiHtml}
+  `;
+
+  const resultsLayout = resultsSection.querySelector(".results-layout");
+  const existingTabs = resultsSection.querySelector(".card-view-tabs-wrap");
+  if (existingTabs) existingTabs.remove();
+  const existingRoi = resultsSection.querySelector(".card-view-roi");
+  if (existingRoi) existingRoi.remove();
+
+  const wrap = document.createElement("div");
+  wrap.className = "card-view-tabs-wrap";
+  wrap.innerHTML = viewTabsHtml;
+  resultsLayout.parentNode.insertBefore(wrap, resultsLayout);
+
+  let currentView = "raw";
+  let gradedData = data.graded?.active?.length ? data.graded : null;
+  allActive = data.raw?.active || [];
+  allSold = data.raw?.sold || [];
+  allItems = [...allActive, ...allSold];
+  displayedActiveCount = 25;
+  displayedSoldCount = 25;
+  applySourceFilter();
+  renderLocalArbitrage(allActive);
+
+  wrap.querySelectorAll(".card-view-tab").forEach(tab => {
+    tab.addEventListener("click", async () => {
+      wrap.querySelectorAll(".card-view-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      currentView = tab.dataset.view;
+      displayedActiveCount = 25;
+      displayedSoldCount = 25;
+      if (currentView === "raw") {
+        allActive = data.raw?.active || [];
+        allSold = data.raw?.sold || [];
+        renderLocalArbitrage(allActive);
+      } else {
+        if (!gradedData && data._viewBase) {
+          tab.textContent = "Graded (loading...)";
+          try {
+            const res = await fetch(`${data._viewBase}&format=slab`);
+            if (res.ok) {
+              const gd = await res.json();
+              gradedData = gd.graded || { active: [], sold: [], counts: { active: 0, sold: 0 } };
+              if (gd.gradingRoi && !data.gradingRoi) {
+                data.gradingRoi = gd.gradingRoi;
+                const existingRoi = wrap.querySelector(".card-view-roi");
+                if (!existingRoi) {
+                  const roiEl = document.createElement("div");
+                  roiEl.innerHTML = buildRoiHtml(gd.gradingRoi);
+                  wrap.appendChild(roiEl.firstElementChild);
+                }
+              }
+            }
+          } catch {}
+          gradedData = gradedData || { active: [], sold: [], counts: { active: 0, sold: 0 } };
+          tab.textContent = `Graded (${gradedData.counts?.active || gradedData.active?.length || 0} active, ${gradedData.counts?.sold || gradedData.sold?.length || 0} sold)`;
+        }
+        allActive = gradedData?.active || [];
+        allSold = gradedData?.sold || [];
+        renderLocalArbitrage(allActive);
+      }
+      allItems = [...allActive, ...allSold];
+      applySourceFilter();
+    });
+  });
 }
 
 async function fetchLiveSources(name, card) {
@@ -190,11 +300,16 @@ document.querySelectorAll(".hint").forEach(h => {
   h.addEventListener("click", () => {
     suppressAc = true;
     input.value = h.dataset.q;
-    currentSource = h.dataset.source || "";
-    currentCondition = h.dataset.condition || "";
-    forceDemo = true;
     hideAc();
-    form.dispatchEvent(new Event("submit"));
+    if (h.dataset.cardid) {
+      currentQuery = h.dataset.q;
+      searchByCardId({ cardId: h.dataset.cardid, name: h.dataset.q });
+    } else {
+      currentSource = h.dataset.source || "";
+      currentCondition = h.dataset.condition || "";
+      forceDemo = true;
+      form.dispatchEvent(new Event("submit"));
+    }
     setTimeout(() => { suppressAc = false; }, 300);
   });
 });
@@ -217,6 +332,7 @@ document.getElementById("sort-select").addEventListener("change", (e) => {
 // ── Search filters ──
 
 let currentFormat = "raw";
+let inCardView = false;
 let activeSources = new Set(["ebay", "magi", "yahoo", "snkrdunk"]);
 let currentFilterCondition = "";
 
@@ -227,7 +343,7 @@ document.querySelectorAll('.filter-pill[data-format]').forEach(btn => {
     currentFormat = btn.dataset.format;
     document.getElementById("slab-options").classList.toggle("hidden", currentFormat !== "slab");
     displayedActiveCount = 25; displayedSoldCount = 25;
-    if (allActive.length) applySourceFilter(); else triggerFilterSearch();
+    applySourceFilter();
   });
 });
 
@@ -243,11 +359,12 @@ function syncSourcePills() {
 }
 
 allPill.addEventListener("click", () => {
-  const allActive = allSources.every(s => activeSources.has(s));
-  if (allActive) return;
+  const allOn = allSources.every(s => activeSources.has(s));
+  if (allOn) return;
   activeSources = new Set(allSources);
   syncSourcePills();
-  triggerFilterSearch();
+  displayedActiveCount = 25; displayedSoldCount = 25;
+  applySourceFilter();
 });
 
 document.querySelectorAll('.source-pill:not([data-source="all"])').forEach(btn => {
@@ -259,18 +376,19 @@ document.querySelectorAll('.source-pill:not([data-source="all"])').forEach(btn =
       activeSources.add(src);
     }
     syncSourcePills();
-    triggerFilterSearch();
+    displayedActiveCount = 25; displayedSoldCount = 25;
+    applySourceFilter();
   });
 });
 
 document.getElementById("condition-filter").addEventListener("change", (e) => {
   currentFilterCondition = e.target.value;
   displayedActiveCount = 25; displayedSoldCount = 25;
-  if (allActive.length) applySourceFilter(); else triggerFilterSearch();
+  applySourceFilter();
 });
 
-document.getElementById("slab-provider").addEventListener("change", () => triggerFilterSearch());
-document.getElementById("slab-grade").addEventListener("change", () => triggerFilterSearch());
+document.getElementById("slab-provider").addEventListener("change", () => { displayedActiveCount = 25; applySourceFilter(); });
+document.getElementById("slab-grade").addEventListener("change", () => { displayedActiveCount = 25; applySourceFilter(); });
 
 function triggerFilterSearch() {
   const q = currentQuery || input.value.trim();
@@ -383,6 +501,10 @@ async function searchUrl(url, q) {
 }
 
 function render(data) {
+  inCardView = false;
+  document.getElementById("search-filters").classList.remove("hidden");
+  const existingWrap = resultsSection.querySelector(".card-view-tabs-wrap");
+  if (existingWrap) existingWrap.remove();
   resultsSection.classList.remove("hidden");
 
   const active = dedupeActive(data);
@@ -418,27 +540,23 @@ function render(data) {
   allSold = sold;
   activeSourceFilter = "all";
   currentSort = "price-asc";
+  displayedActiveCount = 25;
+  displayedSoldCount = 25;
   document.getElementById("sort-select").value = "price-asc";
 
   const isMulti = data.source === "multi";
   const sources = isMulti ? detectSources(active, sold) : [];
   renderSourceFilters(sources);
 
-  renderList(activeList, sortItems(active));
-  renderList(soldList, sortItems(sold));
+  applySourceFilter();
 
-  const activeTab = document.querySelector('.list-tab[data-tab="active"]');
   const soldTab = document.querySelector('.list-tab[data-tab="sold"]');
-  activeTab.textContent = `Active (${active.length})`;
-  soldTab.textContent = `Sold (${sold.length})`;
-
   if (hasGrades && soldTotal === 0) {
     soldTab.classList.add("hidden");
   } else {
     soldTab.classList.remove("hidden");
   }
 
-  // Reset tabs
   document.querySelectorAll(".list-tab").forEach(t => t.classList.remove("active"));
   document.querySelector('.list-tab[data-tab="active"]').classList.add("active");
   activeList.classList.remove("hidden");
@@ -492,6 +610,7 @@ let displayedActiveCount = 25;
 let displayedSoldCount = 25;
 
 function clientFilter(item) {
+  if (inCardView) return true;
   if (currentFormat === "raw" && item.listingGradeLabel && item.listingGradeLabel !== "Ungraded") return false;
   if (currentFormat === "slab") {
     const provider = document.getElementById("slab-provider").value;
@@ -509,9 +628,15 @@ function clientFilter(item) {
 }
 
 function applySourceFilter() {
-  const sourceFilterFn = activeSourceFilter === "all"
+  const allSourcesActive = allSources.every(s => activeSources.has(s));
+  const sourceFilterFn = (activeSourceFilter === "all" && allSourcesActive)
     ? () => true
-    : (item) => itemSource(item.itemWebUrl) === activeSourceFilter;
+    : (item) => {
+        const src = itemSource(item.itemWebUrl);
+        if (activeSourceFilter !== "all" && src !== activeSourceFilter) return false;
+        if (!allSourcesActive && !activeSources.has(src)) return false;
+        return true;
+      };
 
   const filteredActive = sortItems(allActive.filter(i => sourceFilterFn(i) && clientFilter(i)));
   const filteredSold = sortItems(allSold.filter(i => sourceFilterFn(i) && clientFilter(i)));
@@ -774,7 +899,11 @@ function selectItem(itemId) {
 
   loadCardIdentity(currentQuery);
   loadPriceChart(currentQuery);
-  loadArbitrage(currentQuery);
+  if (inCardView) {
+    renderLocalArbitrage(allActive);
+  } else {
+    loadArbitrage(currentQuery);
+  }
   loadGradingRoi(item);
 }
 
@@ -802,6 +931,54 @@ async function loadCardIdentity(query) {
     ].filter(Boolean).join("");
     container.innerHTML = parts;
   } catch {}
+}
+
+function renderLocalArbitrage(items) {
+  const container = document.getElementById("arbitrage-container");
+  if (!container) return;
+  const bySource = {};
+  for (const item of items) {
+    const src = itemSource(item.itemWebUrl);
+    if (!bySource[src]) bySource[src] = { lowest: Infinity, count: 0, currency: item.priceCurrency || "USD", priceJPY: null };
+    const p = item.totalCost || item.price;
+    if (p < bySource[src].lowest) bySource[src].lowest = p;
+    if (item.priceJPY && !bySource[src].priceJPY) bySource[src].priceJPY = item.priceJPY;
+    bySource[src].count++;
+  }
+  const names = Object.keys(bySource);
+  if (names.length === 0) { container.classList.add("hidden"); return; }
+  if (names.length === 1) {
+    container.classList.remove("hidden");
+    container.innerHTML = `
+      <div class="detail-grade-section-label">Cross-Source Prices</div>
+      <div class="arb-single-source">Only available on ${esc(names[0])} &middot; ${bySource[names[0]].count} listing${bySource[names[0]].count !== 1 ? "s" : ""} from ${formatPrice(bySource[names[0]].lowest, bySource[names[0]].currency)}</div>
+    `;
+    return;
+  }
+  const sorted = names.sort((a, b) => bySource[a].lowest - bySource[b].lowest);
+  const cheapest = sorted[0];
+  const most = sorted[sorted.length - 1];
+  const spread = bySource[most].lowest - bySource[cheapest].lowest;
+  const spreadPct = Math.round((spread / bySource[most].lowest) * 100);
+
+  container.classList.remove("hidden");
+  container.innerHTML = `
+    <div class="detail-grade-section-label">Cross-Source Prices</div>
+    <div class="arbitrage-sources">
+      ${sorted.map(s => {
+        const d = bySource[s];
+        const isCheapest = s === cheapest;
+        return `<div class="arb-source${isCheapest ? " arb-cheapest" : ""}">
+          <div class="arb-source-name">${esc(s)}</div>
+          <div class="arb-source-price">${formatPrice(d.lowest, d.currency)}</div>
+          ${d.priceJPY ? `<div class="arb-source-jpy">¥${d.priceJPY.toLocaleString()}</div>` : ""}
+          <div class="arb-source-count">${d.count} listing${d.count !== 1 ? "s" : ""}</div>
+          ${isCheapest ? `<span class="arb-best-chip">Best Price</span>` : ""}
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="arb-summary">${formatPrice(spread, "USD")} cheaper on ${esc(cheapest)}<span class="arb-summary-spread">${spreadPct}% spread</span></div>
+  `;
 }
 
 async function loadArbitrage(query) {

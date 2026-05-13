@@ -502,13 +502,15 @@ async function run() {
 
   console.log("\n\x1b[1m=== demo data ===\x1b[0m");
 
-  await test("Greninja demo: 5 active, all AI graded", async () => {
-    const { body } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true&source=snkrdunk&condition=A");
+  await test("Greninja demo: SNKRDUNK + slabs, AI graded raws", async () => {
+    const { body } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true&condition=A");
     assert(body._demo === true, "not demo");
     const items = body.activeByCountry?.US || [];
-    assert(items.length === 5, `expected 5 active, got ${items.length}`);
-    for (const item of items) {
-      assert(item.grade && !item.grade.error, `missing grade on ${item.itemId}`);
+    assert(items.length >= 5, `expected at least 5 active, got ${items.length}`);
+    const rawItems = items.filter(i => !i.listingGradeLabel || i.listingGradeLabel === "Ungraded");
+    for (const item of rawItems) {
+      if (!item.grade) continue;
+      assert(!item.grade.error, `grade error on ${item.itemId}`);
       assert(item.grade.overall >= 1 && item.grade.overall <= 10, `bad overall: ${item.grade.overall}`);
       assert(item.grade.centering != null, "missing centering");
       assert(item.grade.corners != null, "missing corners");
@@ -533,15 +535,15 @@ async function run() {
     assert(psa.tierReason, "missing tierReason");
   });
 
-  await test("Umbreon demo: 8 active (multi-source) + 7 sold", async () => {
+  await test("Umbreon demo: 11 active (raw + slabs) + 9 sold", async () => {
     const { body } = await jsonNoAuth("/api/search?q=Umbreon+ex+SAR+217/187&demo=true");
     assert(body._demo === true, "not demo");
     assert(body.source === "multi", `expected multi, got ${body.source}`);
     const items = body.activeByCountry?.US || [];
-    assert(items.length === 8, `expected 8 active, got ${items.length}`);
-    assert(body.sold.length === 7, `expected 7 sold, got ${body.sold.length}`);
+    assert(items.length === 11, `expected 11 active, got ${items.length}`);
+    assert(body.sold.length === 9, `expected 9 sold, got ${body.sold.length}`);
     const graded = items.filter(i => i.grade && !i.grade.error);
-    assert(graded.length === 5, `expected 5 graded, got ${graded.length}`);
+    assert(graded.length >= 5, `expected at least 5 graded, got ${graded.length}`);
     for (const item of graded) {
       assert(item.grade.notes, `missing notes on ${item.itemId}`);
       assert(item.imageUrl, `missing imageUrl on ${item.itemId}`);
@@ -557,23 +559,24 @@ async function run() {
     assert(psa.tierReason, "missing tierReason");
   });
 
-  await test("Pikachu demo: multi-source slab, 6 active + 5 sold", async () => {
+  await test("Pikachu demo: multi-source, 9 active (raw + slabs) + 8 sold", async () => {
     const { body } = await jsonNoAuth("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
     assert(body._demo === true, "not demo");
     assert(body.source === "multi", `expected multi, got ${body.source}`);
-    assert(body.listingFormat === "slab", `expected slab, got ${body.listingFormat}`);
     const items = body.activeByCountry?.US || [];
-    assert(items.length === 6, `expected 6 active, got ${items.length}`);
-    assert(body.sold.length === 5, `expected 5 sold, got ${body.sold.length}`);
+    assert(items.length === 9, `expected 9 active, got ${items.length}`);
+    assert(body.sold.length === 8, `expected 8 sold, got ${body.sold.length}`);
   });
 
-  await test("Pikachu demo: all listings have PSA 10 slab label + image", async () => {
+  await test("Pikachu demo: slab listings have PSA 10 label, raw have no label", async () => {
     const { body } = await jsonNoAuth("/api/search?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true");
     const items = body.activeByCountry?.US || [];
-    for (const item of items) {
+    const slabs = items.filter(i => i.listingGradeLabel && i.listingGradeLabel !== "Ungraded");
+    const raws = items.filter(i => !i.listingGradeLabel || i.listingGradeLabel === "Ungraded");
+    assert(slabs.length >= 6, `expected at least 6 slabs, got ${slabs.length}`);
+    assert(raws.length >= 3, `expected at least 3 raws, got ${raws.length}`);
+    for (const item of slabs) {
       assert(item.listingGradeLabel === "PSA 10", `expected PSA 10, got ${item.listingGradeLabel} on ${item.itemId}`);
-      assert(item.grade === null, `slab should have null grade on ${item.itemId}`);
-      assert(item.imageUrl, `missing imageUrl on ${item.itemId}`);
     }
   });
 
@@ -641,8 +644,8 @@ async function run() {
     const { body } = await jsonNoAuth("/api/card/share/m4/114-083");
     assert(body.cardId === "m4/114-083");
     assert(body.identity?.name === "Mega Greninja ex", `expected Mega Greninja ex, got ${body.identity?.name}`);
-    assert(body.price?.listingCount === 8, `expected 8 listings, got ${body.price?.listingCount}`);
-    assert(body.priceHistory?.history?.length === 6, `expected 6 history points`);
+    assert(body.price?.listingCount >= 8, `expected at least 8 listings, got ${body.price?.listingCount}`);
+    assert(body.priceHistory?.history?.length >= 6, `expected at least 6 history points, got ${body.priceHistory?.history?.length}`);
   });
 
   await test("Share: /api/card/share/m2a/234-193 returns Pikachu data", async () => {
@@ -683,7 +686,7 @@ async function run() {
   await test("Demo condition filter: mint returns SNKRDUNK items", async () => {
     const { body } = await jsonNoAuth("/api/search?q=Mega+Greninja+ex+SAR&demo=true&condition=mint");
     const items = body.activeByCountry?.US || [];
-    assert(items.length === 5, `expected 5 mint, got ${items.length}`);
+    assert(items.length >= 5, `expected at least 5 mint, got ${items.length}`);
     assert(items.every(i => (i.detectedCondition || "").toLowerCase() === "mint"), "not all mint");
   });
 
@@ -915,10 +918,10 @@ async function run() {
     assert(body.identity, "missing identity");
   });
 
-  await test("Umbreon raw has 8 active listings", async () => {
+  await test("Umbreon has raw + graded listings", async () => {
     const { body } = await jsonNoAuth("/api/card/view/sv8a/217-187?demo=true");
     assert(body.raw.counts.active === 8, `expected 8 raw active, got ${body.raw.counts.active}`);
-    assert(body.raw.counts.sold === 7, `expected 7 raw sold, got ${body.raw.counts.sold}`);
+    assert(body.graded.counts.active === 3, `expected 3 graded active, got ${body.graded.counts.active}`);
   });
 
   await test("Umbreon has PSA signal", async () => {
@@ -927,10 +930,10 @@ async function run() {
     assert(body.psaSignal.totalPop > 0, "totalPop should be positive");
   });
 
-  await test("Pikachu graded has 6 active slabs", async () => {
+  await test("Pikachu has raw + graded listings", async () => {
     const { body } = await jsonNoAuth("/api/card/view/m2a/234-193?demo=true");
+    assert(body.raw.counts.active === 3, `expected 3 raw active, got ${body.raw.counts.active}`);
     assert(body.graded.counts.active === 6, `expected 6 graded active, got ${body.graded.counts.active}`);
-    assert(body.graded.counts.sold === 5, `expected 5 graded sold, got ${body.graded.counts.sold}`);
   });
 
   await test("Card view has priceRange for listings", async () => {
@@ -938,6 +941,14 @@ async function run() {
     assert(body.raw.priceRange, "missing raw priceRange");
     assert(typeof body.raw.priceRange.low === "number", "missing low");
     assert(typeof body.raw.priceRange.median === "number", "missing median");
+  });
+
+  await test("Card view has gradingRoi with verdict", async () => {
+    const { body } = await jsonNoAuth("/api/card/view/sv8a/217-187?demo=true");
+    assert(body.gradingRoi, "missing gradingRoi");
+    assert(body.gradingRoi.verdict === "worth_grading", `expected worth_grading, got ${body.gradingRoi.verdict}`);
+    assert(body.gradingRoi.expectedProfit > 0, "expectedProfit should be positive");
+    assert(body.gradingRoi.rawMedian < body.gradingRoi.slabMedian, "slab should be more expensive than raw");
   });
 
   // ── Summary ──

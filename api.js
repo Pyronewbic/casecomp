@@ -766,6 +766,7 @@ app.get("/api/card/view/:setCode/:number", apiAuthMiddleware, async (req, res) =
   const searchQuery = resolveCardIdToQuery(cardId);
   const numberQuery = req.params.number.replace("-", "/");
   const isDemo = req.query.demo === "true" || (!clientId && !clientSecret);
+  const formatFilter = req.query.format || "both";
 
   try {
     function findDemo() {
@@ -802,23 +803,38 @@ app.get("/api/card/view/:setCode/:number", apiAuthMiddleware, async (req, res) =
     } else {
       const q = searchQuery;
       const cp = cachePrefix(req);
-      const ebayRawQuery = buildEbaySearchQuery(q, { listingFormat: "raw" });
-      const ebaySlabQuery = buildEbaySearchQuery(q, { listingFormat: "slab", slab: { provider: "PSA", grade: "10" } });
       const soldTimeout = (p) => Promise.race([p, new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000))]);
+      const fetchOpts = { deliveryCountries: ["US", "IN"], languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401 };
 
-      const [rawActive, rawSold, slabActive, slabSold, psa] = await Promise.all([
-        searchActive({ query: ebayRawQuery, relevanceQuery: q, deliveryCountries: ["US", "IN"], languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401 }).catch(() => ({ itemsByCountry: {} })),
-        soldTimeout(searchSold({ query: ebayRawQuery, relevanceQuery: q, languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })).catch(() => ({ items: [] })),
-        searchActive({ query: ebaySlabQuery, relevanceQuery: q, deliveryCountries: ["US", "IN"], languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401 }).catch(() => ({ itemsByCountry: {} })),
-        soldTimeout(searchSold({ query: ebaySlabQuery, relevanceQuery: q, languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })).catch(() => ({ items: [] })),
-        getPsaGradingSignal(q, { _cachePrefix: cp }).catch(() => null),
-      ]);
+      const jobs = [getPsaGradingSignal(q, { _cachePrefix: cp }).catch(() => null)];
 
-      rawResults.active = filterRelevantResults(Object.values(rawActive.itemsByCountry || {}).flat(), q).filtered;
-      rawResults.sold = filterRelevantResults(rawSold.items || [], q).filtered;
-      slabResults.active = filterRelevantResults(Object.values(slabActive.itemsByCountry || {}).flat(), q).filtered;
-      slabResults.sold = filterRelevantResults(slabSold.items || [], q).filtered;
-      psaSignal = psa;
+      if (formatFilter !== "slab") {
+        const ebayRawQuery = buildEbaySearchQuery(q, { listingFormat: "raw" });
+        jobs.push(
+          searchActive({ query: ebayRawQuery, relevanceQuery: q, ...fetchOpts }).catch(() => ({ itemsByCountry: {} })),
+          soldTimeout(searchSold({ query: ebayRawQuery, relevanceQuery: q, languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })).catch(() => ({ items: [] })),
+        );
+      }
+      if (formatFilter !== "raw") {
+        const ebaySlabQuery = buildEbaySearchQuery(q, { listingFormat: "slab", slab: { provider: "PSA", grade: "10" } });
+        jobs.push(
+          searchActive({ query: ebaySlabQuery, relevanceQuery: q, ...fetchOpts }).catch(() => ({ itemsByCountry: {} })),
+          soldTimeout(searchSold({ query: ebaySlabQuery, relevanceQuery: q, languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })).catch(() => ({ items: [] })),
+        );
+      }
+
+      const results = await Promise.all(jobs);
+      psaSignal = results[0];
+      let idx = 1;
+      if (formatFilter !== "slab") {
+        rawResults.active = filterRelevantResults(Object.values(results[idx]?.itemsByCountry || {}).flat(), q).filtered;
+        rawResults.sold = filterRelevantResults(results[idx + 1]?.items || [], q).filtered;
+        idx += 2;
+      }
+      if (formatFilter !== "raw") {
+        slabResults.active = filterRelevantResults(Object.values(results[idx]?.itemsByCountry || {}).flat(), q).filtered;
+        slabResults.sold = filterRelevantResults(results[idx + 1]?.items || [], q).filtered;
+      }
     }
 
     const rawPrices = rawResults.active.map(i => i.totalCost || i.price).filter(Boolean).sort((a, b) => a - b);
