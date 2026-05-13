@@ -760,6 +760,107 @@ app.get("/api/card/share/:setCode/:number", async (req, res) => {
   }
 });
 
+// GET /api/card/view/:setCode/:number — card-centric view with raw + graded data
+app.get("/api/card/view/:setCode/:number", apiAuthMiddleware, async (req, res) => {
+  const cardId = `${req.params.setCode}/${req.params.number}`;
+  const searchQuery = resolveCardIdToQuery(cardId);
+  const numberQuery = req.params.number.replace("-", "/");
+  const isDemo = req.query.demo === "true" || (!clientId && !clientSecret);
+
+  try {
+    function findDemo() {
+      const byNumber = findDemoByNumber(req.params.number);
+      if (byNumber) return byNumber;
+      const d = getDemoSearchResult(searchQuery, {});
+      if (d._demo && Object.values(d.activeByCountry || {}).flat().length > 0) return d;
+      return getDemoSearchResult(numberQuery, {});
+    }
+
+    const cardData = await findCardByQuery(searchQuery).catch(() => null);
+    const identity = cardData || parseCardIdentity(searchQuery);
+    if (identity.setCode) identity.setName = SET_NAME_MAP[identity.setCode] || identity.setCode;
+
+    let rawResults = { active: [], sold: [] };
+    let slabResults = { active: [], sold: [] };
+    let psaSignal = null;
+
+    if (isDemo) {
+      const demo = findDemo();
+      if (demo._demo) {
+        const active = Object.values(demo.activeByCountry || {}).flat();
+        rawResults.active = active.filter(i => !i.listingGradeLabel || i.listingGradeLabel === "Ungraded");
+        slabResults.active = active.filter(i => i.listingGradeLabel && i.listingGradeLabel !== "Ungraded");
+        rawResults.sold = (demo.sold || []).filter(s => !s.listingGradeLabel);
+        slabResults.sold = (demo.sold || []).filter(s => s.listingGradeLabel);
+        psaSignal = demo.psaSignal || null;
+        if (demo.query) {
+          const fromQuery = parseCardIdentity(demo.query);
+          if (!identity.rarity && fromQuery.rarity) identity.rarity = fromQuery.rarity;
+          if ((!identity.name || identity.name === identity.setName) && fromQuery.name) identity.name = fromQuery.name;
+        }
+      }
+    } else {
+      const q = searchQuery;
+      const cp = cachePrefix(req);
+      const ebayRawQuery = buildEbaySearchQuery(q, { listingFormat: "raw" });
+      const ebaySlabQuery = buildEbaySearchQuery(q, { listingFormat: "slab", slab: { provider: "PSA", grade: "10" } });
+      const soldTimeout = (p) => Promise.race([p, new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000))]);
+
+      const [rawActive, rawSold, slabActive, slabSold, psa] = await Promise.all([
+        searchActive({ query: ebayRawQuery, relevanceQuery: q, deliveryCountries: ["US", "IN"], languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401 }).catch(() => ({ itemsByCountry: {} })),
+        soldTimeout(searchSold({ query: ebayRawQuery, relevanceQuery: q, languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })).catch(() => ({ items: [] })),
+        searchActive({ query: ebaySlabQuery, relevanceQuery: q, deliveryCountries: ["US", "IN"], languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401 }).catch(() => ({ itemsByCountry: {} })),
+        soldTimeout(searchSold({ query: ebaySlabQuery, relevanceQuery: q, languages: [], config: { _cachePrefix: cp }, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })).catch(() => ({ items: [] })),
+        getPsaGradingSignal(q, { _cachePrefix: cp }).catch(() => null),
+      ]);
+
+      rawResults.active = filterRelevantResults(Object.values(rawActive.itemsByCountry || {}).flat(), q).filtered;
+      rawResults.sold = filterRelevantResults(rawSold.items || [], q).filtered;
+      slabResults.active = filterRelevantResults(Object.values(slabActive.itemsByCountry || {}).flat(), q).filtered;
+      slabResults.sold = filterRelevantResults(slabSold.items || [], q).filtered;
+      psaSignal = psa;
+    }
+
+    const rawPrices = rawResults.active.map(i => i.totalCost || i.price).filter(Boolean).sort((a, b) => a - b);
+    const slabPrices = slabResults.active.map(i => i.totalCost || i.price).filter(Boolean).sort((a, b) => a - b);
+    const gradingCost = psaSignal?.estCost ? parseInt(psaSignal.estCost.replace(/\D/g, "")) || 50 : 50;
+    const rawMedian = rawPrices.length ? rawPrices[Math.floor(rawPrices.length / 2)] : null;
+    const slabMedian = slabPrices.length ? slabPrices[Math.floor(slabPrices.length / 2)] : null;
+    const gradingRoi = rawMedian && slabMedian ? {
+      rawMedian,
+      slabMedian,
+      gradingCost,
+      expectedProfit: Math.round((slabMedian - rawMedian - gradingCost) * 100) / 100,
+      spreadPercent: Math.round(((slabMedian - rawMedian) / rawMedian) * 100),
+      verdict: slabMedian > rawMedian + gradingCost ? "worth_grading" : "not_worth_grading",
+    } : null;
+
+    res.json({
+      cardId,
+      identity,
+      raw: {
+        active: rawResults.active,
+        sold: rawResults.sold,
+        counts: { active: rawResults.active.length, sold: rawResults.sold.length },
+        priceRange: rawPrices.length ? { low: rawPrices[0], high: rawPrices[rawPrices.length - 1], median: rawMedian } : null,
+      },
+      graded: {
+        active: slabResults.active,
+        sold: slabResults.sold,
+        counts: { active: slabResults.active.length, sold: slabResults.sold.length },
+        priceRange: slabPrices.length ? { low: slabPrices[0], high: slabPrices[slabPrices.length - 1], median: slabMedian } : null,
+      },
+      psaSignal,
+      gradingRoi,
+      searchQuery,
+      _demo: isDemo || undefined,
+    });
+  } catch (e) {
+    logError("card-view", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
 // GET /api/price-history — historical sold prices for a card
 app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
   const { q } = req.query;
