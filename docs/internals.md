@@ -2,37 +2,123 @@
 
 ## Project layout
 
-| File | Role |
-|------|------|
-| `index.js` | `CARDS`, `CONFIG`, CLI parsing, main loop |
-| `ebay.js` | OAuth, Browse search, Insights + sold scrape fallback |
-| `ebayCategories.js` | US category id for Single Cards = `183454` |
-| `filters.js` | Language, relevance, raw/slab title filters |
-| `listingQuery.js` | Builds eBay `q` for raw vs slab |
-| `grading.js` | LLM + site grading adapters, cache, throttling |
-| `output.js` | `results.md` / `results.json` (supports `--output` prefix) |
-| `cache.js` | Shared cache helpers |
-| `.claude/commands/casecomp.md` | Claude Code `/casecomp` skill definition |
+```
+api.js                Express API server + dashboard (port 3000)
+index.js              CLI entry point (minimist)
+scan.js               Event & release scanner
 
-## Output and cache files
+lib/
+  sources/
+    ebay.js           eBay Browse API, OAuth, ship-to, sold scrape
+    magi.js           magi.camp scraper (fetch + cheerio)
+    yahooauctions.js  Yahoo Auctions JP scraper (cheerio)
+    snkrdunk.js       SNKRDUNK JSON API
+    tcgplayer.js      TCGPlayer price seeding
+  grading/
+    grading.js        AI pre-grading (per-subgrade, Claude/OpenAI)
+    preprocessing.js  Corner crop extraction via sharp
+    psa.js            PSA pop reports, cert lookup, grading signal
+    psaTiers.js       PSA submission tier data
+  data/
+    firestore.js      Firestore: grade logs, drops, webhooks, cache
+    api-keys.js       Developer key management
+    card-identity.js  Canonical IDs, set resolution, SET_TOTAL_MAP
+    card-database.js  TCGdex card DB (29K EN+JP cards), set browser, rarity
+    price-history.js  Sold comp tracking + TCGPlayer seeding
+    demo.js           Sample data (3 multi-source cards)
+    cache.js          File-based cache (legacy CLI)
+    redis-cache.js    Redis cache (optional)
+    email.js          Alert emails via Resend
+    csv.js            CSV export helpers
+    portfolio.js      Portfolio CRUD (Firestore subcollection)
+  search/
+    filters.js        Language, relevance, condition detection, outlier flagging
+    listingQuery.js   eBay search query builder (raw vs slab)
+    ebayCategories.js eBay category IDs (TCG singles: 183454)
+    output.js         Markdown/JSON formatters (CLI output)
+  scan.js             Event scanning logic
+  swagger.js          OpenAPI 3.0.3 spec
 
-| File | Purpose | TTL |
-|------|---------|-----|
-| `results.md` | Human-readable tables | overwritten each run |
-| `results.json` | Full structured payload + config snapshot | overwritten each run |
-| `ebay-active-cache.json` | Cached active searches | 6h |
-| `ebay-sold-cache.json` | Cached sold searches | 24h |
-| `ebay-insights-forbidden-cache.json` | Suppresses Insights retries after HTTP 403 | ~14 days |
-| `ai-grade-cache.json` | Cached AI grades (key includes model/provider) | 30 days |
-| `ebay-usage.json` | Rough daily eBay call counter (vs 5000/day cap) | resets daily |
+public/               Dashboard frontend (search, grade, arbitrage, portfolio)
+public/admin/         Admin panel (keys, stats, errors)
+extension/            Chrome extension: queue auto-join, drop intel
+terraform/            GCP infra (Cloud Run, Firestore, LB, CDN, Scheduler)
+test/
+  unit-test.js        130 unit tests
+  api-test.js         96 API integration tests
+  smoke-test.js       74 Playwright UI smoke tests
+```
+
+## API server
+
+`api.js` is the primary entry point for production. Express 5 with:
+
+- **Auth middleware**: owner key (`CC_LIVE_`) → sandbox → Firestore developer keys (30s cache). `apiAuthMiddleware` adds demo bypass.
+- **Rate limiting**: 60/min authenticated, 360/min demo, 5/min sandbox.
+- **Security**: Helmet headers, trust proxy = 1, request IDs, compression, `safeErrorMessage()` on all errors.
+- **CORS**: wildcard `*` — API key is the access control layer.
+- **Dashboard**: static files from `public/` served at `/` and `/admin`.
+- **Docs**: Swagger UI at `/docs`, spec at `/docs/spec.json`.
+
+On startup: eBay OAuth token pre-fetched, TCGdex card database loaded from Firestore cache (24h TTL), set names + logos loaded in parallel.
+
+## Caching
+
+All caches use Firestore (shared across Cloud Run instances). No Redis in production.
+
+| Collection | TTL | Content |
+|-----------|-----|---------|
+| `cache-grades` | 30 days | AI grade results by image hash |
+| `cache-psa-pop` | 24 hours | PSA population data |
+| `cache-psa-spec` | permanent | PSA spec ID lookups (negative cache: 7 days) |
+| `cache-translations` | permanent | EN-to-JP card name translations |
+| `cache-ebay-active` | 6 hours | eBay active listing results |
+| `cache-ebay-sold` | 24 hours | eBay sold comp results |
+| `price-history` | permanent | Sold comp prices over time |
+| `api-keys` | permanent | Developer API keys (hashed) |
+| `error-logs` | permanent | API errors with request IDs |
+
+Stale-while-revalidate on active listings for owner key. File-based cache (`.json` files) still used by the CLI.
+
+## CLI cache files
+
+| File | TTL |
+|------|-----|
+| `ebay-active-cache.json` | 6h |
+| `ebay-sold-cache.json` | 24h |
+| `ebay-insights-forbidden-cache.json` | ~14 days |
+| `ai-grade-cache.json` | 30 days |
+| `ebay-usage.json` | resets daily |
 
 Use `--refresh` to delete all cache files before a run.
 
+## Authentication flow
+
+1. `authMiddleware`: checks `Authorization: Bearer` header or `?key=` param. Matches owner → sandbox → Firestore developer keys. Local dev (`K_SERVICE` unset) bypasses auth.
+2. `apiAuthMiddleware`: wraps `authMiddleware` with a `?demo=true` bypass that serves canned sample data (360 req/min).
+3. `ownerOnly`: requires the owner `CASECOMP_API_KEY`. Used for admin, error management, check-alerts.
+
+## AI grading pipeline
+
+1. Listing images fetched, upgraded to `s-l1600` resolution for eBay.
+2. `preprocessing.js` crops 4 corners (20% region) from front + back via `sharp` (~100ms).
+3. Four parallel LLM calls: centering, corners, edges, surface — each with the full PSA rubric (grades 5-10).
+4. Corners subgrade receives front + back URLs + 8 magnified corner crops. Others receive all listing images.
+5. Overall = minimum of all subgrades (matches PSA methodology).
+6. Falls back to single combined prompt for non-Claude providers or missing back image.
+
+## Scheduled tasks
+
+Cloud Scheduler runs two jobs every 6 hours:
+
+- **track-prices**: snapshots portfolio values for all users (capped at 100).
+- **check-alerts**: evaluates active alerts against live data, sends email via Resend (6h dedup).
+
 ## Configuration
 
-Edit `index.js` to change defaults:
+Edit `index.js` to change CLI defaults:
 
-- **`CARDS`** — Default search phrases when no card lines are passed via CLI.
-- **`CONFIG`** — Language, delivery countries, results per card, sold limit, raw/slab mode, AI grading settings.
+- **`CARDS`** — default search phrases when no card lines are passed.
+- **`CONFIG`** — language, delivery countries, results per card, sold limit, raw/slab mode, AI grading settings.
 
 CLI flags override `CONFIG` for that run. See [CLI reference](cli-reference.md).
