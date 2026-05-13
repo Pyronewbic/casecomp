@@ -951,6 +951,31 @@ async function run() {
     assert(body.gradingRoi.rawMedian < body.gradingRoi.slabMedian, "slab should be more expensive than raw");
   });
 
+  // ── Set browser ──
+
+  console.log("\n\x1b[1m=== set browser ===\x1b[0m");
+
+  await test("GET /api/sets returns array with count", async () => {
+    const { res, body } = await jsonNoAuth("/api/sets");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(Array.isArray(body.sets), "sets should be an array");
+    assert(typeof body.count === "number", "count should be a number");
+  });
+
+  await test("GET /api/sets?era filters by era", async () => {
+    const { body: all } = await jsonNoAuth("/api/sets");
+    const { body: filtered } = await jsonNoAuth("/api/sets?era=Scarlet%20%26%20Violet");
+    assert(filtered.count <= all.count, "filtered count should be <= total");
+    for (const s of filtered.sets) {
+      assert(s.era === "Scarlet & Violet", `expected SV era, got ${s.era}`);
+    }
+  });
+
+  await test("GET /api/sets/:setCode returns 404 for unknown set", async () => {
+    const { res } = await jsonNoAuth("/api/sets/zzz999");
+    assert(res.status === 404, `expected 404, got ${res.status}`);
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);
