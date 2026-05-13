@@ -23,6 +23,7 @@ import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
+import { initCardDatabase, searchCards, refreshCardDatabase } from "./lib/data/card-database.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -253,22 +254,27 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
       const cp = cachePrefix(req);
       config._cachePrefix = cp;
       const soldTimeout = (p) => Promise.race([p, new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000))]);
-      const [activeRes, soldRes, psaSignal] = await Promise.all([
+      const [activeRes, soldRes] = await Promise.all([
         searchActive({ query: ebayQuery, relevanceQuery: q, deliveryCountries: config.deliveryCountries, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401 }),
         soldTimeout(searchSold({ query: ebayQuery, relevanceQuery: q, languages: config.languages, config, refresh: false, noEbay: false, getToken, on401, soldBrowser: false })),
-        getPsaGradingSignal(q, { _cachePrefix: cp }),
       ]);
+      const filteredByCountry = {};
+      for (const [country, items] of Object.entries(activeRes.itemsByCountry || {})) {
+        filteredByCountry[country] = filterRelevantResults(items, q).filtered;
+      }
+      const filteredSold = filterRelevantResults(soldRes.items || [], q).filtered;
+      getPsaGradingSignal(q, { _cachePrefix: cp }).catch(() => null);
       result = {
         query: q,
         source: "ebay",
         listingFormat: config.listingFormat,
-        activeByCountry: activeRes.itemsByCountry || {},
-        sold: soldRes.items || [],
+        activeByCountry: filteredByCountry,
+        sold: filteredSold,
         soldSource: soldRes.source,
-        psaSignal,
+        psaSignal: null,
         counts: {
-          activeTotal: Object.values(activeRes.itemsByCountry || {}).reduce((n, arr) => n + arr.length, 0),
-          sold: (soldRes.items || []).length,
+          activeTotal: Object.values(filteredByCountry).reduce((n, arr) => n + arr.length, 0),
+          sold: filteredSold.length,
         },
       };
     }
@@ -354,7 +360,7 @@ app.get("/api/sold", apiAuthMiddleware, (req, res, next) => { req._errorType = "
 });
 
 // GET /api/psa
-app.get("/api/psa", authMiddleware, (req, res, next) => { req._errorType = "psa"; next(); }, async (req, res) => {
+app.get("/api/psa", apiAuthMiddleware, (req, res, next) => { req._errorType = "psa"; next(); }, async (req, res) => {
   const { q } = req.query;
   if (!validateQuery(q, res)) return;
   try {
@@ -450,6 +456,16 @@ app.get("/api/health", async (req, res) => {
     firestore: firestoreStatus,
     ebay: { configured: !!(clientId && clientSecret), usageToday: ebayUsage, dailyCap: DAILY_CAP },
   });
+});
+
+// GET /api/autocomplete
+app.get("/api/autocomplete", (req, res) => {
+  const q = (req.query.q || "").trim();
+  if (!q || q.length < 2) return res.status(400).json({ error: "Query must be at least 2 characters" });
+  if (q.length > 100) return res.status(400).json({ error: "Query too long (max 100 characters)" });
+  const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 8));
+  const results = searchCards(q, limit);
+  res.json({ results, count: results.length, query: q });
 });
 
 // ============ V1 API — Drop Intelligence ============
@@ -1381,9 +1397,14 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
       if (hasEbay) {
         try {
           const ebayQuery = buildEbaySearchQuery(card, {});
-          const soldRes = await Promise.race([
-            searchSold({ query: ebayQuery, relevanceQuery: card, languages: [], config: {}, refresh: false, noEbay: false, getToken, on401, soldBrowser: false }),
-            new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000)),
+          const warmConfig = { deliveryCountries: ["US", "IN"], languages: [], _cachePrefix: "" };
+          const [soldRes] = await Promise.all([
+            Promise.race([
+              searchSold({ query: ebayQuery, relevanceQuery: card, languages: [], config: {}, refresh: false, noEbay: false, getToken, on401, soldBrowser: false }),
+              new Promise(r => setTimeout(() => r({ items: [], source: "timeout" }), 30000)),
+            ]),
+            searchActive({ query: ebayQuery, relevanceQuery: card, deliveryCountries: warmConfig.deliveryCountries, languages: warmConfig.languages, config: warmConfig, refresh: false, noEbay: false, getToken, on401 }).catch(() => null),
+            getPsaGradingSignal(card, { _cachePrefix: "" }).catch(() => null),
           ]);
           ebaySold = soldRes.items || [];
           if (ebaySold.length) {
@@ -1451,6 +1472,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
     }
   } catch {}
 
+  refreshCardDatabase().catch(() => {});
   res.json({ tracked: results.length, results, portfolioSnapshots });
 });
 
@@ -1660,4 +1682,5 @@ app.listen(PORT, async () => {
       console.warn(`eBay token warmup failed: ${e.message}`);
     }
   }
+  initCardDatabase().catch(() => {});
 });

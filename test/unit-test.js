@@ -24,6 +24,7 @@ import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards, findDem
 import { parseCardIdentity, buildCardId, SET_NAME_MAP, resolveCardIdToQuery } from "../lib/data/card-identity.js";
 import { buildAlertEmailSubject, sendAlertEmail } from "../lib/data/email.js";
 import { csvEscape, csvRow } from "../lib/data/csv.js";
+import { matchesQuery, searchCards } from "../lib/data/card-database.js";
 
 let passed = 0;
 let failed = 0;
@@ -988,6 +989,58 @@ test("isGradedCard detects BGS 9.5", () => {
 
 test("isGradedCard rejects raw card query", () => {
   assert(!isGradedCard("Umbreon ex SAR 217/187"));
+});
+
+// ── Card database / autocomplete ──
+
+console.log("\n\x1b[1m=== card database ===\x1b[0m");
+
+test("matchesQuery: prefix match scores 3", () => {
+  const card = { id: "SV8a-217", name: "Umbreon ex", nameJa: "ブラッキーex", localId: "217", setCode: "SV8a" };
+  eq(matchesQuery(card, "umbr"), 3);
+});
+
+test("matchesQuery: contains match scores 2", () => {
+  const card = { id: "SV8a-217", name: "Umbreon ex", nameJa: "ブラッキーex", localId: "217", setCode: "SV8a" };
+  eq(matchesQuery(card, "breon"), 2);
+});
+
+test("matchesQuery: JP name prefix scores 3", () => {
+  const card = { id: "SV8a-217", name: "Umbreon ex", nameJa: "ブラッキーex", localId: "217", setCode: "SV8a" };
+  eq(matchesQuery(card, "ブラッキー"), 3);
+});
+
+test("matchesQuery: localId prefix scores 1", () => {
+  const card = { id: "SV8a-217", name: "Umbreon ex", nameJa: "ブラッキーex", localId: "217", setCode: "SV8a" };
+  eq(matchesQuery(card, "217"), 1);
+});
+
+test("matchesQuery: id contains scores 1", () => {
+  const card = { id: "SV8a-217", name: "Umbreon ex", nameJa: null, localId: "217", setCode: "SV8a" };
+  eq(matchesQuery(card, "sv8a-217"), 1);
+});
+
+test("matchesQuery: no match returns 0", () => {
+  const card = { id: "SV8a-217", name: "Umbreon ex", nameJa: "ブラッキーex", localId: "217", setCode: "SV8a" };
+  eq(matchesQuery(card, "charizard"), 0);
+});
+
+test("matchesQuery: empty query returns 0", () => {
+  const card = { id: "SV8a-217", name: "Umbreon ex", nameJa: null, localId: "217", setCode: "SV8a" };
+  eq(matchesQuery(card, ""), 0);
+});
+
+test("matchesQuery: query under 2 chars returns 0", () => {
+  const card = { id: "SV8a-217", name: "Umbreon ex", nameJa: null, localId: "217", setCode: "SV8a" };
+  eq(matchesQuery(card, "u"), 0);
+});
+
+test("searchCards: empty query returns empty", () => {
+  eq(searchCards("", 8).length, 0);
+});
+
+test("searchCards: query under 2 chars returns empty", () => {
+  eq(searchCards("a", 8).length, 0);
 });
 
 // ── Summary ──

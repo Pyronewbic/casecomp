@@ -227,6 +227,29 @@ async function run() {
 
     await apiPage.close();
 
+    // --- Autocomplete API ---
+    console.log("\n[Autocomplete API]");
+    const acPage = await browser.newPage();
+
+    const acRes = await acPage.goto(`${BASE}/api/autocomplete?q=pikachu`);
+    assert(acRes.status() === 200, "autocomplete pikachu returns 200");
+    const acBody = await acRes.json();
+    assert(Array.isArray(acBody.results), "autocomplete returns results array");
+    if (acBody.results.length > 0) {
+      const first = acBody.results[0];
+      assert(typeof first.id === "string", "result has id field");
+      assert(typeof first.name === "string", "result has name field");
+      assert(first.imageUrl === null || typeof first.imageUrl === "string", "result has imageUrl field");
+    }
+
+    const acShort = await acPage.goto(`${BASE}/api/autocomplete?q=a`);
+    assert(acShort.status() === 400, "autocomplete q=a returns 400 (too short)");
+
+    const acNoQ = await acPage.goto(`${BASE}/api/autocomplete`);
+    assert(acNoQ.status() === 400, "autocomplete missing q returns 400");
+
+    await acPage.close();
+
     // --- Static assets ---
     console.log("\n[Static assets]");
     const page2 = await browser.newPage();
