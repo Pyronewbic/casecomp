@@ -18,6 +18,164 @@ let currentCondition = "";
 let forceDemo = false;
 let isDemo = false;
 let allItems = [];
+
+// ── Autocomplete ──
+
+const acDropdown = document.getElementById("autocomplete-dropdown");
+const acPreview = document.getElementById("ac-preview");
+let acDebounce = null;
+let acIndex = -1;
+let acResults = [];
+
+input.addEventListener("input", () => {
+  clearTimeout(acDebounce);
+  const q = input.value.trim();
+  if (q.length < 2) { hideAc(); return; }
+  acDebounce = setTimeout(() => fetchAc(q), 150);
+});
+
+input.addEventListener("keydown", (e) => {
+  if (acDropdown.classList.contains("hidden")) return;
+  const items = acDropdown.querySelectorAll(".ac-item");
+  if (e.key === "ArrowDown") { e.preventDefault(); acIndex = Math.min(acIndex + 1, items.length - 1); highlightAc(items); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); acIndex = Math.max(acIndex - 1, 0); highlightAc(items); }
+  else if (e.key === "Enter") { e.preventDefault(); if (acIndex >= 0) selectAc(items[acIndex], acIndex); else if (items.length > 0) selectAc(items[0], 0); }
+  else if (e.key === "Escape") { hideAc(); }
+});
+
+document.addEventListener("click", (e) => { if (!e.target.closest(".search-bar")) hideAc(); });
+
+async function fetchAc(q) {
+  try {
+    const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(q)}&limit=6`);
+    if (!res.ok) { hideAc(); return; }
+    const data = await res.json();
+    renderAc(data.results || []);
+  } catch { hideAc(); }
+}
+
+function showAcPreview(idx) {
+  const c = acResults[idx];
+  if (!c || !c.imageUrl) { acPreview.classList.add("hidden"); return; }
+  const highRes = c.imageUrl.replace("/low.png", "/high.png");
+  acPreview.innerHTML = `<img src="${highRes}" alt="${c.name}"><div class="ac-preview-name">${c.name}${c.nameJa && c.nameJa !== c.name ? ' <span style="opacity:0.5">' + c.nameJa + '</span>' : ''}</div><div class="ac-preview-set">${c.setName || c.setCode || ""} / ${c.localId || ""}</div>`;
+  acPreview.classList.remove("hidden");
+}
+
+function renderAc(results) {
+  if (!results.length) { hideAc(); return; }
+  acIndex = -1;
+  acResults = results;
+  acDropdown.innerHTML = results.map(c => {
+    const img = c.imageUrl
+      ? `<img class="ac-img" src="${c.imageUrl}" alt="" loading="lazy">`
+      : `<div class="ac-img-placeholder">?</div>`;
+    const name = c.nameJa && c.nameJa !== c.name ? `${c.name} <span style="opacity:0.5">${c.nameJa}</span>` : c.name;
+    const meta = [c.setName || c.setCode, c.localId].filter(Boolean).join(" / ");
+    const cardId = c.cardId ? `<span class="ac-cardid">${c.cardId}</span>` : "";
+    const cardNum = c.cardId ? c.cardId.split("/")[1]?.replace("-", "/") : "";
+    const searchQuery = cardNum
+      ? `${c.name} ${cardNum} ${c.setName || ""}`.trim()
+      : c.name;
+    return `<div class="ac-item" data-query="${searchQuery}" data-name="${c.name}">${img}<div class="ac-info"><span class="ac-name">${name}</span><span class="ac-meta">${meta}</span></div>${cardId}</div>`;
+  }).join("");
+  acDropdown.classList.remove("hidden");
+  acDropdown.querySelectorAll(".ac-item").forEach((el, i) => {
+    el.addEventListener("mousedown", (e) => { e.preventDefault(); selectAc(el, i); });
+    el.addEventListener("mouseenter", () => { acIndex = i; highlightAc(acDropdown.querySelectorAll(".ac-item")); showAcPreview(i); });
+  });
+}
+
+function highlightAc(items) {
+  items.forEach((el, i) => el.classList.toggle("ac-active", i === acIndex));
+  if (items[acIndex]) { items[acIndex].scrollIntoView({ block: "nearest" }); showAcPreview(acIndex); }
+}
+
+function selectAc(el, idx) {
+  const q = el.dataset.query.trim();
+  input.value = q;
+  const card = acResults[idx ?? acIndex] || {};
+  hideAc();
+  currentQuery = q;
+
+  if (card.cardId) {
+    searchByCardId(card);
+  } else {
+    const lang = card.nameJa ? "jp" : "";
+    let url = `/api/search?q=${encodeURIComponent(q)}`;
+    if (forceDemo) url += `&demo=true`;
+    if (lang) url += `&lang=${lang}`;
+    searchUrl(url, q);
+  }
+  currentSource = "";
+  currentCondition = "";
+  forceDemo = false;
+}
+
+async function searchByCardId(card) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Searching';
+  emptyState.classList.add("hidden");
+  resultsSection.classList.add("hidden");
+  alertSection.classList.add("hidden");
+
+  const [setCode, number] = card.cardId.split("/");
+  const shareUrl = `/api/card/share/${setCode}/${number}`;
+  const searchName = card.name || card.nameJa || "";
+
+  try {
+    const shareRes = await fetch(shareUrl);
+    if (shareRes.ok) {
+      const shareData = await shareRes.json();
+      if (shareData.psaSignal) currentPsaSignal = shareData.psaSignal;
+
+      const searchQ = shareData.searchQuery || `${searchName} ${number.replace("-", "/")}`;
+      const searchRes = await fetch(`/api/search?q=${encodeURIComponent(searchQ)}&demo=true`);
+      if (searchRes.ok) {
+        const data = await searchRes.json();
+        if (data.psaSignal == null && shareData.psaSignal) data.psaSignal = shareData.psaSignal;
+        isDemo = !!data._demo;
+        render(data);
+        btn.disabled = false;
+        btn.textContent = "Search";
+
+        fetchLiveSources(searchName, card).catch(() => {});
+        return;
+      }
+    }
+  } catch {}
+
+  const lang = card.nameJa ? "jp" : "";
+  let url = `/api/search?q=${encodeURIComponent(input.value.trim())}&grade=true`;
+  if (lang) url += `&lang=${lang}`;
+  searchUrl(url, input.value.trim());
+}
+
+async function fetchLiveSources(name, card) {
+  const q = `${name} ${card.cardId.split("/")[1]?.replace("-", "/") || ""}`.trim();
+  const sources = ["magi", "yahoo", "snkrdunk"];
+  const results = await Promise.allSettled(
+    sources.map(s => fetch(`/api/search?q=${encodeURIComponent(q)}&source=${s}&grade=true`).then(r => r.json()))
+  );
+  let added = 0;
+  for (let i = 0; i < sources.length; i++) {
+    if (results[i].status !== "fulfilled") continue;
+    const data = results[i].value;
+    const items = Object.values(data.activeByCountry || {}).flat();
+    if (items.length) {
+      allActive.push(...items);
+      added += items.length;
+    }
+    if (data.sold?.length) allSold.push(...data.sold);
+  }
+  if (added > 0) {
+    renderList(sortItems(allActive, currentSort), "active");
+    document.querySelector('.list-tab[data-tab="active"]').textContent = `Active (${allActive.length})`;
+    document.querySelector('.list-tab[data-tab="sold"]').textContent = `Sold (${allSold.length})`;
+  }
+}
+
+function hideAc() { acDropdown.classList.add("hidden"); acPreview.classList.add("hidden"); acDropdown.innerHTML = ""; acIndex = -1; acResults = []; }
 let allActive = [];
 let allSold = [];
 let activeSourceFilter = "all";
@@ -51,6 +209,110 @@ document.getElementById("sort-select").addEventListener("change", (e) => {
   applySourceFilter();
 });
 
+// ── Search filters ──
+
+let currentFormat = "raw";
+let activeSources = new Set(["ebay", "magi", "yahoo", "snkrdunk"]);
+let currentFilterCondition = "";
+
+document.querySelectorAll('.filter-pill[data-format]').forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll('.filter-pill[data-format]').forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentFormat = btn.dataset.format;
+    document.getElementById("slab-options").classList.toggle("hidden", currentFormat !== "slab");
+    triggerFilterSearch();
+  });
+});
+
+const allSources = ["ebay", "magi", "yahoo", "snkrdunk"];
+const allPill = document.querySelector('.source-pill[data-source="all"]');
+
+function syncSourcePills() {
+  const allActive = allSources.every(s => activeSources.has(s));
+  allPill.classList.toggle("active", allActive);
+  document.querySelectorAll('.source-pill:not([data-source="all"])').forEach(b => {
+    b.classList.toggle("active", activeSources.has(b.dataset.source));
+  });
+}
+
+allPill.addEventListener("click", () => {
+  const allActive = allSources.every(s => activeSources.has(s));
+  if (allActive) return;
+  activeSources = new Set(allSources);
+  syncSourcePills();
+  triggerFilterSearch();
+});
+
+document.querySelectorAll('.source-pill:not([data-source="all"])').forEach(btn => {
+  btn.addEventListener("click", () => {
+    const src = btn.dataset.source;
+    if (activeSources.has(src)) {
+      if (activeSources.size > 1) activeSources.delete(src);
+    } else {
+      activeSources.add(src);
+    }
+    syncSourcePills();
+    triggerFilterSearch();
+  });
+});
+
+document.getElementById("condition-filter").addEventListener("change", (e) => {
+  currentFilterCondition = e.target.value;
+  triggerFilterSearch();
+});
+
+document.getElementById("slab-provider").addEventListener("change", () => triggerFilterSearch());
+document.getElementById("slab-grade").addEventListener("change", () => triggerFilterSearch());
+
+function triggerFilterSearch() {
+  const q = currentQuery || input.value.trim();
+  if (!q) return;
+  const sources = [...activeSources];
+  if (sources.length === 1) {
+    let url = `/api/search?q=${encodeURIComponent(q)}&source=${sources[0]}`;
+    if (currentFormat === "slab") {
+      url += `&format=slab&slab_provider=${document.getElementById("slab-provider").value}&slab_grade=${document.getElementById("slab-grade").value}`;
+    }
+    if (currentFilterCondition) url += `&condition=${currentFilterCondition}`;
+    url += "&grade=true";
+    searchUrl(url, q);
+  } else if (sources.length === allSources.length) {
+    let url = `/api/search?q=${encodeURIComponent(q)}`;
+    if (currentFormat === "slab") {
+      url += `&format=slab&slab_provider=${document.getElementById("slab-provider").value}&slab_grade=${document.getElementById("slab-grade").value}`;
+    }
+    if (currentFilterCondition) url += `&condition=${currentFilterCondition}`;
+    url += "&grade=true";
+    searchUrl(url, q);
+  } else {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Searching';
+    emptyState.classList.add("hidden");
+    resultsSection.classList.add("hidden");
+    const cond = currentFilterCondition ? `&condition=${currentFilterCondition}` : "";
+    const fmt = currentFormat === "slab" ? `&format=slab&slab_provider=${document.getElementById("slab-provider").value}&slab_grade=${document.getElementById("slab-grade").value}` : "";
+    Promise.allSettled(
+      sources.map(s => fetch(`/api/search?q=${encodeURIComponent(q)}&source=${s}${cond}${fmt}&grade=true`).then(r => r.json()))
+    ).then(results => {
+      const merged = { query: q, source: "multi", listingFormat: currentFormat, activeByCountry: { US: [] }, sold: [], psaSignal: null, counts: { activeTotal: 0, sold: 0 } };
+      for (const r of results) {
+        if (r.status !== "fulfilled") continue;
+        const d = r.value;
+        const items = Object.values(d.activeByCountry || {}).flat();
+        merged.activeByCountry.US.push(...items);
+        if (d.sold) merged.sold.push(...d.sold);
+        if (d.psaSignal && !merged.psaSignal) merged.psaSignal = d.psaSignal;
+      }
+      merged.counts.activeTotal = merged.activeByCountry.US.length;
+      merged.counts.sold = merged.sold.length;
+      render(merged);
+      btn.disabled = false;
+      btn.textContent = "Search";
+    });
+  }
+}
+
 function sortItems(items) {
   const sorted = [...items];
   if (currentSort === "price-desc") {
@@ -73,16 +335,19 @@ form.addEventListener("submit", async (e) => {
 });
 
 async function search(q, source, condition) {
+  let url = `/api/search?q=${encodeURIComponent(q)}`;
+  if (forceDemo) url += `&demo=true`;
+  if (source) url += `&source=${encodeURIComponent(source)}`;
+  if (condition) url += `&condition=${encodeURIComponent(condition)}`;
+  return searchUrl(url, q);
+}
+
+async function searchUrl(url, q) {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Searching';
   emptyState.classList.add("hidden");
   resultsSection.classList.add("hidden");
   alertSection.classList.add("hidden");
-
-  let url = `/api/search?q=${encodeURIComponent(q)}`;
-  if (forceDemo) url += `&demo=true`;
-  if (source) url += `&source=${encodeURIComponent(source)}`;
-  if (condition) url += `&condition=${encodeURIComponent(condition)}`;
 
   try {
     const res = await fetch(url);
@@ -130,7 +395,13 @@ function render(data) {
   `;
 
   currentPsaSignal = data.psaSignal || null;
-  renderPsa(data.psaSignal);
+  if (data.psaSignal) {
+    renderPsa(data.psaSignal);
+  } else {
+    psaSignal.classList.add("hidden");
+    const psaQuery = data.query.replace(/\s+\d+\/\d+.*$/, "").trim() || data.query;
+    fetchPsaLazy(psaQuery);
+  }
 
   allActive = active;
   allSold = sold;
@@ -240,6 +511,19 @@ function dedupeActive(data) {
   return items.sort((a, b) => (a.totalCost || a.price) - (b.totalCost || b.price));
 }
 
+async function fetchPsaLazy(query) {
+  try {
+    const res = await fetch(`/api/psa?q=${encodeURIComponent(query)}&demo=true`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const psa = data.signal || data;
+    if (psa && psa.totalPop != null && currentQuery === query) {
+      currentPsaSignal = psa;
+      renderPsa(psa);
+    }
+  } catch {}
+}
+
 function renderPsa(psa) {
   if (!psa) { psaSignal.classList.add("hidden"); return; }
   psaSignal.classList.remove("hidden");
@@ -336,7 +620,7 @@ function selectItem(itemId) {
     : "";
 
   const grade = item.grade && !item.grade.error ? item.grade : null;
-  const slabLabel = item.listingGradeLabel || null;
+  const slabLabel = item.listingGradeLabel && item.listingGradeLabel !== "Ungraded" ? item.listingGradeLabel : null;
   const shippingText = item.shippingLabel && item.shippingLabel !== "—" && item.shippingLabel !== "Free"
     ? `+ ${item.shippingLabel} shipping` : item.shippingLabel === "Free" ? "Free shipping" : "";
 

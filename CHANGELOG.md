@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- Card autocomplete: GET /api/autocomplete with TCGdex EN+JP database (29K cards), card preview images, EN→JP name mapping
+- Search filters: format (raw/slab), multi-select source pills, condition dropdown, slab provider+grade selectors
+- Autocomplete dropdown on dashboard: card thumbnails, card preview panel on hover, keyboard navigation
+- Lazy PSA loading: search returns results without waiting for PSA, frontend fetches PSA separately
+- Pre-warm cache: track-prices scheduler pre-caches active listings + PSA for tracked cards
+- Fast card-first search: autocomplete → card share → demo search → render in 2-3s (was 30s)
+- eBay relevance filtering: blocklist expanded (art case, sleeves, playmat, booster, etc.), applied to active+sold
 - Arbitrage alerts: notify when cross-source spread exceeds threshold (POST /api/alerts with type "arbitrage")
 - Price drop alerts: notify when price falls below target (POST /api/alerts with type "price")
 - check-alerts endpoint (owner-only): evaluates all active alerts against live data
@@ -51,7 +58,7 @@
 - Card identity: cleaned up long names (strips pack names, condition text from titles)
 - track-prices: now also tracks cards from active alerts, not just 3 hardcoded defaults
 - Demo condition filter: checks detectedCondition in addition to raw condition field
-- Tests: 238 total (118 unit + 80 API + 40 smoke), up from 183
+- Tests: 271 total (128 unit + 80 API + 63 smoke), up from 183
 - AI grading prompts: full PSA rubric (5-10), perspective correction, per-corner/edge detail, holo-specific surface guidance
 - Demo grades re-evaluated with improved prompts (more conservative scores, honest confidence)
 - Removed dead code: Redis import from api.js, updateCardField from card-identity.js
