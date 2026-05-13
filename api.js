@@ -23,7 +23,7 @@ import { recordSoldPrices, getPriceHistory } from "./lib/data/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
-import { initCardDatabase, searchCards, refreshCardDatabase } from "./lib/data/card-database.js";
+import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards } from "./lib/data/card-database.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -476,6 +476,21 @@ app.get("/api/autocomplete", (req, res) => {
   res.json({ results, count: results.length, query: q });
 });
 
+// GET /api/sets
+app.get("/api/sets", (req, res) => {
+  const sets = getAllSets();
+  const era = req.query.era;
+  const filtered = era ? sets.filter(s => s.era === era) : sets;
+  res.json({ sets: filtered, count: filtered.length });
+});
+
+// GET /api/sets/:setCode
+app.get("/api/sets/:setCode", (req, res) => {
+  const result = getSetWithCards(req.params.setCode);
+  if (!result) return res.status(404).json({ error: "Set not found" });
+  res.json(result);
+});
+
 // ============ V1 API — Drop Intelligence ============
 
 async function authMiddleware(req, res, next) {
@@ -777,10 +792,18 @@ app.get("/api/sitemap", async (req, res) => {
     const staticPages = [
       { url: `${base}/`, changefreq: "weekly", priority: 1.0, lastmod: now },
       { url: `${base}/search`, changefreq: "daily", priority: 0.9, lastmod: now },
+      { url: `${base}/sets`, changefreq: "weekly", priority: 0.8, lastmod: now },
       { url: `${base}/portfolio`, changefreq: "daily", priority: 0.8, lastmod: now },
       { url: `${base}/developers`, changefreq: "monthly", priority: 0.6, lastmod: now },
       { url: `${base}/install`, changefreq: "monthly", priority: 0.5, lastmod: now },
     ];
+
+    const setPages = getAllSets().map(s => ({
+      url: `${base}/set/${s.setCode}`,
+      changefreq: "weekly",
+      priority: 0.7,
+      lastmod: now,
+    }));
 
     const cardPages = [];
     const seen = new Set();
@@ -809,7 +832,7 @@ app.get("/api/sitemap", async (req, res) => {
       }
     }
 
-    const pages = [...staticPages, ...cardPages];
+    const pages = [...staticPages, ...setPages, ...cardPages];
 
     const format = req.query.format;
     if (format === "xml") {

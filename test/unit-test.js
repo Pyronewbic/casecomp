@@ -24,7 +24,7 @@ import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards, findDem
 import { parseCardIdentity, buildCardId, SET_NAME_MAP, resolveCardIdToQuery } from "../lib/data/card-identity.js";
 import { buildAlertEmailSubject, sendAlertEmail } from "../lib/data/email.js";
 import { csvEscape, csvRow } from "../lib/data/csv.js";
-import { matchesQuery, searchCards } from "../lib/data/card-database.js";
+import { matchesQuery, searchCards, getAllSets, getSetWithCards } from "../lib/data/card-database.js";
 
 let passed = 0;
 let failed = 0;
@@ -1045,6 +1045,15 @@ test("searchCards: empty query returns empty", () => {
 
 test("searchCards: query under 2 chars returns empty", () => {
   eq(searchCards("a", 8).length, 0);
+});
+
+test("getAllSets: returns empty array when no cards loaded", () => {
+  const sets = getAllSets();
+  eq(Array.isArray(sets), true);
+});
+
+test("getSetWithCards: returns null for nonexistent set", () => {
+  eq(getSetWithCards("zzz999"), null);
 });
 
 // ── Summary ──
