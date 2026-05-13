@@ -43,6 +43,12 @@ jobs:
         run: terraform fmt -check -recursive
         working-directory: ${{ env.TF_DIR }}
 
+      - name: Write tfvars from secrets
+        run: |
+          cat > ${{ env.TF_DIR }}/ci.auto.tfvars <<EOF
+          alert_email = "${{ secrets.ALERT_EMAIL }}"
+          EOF
+
       - name: Plan
         id: plan
         run: terraform plan -no-color -input=false -out=tfplan 2>&1 | tee plan.txt
@@ -92,6 +98,12 @@ jobs:
       - name: Init
         run: terraform init -input=false
         working-directory: ${{ env.TF_DIR }}
+
+      - name: Write tfvars from secrets
+        run: |
+          cat > ${{ env.TF_DIR }}/ci.auto.tfvars <<EOF
+          alert_email = "${{ secrets.ALERT_EMAIL }}"
+          EOF
 
       - name: Apply
         run: terraform apply -auto-approve -input=false
