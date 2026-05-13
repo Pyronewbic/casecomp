@@ -760,6 +760,73 @@ app.get("/api/card/share/:setCode/:number", async (req, res) => {
   }
 });
 
+// GET /api/sitemap — public sitemap of all indexable URLs
+app.get("/api/sitemap", async (req, res) => {
+  try {
+    const now = new Date().toISOString();
+    const base = "https://casecomp.xyz";
+
+    const staticPages = [
+      { url: `${base}/`, changefreq: "weekly", priority: 1.0, lastmod: now },
+      { url: `${base}/search`, changefreq: "daily", priority: 0.9, lastmod: now },
+      { url: `${base}/portfolio`, changefreq: "daily", priority: 0.8, lastmod: now },
+      { url: `${base}/developers`, changefreq: "monthly", priority: 0.6, lastmod: now },
+      { url: `${base}/install`, changefreq: "monthly", priority: 0.5, lastmod: now },
+    ];
+
+    const cardPages = [];
+    const seen = new Set();
+    try {
+      const { Firestore: FSLib } = await import("@google-cloud/firestore");
+      const db = new FSLib();
+      const snap = await db.collection("cards").orderBy("createdAt", "desc").limit(50000).get();
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        if (!data.cardId || seen.has(data.cardId)) continue;
+        seen.add(data.cardId);
+        if (!data.cardId.includes("/")) continue;
+        cardPages.push({
+          url: `${base}/card/${data.cardId}`,
+          changefreq: "daily",
+          priority: 0.7,
+          lastmod: data.updatedAt || data.createdAt || now,
+        });
+      }
+    } catch {}
+
+    const demoSlugs = ["sv8a/217-187", "m4/114-083", "m2a/234-193"];
+    for (const slug of demoSlugs) {
+      if (!seen.has(slug)) {
+        cardPages.push({ url: `${base}/card/${slug}`, changefreq: "daily", priority: 0.7, lastmod: now });
+      }
+    }
+
+    const pages = [...staticPages, ...cardPages];
+
+    const format = req.query.format;
+    if (format === "xml") {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${pages.map(p => `  <url>
+    <loc>${p.url}</loc>
+    <lastmod>${p.lastmod.split("T")[0]}</lastmod>
+    <changefreq>${p.changefreq}</changefreq>
+    <priority>${p.priority}</priority>
+  </url>`).join("\n")}
+</urlset>`;
+      res.set("Content-Type", "application/xml");
+      res.set("Cache-Control", "public, max-age=3600");
+      return res.send(xml);
+    }
+
+    res.set("Cache-Control", "public, max-age=3600");
+    res.json({ pages, count: pages.length });
+  } catch (e) {
+    logError("sitemap", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
 // GET /api/card/view/:setCode/:number — card-centric view with raw + graded data
 app.get("/api/card/view/:setCode/:number", apiAuthMiddleware, async (req, res) => {
   const cardId = `${req.params.setCode}/${req.params.number}`;
