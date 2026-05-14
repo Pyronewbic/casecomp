@@ -46,7 +46,6 @@ jobs:
       - run: node test/smoke-test.js
 
   scan:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
