@@ -1,0 +1,39 @@
+name: Auto PR
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Create or update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh pr list --base main --head dev --json number --jq '.[0].number' 2>/dev/null)
+          if [ -z "$existing" ]; then
+            COMMITS=$(git log origin/main..origin/dev --oneline --no-merges | head -20)
+            BODY="## Commits
+          ${COMMITS}
+
+          Auto-PR from dev. Merges when checks pass."
+            gh pr create --base main --head dev \
+              --title "$(git log -1 --format='%s')" \
+              --body "$BODY"
+          fi
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr=$(gh pr list --base main --head dev --json number --jq '.[0].number')
+          gh pr merge "$pr" --auto --merge 2>/dev/null || true
