@@ -51,6 +51,28 @@ terraform apply         # apply changes
 
 CI handles plan (PR comment) and apply (on merge) via `.github/workflows/terraform.yml`.
 
+## Adding a new secret
+
+Terraform creates the secret resource. You add the value separately.
+
+```bash
+# 1. Add to secrets.tf locals.secrets list
+# 2. Push → CI creates the empty secret via terraform apply
+# 3. Then add the value:
+echo -n "the-value" | gcloud secrets versions add SECRET_NAME --data-file=- --project=casecomp-495718
+```
+
+Do NOT run `gcloud secrets create` — that conflicts with Terraform. If you already did, add an `import` block to secrets.tf:
+
+```hcl
+import {
+  to = google_secret_manager_secret.api_secrets["SECRET_NAME"]
+  id = "projects/casecomp-495718/secrets/SECRET_NAME"
+}
+```
+
+Remove the import block after the first successful apply.
+
 ## Files
 
 | File | Content |

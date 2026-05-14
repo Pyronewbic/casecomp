@@ -13,6 +13,11 @@ locals {
   ]
 }
 
+import {
+  to = google_secret_manager_secret.api_secrets["CASECOMP_ADMIN_SUB"]
+  id = "projects/casecomp-495718/secrets/CASECOMP_ADMIN_SUB"
+}
+
 resource "google_secret_manager_secret" "api_secrets" {
   for_each  = toset(local.secrets)
   secret_id = each.key
