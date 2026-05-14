@@ -23,13 +23,10 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v3
 
-      - name: Install apko
-        run: |
-          curl -sSL https://github.com/chainguard-dev/apko/releases/latest/download/apko_linux_amd64 -o /usr/local/bin/apko
-          chmod +x /usr/local/bin/apko
+      - uses: chainguard-dev/actions/setup-apko@main
 
       - name: Build image
-        run: apko build images/node24/apko.yaml ${{ env.IMAGE }}:latest image.tar
+        run: apko build --lockfile images/node24/apko.lock.json images/node24/apko.yaml ${{ env.IMAGE }}:latest image.tar
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker --quiet

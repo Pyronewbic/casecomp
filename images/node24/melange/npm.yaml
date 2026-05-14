@@ -1,0 +1,235 @@
+package:
+  name: npm
+  version: "11.14.1"
+  epoch: 0
+  description: "the npm package manager for javascript, mainline"
+  copyright:
+    - license: Artistic-2.0
+  dependencies:
+    runtime:
+      - node-gyp
+
+environment:
+  contents:
+    packages:
+      - build-base
+      - jq
+      - nodejs
+      - npm
+      - wolfi-base
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/npm/cli
+      tag: v${{package.version}}
+      expected-commit: 0fc09e888bcb0a52dd95e32a392447431fd9ac85
+
+  - name: Build man pages
+    runs: |
+      npm install --include=dev --ignore-scripts
+      npm run build -w docs
+
+  - name: Patch vulnerable vendored packages
+    runs: |
+      # `npm install` fails due to missing permissions for unrelated internal
+      # packages: upgrade vendored packages manually
+      fix_pkg() {
+        local pkg_dir="$1" target="$2" pkg_name="${3:-$(basename "$1")}"
+        local tarball_name="$(echo "$pkg_name" | sed 's|^@||; s|/|-|')"
+        if [ -f "$pkg_dir/package.json" ]; then
+          current=$(jq -r .version "$pkg_dir/package.json")
+          echo "Updating $pkg_name in $pkg_dir from $current to $target"
+          rm -rf "$pkg_dir"
+          npm pack "$pkg_name@$target" --pack-destination /tmp
+          mkdir -p "$pkg_dir"
+          tar xzf "/tmp/$tarball_name-$target.tgz" -C "$pkg_dir" --strip-components=1
+          rm "/tmp/$tarball_name-$target.tgz"
+        fi
+      }
+
+      fix_pkg node_modules/minimatch 10.2.3
+      fix_pkg node_modules/tar 7.5.11
+      fix_pkg node_modules/brace-expansion 5.0.5
+      fix_pkg node_modules/tinyglobby/node_modules/picomatch 4.0.4
+      fix_pkg node_modules/yaml 2.8.3
+      fix_pkg node_modules/picomatch 4.0.4
+      fix_pkg node_modules/lodash 4.18.1
+      fix_pkg node_modules/@xmldom/xmldom 0.8.12 @xmldom/xmldom
+      fix_pkg node_modules/anymatch/node_modules/picomatch 2.3.2
+      fix_pkg node_modules/readdirp/node_modules/picomatch 2.3.2
+
+  - working-directory: /home/build/man
+    runs: |
+      for f in man5/folders.5 man5/install.5 man7/*.7; do
+        sec=${f##*.}
+        name=$(basename $f .$sec)
+        title=$(echo "$name" | tr '[:lower:]' '[:upper:]')
+
+        sed -Ei "s/^\.TH \"$title\"/.TH \"NPM-$title\"/" "$f"
+        mv "$f" "${f%/*}/npm-$name.$sec"
+      done
+
+  - runs: |
+      # Remove test/fixture dirs from workspaces/ (CVE-laden test data, not needed at runtime)
+      # Do NOT delete workspaces/ itself — node_modules/@npmcli/* symlinks point into it at runtime
+      find workspaces -type d \( -name 'test' -o -name 'tests' -o -name '__tests__' -o -name 'fixtures' \) \
+        -exec rm -rf {} + 2>/dev/null || true
+
+  - name: Build the npm tarball
+    runs: npm pack
+
+  - runs: |
+      destdir="${{targets.destdir}}"/usr/lib/node_modules/npm
+      install -dDm755 "$destdir"
+      tar -xzf npm-${{package.version}}.tgz --strip-components=1 -C "$destdir"
+      chmod 755 "$destdir"
+
+  - working-directory: ${{targets.destdir}}/usr/lib/node_modules/npm/node_modules
+    runs: |
+      find . -type f \( \
+             -name '.*' -o \
+             -name '*.cmd' -o \
+             -name '*.bat' -o \
+             -name '*.map' -o \
+             -name '*.md' -o \
+             \( -name '*.ts' -a ! -name '*.d.ts' \) -o \
+             -name 'AUTHORS*' -o \
+             -name 'LICENSE*' -o \
+             -name 'license' -o \
+             -name 'node-gyp' -o \
+             -name 'Makefile' -o \
+             -name 'README*' -o \
+             -name 'readme.markdown' \) -delete
+
+      rm -rf ./*/.git* ./*/doc ./*/docs ./*/examples ./*/scripts ./*/test
+      # Remove test/fixture dirs at all depths (catches nested node_modules like arborist/test/fixtures/)
+      find . -type d \( -name 'test' -o -name 'tests' -o -name '__tests__' -o -name 'fixtures' \) -exec rm -rf {} + 2>/dev/null || true
+
+  - working-directory: ${{targets.destdir}}/usr/lib/node_modules/npm
+    runs: |
+      # Wrapper scripts written in Bash, CMD and PowerShell
+      rm bin/npm bin/npx bin/*.cmd bin/*.ps1
+      rm README.md
+      # HTML docs
+      rm -rf docs
+      rm -rf bin/node-gyp-bin
+
+  - working-directory: ${{targets.destdir}}/usr/lib/node_modules/npm/node_modules
+    runs: |
+      rm -rf node-gyp
+      # remove broken links related to bundled-dep removals
+      find . -type f -executable -exec chmod -x {} \;
+
+  - working-directory: ${{targets.destdir}}/usr/bin
+    runs: |
+      ln -s ../lib/node_modules/npm/bin/npm-cli.js npm
+      ln -s ../lib/node_modules/npm/bin/npx-cli.js npx
+
+  - working-directory: ${{targets.destdir}}/usr/share
+    runs: |
+      mv "${{targets.destdir}}"/usr/lib/node_modules/npm/man man
+      ln -s ../../../share/man "${{targets.destdir}}"/usr/lib/node_modules/npm/man
+
+  - runs: |
+      install -Dm644 npmrc "${{targets.destdir}}"/usr/lib/node_modules/npm/npmrc
+
+subpackages:
+  - name: "npm-doc"
+    description: "npm documentation"
+    pipeline:
+      - uses: split/manpages
+    test:
+      pipeline:
+        - uses: test/tw/docs
+
+update:
+  enabled: true
+  ignore-regex-patterns:
+    - -v # ignore versions that start contain a -v, e.g. arborist-v7.2.1, libnpmfund-v4.2.0
+  github:
+    identifier: npm/cli
+    strip-prefix: v
+    tag-filter: v
+    use-tag: true
+
+test:
+  environment:
+    contents:
+      packages:
+        - nodejs
+        - npm-doc # need man page target for the symlink-check
+        - python3
+    environment:
+      HOME: /home/build
+  pipeline:
+    - uses: test/tw/symlink-check
+    - uses: test/tw/ver-check
+      with:
+        bins: |
+          npm
+          npx
+    - uses: test/tw/help-check
+      with:
+        bins: |
+          npm
+          npx
+    - runs: |
+        npm install -g cowsay
+        cowsay Yay! It works!
+    - runs: |
+        # Reproduce https://github.com/npm/cli/issues/8216: create a
+        # package-lock.json and then attempt to use a registry at a non-/
+        # prefix with `npm install`
+
+        cat << EOF > proxy.py
+        import http.server
+        import socketserver
+        import urllib.request
+
+        class MyProxy(http.server.SimpleHTTPRequestHandler):
+
+            def do_GET(self):
+                if not self.path.startswith("/prefix"):
+                  self.send_response(404)
+                  self.end_headers()
+                  self.wfile.write(b"Unprefixed!\n")
+                  return
+                path = self.path.replace("/prefix", "")
+                url = f"https://registry.npmjs.org/{path}"
+                self.send_response(200)
+                self.end_headers()
+                self.copyfile(urllib.request.urlopen(url), self.wfile)
+
+        PORT = 7777
+
+        httpd = None
+
+        try:
+            httpd = socketserver.TCPServer(('', PORT), MyProxy)
+            print(f"Proxy at: http://localhost:{PORT}")
+            httpd.serve_forever()
+        finally:
+            if httpd:
+                httpd.shutdown()
+        EOF
+
+        # Run a proxy which strips "prefix/" from URLs, which should work as an
+        # NPM registry rooted at /prefix
+        python3 proxy.py > /tmp/proxy.log 2>&1 &
+        sleep 1
+
+        # Create a package-lock.json
+        npm install rightpad
+        # Ensure npm will find something to do
+        rm -rf node_modules .npm
+
+        # Set our registry
+        npm config set registry http://localhost:7777/prefix/
+
+        # npm will use the scheme of `resolved` regardless of registry setting,
+        # so avoid the need to terminate SSL in our proxy
+        sed -i 's/https/http/' package-lock.json
+
+        # Attempt an install
+        npm install --loglevel silly
