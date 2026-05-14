@@ -550,7 +550,8 @@ app.post("/auth/google", authLimiter, async (req, res) => {
       apiKey = { keyPrefix: existingKeys[0].keyPrefix, id: existingKeys[0].id, isNew: false };
     }
 
-    res.json({ jwt, apiKey, user: { id: gUser.sub, email: gUser.email, name: gUser.name, picture: gUser.picture } });
+    const isAdmin = gUser.sub === process.env.CASECOMP_ADMIN_SUB;
+    res.json({ jwt, apiKey, isAdmin, user: { id: gUser.sub, email: gUser.email, name: gUser.name, picture: gUser.picture } });
   } catch (e) {
     res.status(401).json({ error: "Invalid Google token" });
   }
