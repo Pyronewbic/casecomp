@@ -532,6 +532,32 @@ app.post("/auth/google", authLimiter, async (req, res) => {
   }
 });
 
+// POST /api/upload-url — generate signed GCS upload URL
+app.post("/api/upload-url", authMiddleware, async (req, res) => {
+  const { filename, contentType } = req.body || {};
+  if (!filename || !contentType) return res.status(400).json({ error: "filename and contentType required" });
+  if (!/^image\/(jpeg|png|webp)$/.test(contentType)) return res.status(400).json({ error: "Only JPEG, PNG, or WebP images allowed" });
+  try {
+    const { Storage } = await import("@google-cloud/storage");
+    const storage = new Storage();
+    const bucket = storage.bucket("casecomp-uploads");
+    const userId = portfolioUserId(req);
+    const key = `${userId}/${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const file = bucket.file(key);
+    const [url] = await file.getSignedUrl({
+      version: "v4",
+      action: "write",
+      expires: Date.now() + 15 * 60 * 1000,
+      contentType,
+    });
+    const publicUrl = `https://storage.googleapis.com/casecomp-uploads/${key}`;
+    res.json({ uploadUrl: url, imageUrl: publicUrl, key });
+  } catch (e) {
+    logError("upload", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
 // GET /api/autocomplete
 app.get("/api/autocomplete", (req, res) => {
   const q = (req.query.q || "").trim();
