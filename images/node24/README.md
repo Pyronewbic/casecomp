@@ -38,8 +38,18 @@ COPY . .
 CMD ["api.js"]
 ```
 
+## Vendored melange configs
+
+`melange/` contains the Wolfi build configs for the critical packages:
+- `nodejs-24.yaml` — Node.js 24.15.0 build from source (from wolfi-dev/os)
+- `npm.yaml` — npm 11.14.1 build (from wolfi-dev/os)
+
+These are reference copies — if Wolfi changes their build or you need to rebuild Node from source, the configs are here. Everything else (glibc, openssl, etc.) comes from the Wolfi registry.
+
+To update: pull latest from `https://github.com/wolfi-dev/os` and re-run `apko lock apko.yaml`.
+
 ## Why custom instead of distroless or Chainguard free?
 
 - Distroless: maintained by Google, can't control update schedule
 - Chainguard free: `:latest` only, no version pinning
-- Custom: we control exact package versions, rebuild when we want, same Wolfi supply chain as Chainguard
+- Custom: we control exact package versions, rebuild when we want, vendored build configs for critical packages, same Wolfi supply chain as Chainguard
