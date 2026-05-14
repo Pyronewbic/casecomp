@@ -129,6 +129,7 @@ Deploy workflow: Build (Kaniko) → Get digest → Sign (cosign keyless) → Dep
 
 | Tool | Stage | What |
 |------|-------|------|
+| apko + Wolfi | Base image | Custom Node 24 image, manual rebuild via `workflow_dispatch` |
 | Kaniko v1.23.2 | Build | Pinned version, `--reproducible`, dual tags (latest + SHA) |
 | Cosign | Post-build | Keyless signing via GitHub OIDC → Sigstore Rekor |
 | Syft | Post-deploy | SBOM generation (SPDX JSON), 90-day artifact retention |

@@ -127,6 +127,7 @@ curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
 - **Binary Authorization** - GCP policy on both Cloud Run services (audit mode)
 - **Reproducible builds** - Kaniko `--reproducible` flag, pinned version
 - **Multi-region** - Cloud Run in asia-south1 + us-central1, global LB auto geo-routes to nearest
+- **Custom base image** - Wolfi + apko Node 24 image, manual rebuild, zero CVEs by design
 
 ## Claude Code Skills
 

@@ -15,3 +15,13 @@ terraform/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 terraform/*.tfvars
+
+# Images
+images/**/*.tar
+images/**/*.tar.gz
+images/**/*.spdx.json
+
+# OS
+.DS_Store
+*.swp
+*.swo
