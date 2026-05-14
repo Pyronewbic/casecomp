@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.0 (2026-05-15)
+
 ### Added
 - Set browser: GET /api/sets (238 sets with logos, era groups, card count breakdown) and GET /api/sets/:setCode (cards with rarity)
 - Collection tracking: GET /api/portfolio/set/:setCode returns owned cardIds for progress bars and owned/missing indicators
