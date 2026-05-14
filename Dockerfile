@@ -1,29 +1,20 @@
-FROM node:24-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN groupadd --system appuser && useradd --system --gid appuser appuser
+FROM node:24-slim AS build
 
 WORKDIR /app
 
-# Layer 1: playwright system deps (rarely changes)
-RUN npx playwright install --with-deps chromium
-
-# Layer 2: npm dependencies (changes when package.json changes)
 COPY package.json yarn.lock* package-lock.json* ./
-RUN npm install --production --ignore-scripts
+RUN npm install --production
 
-# Layer 3: application code (changes every deploy)
 COPY . .
-RUN chown -R appuser:appuser /app
+RUN rm -rf .git .env* test/ extension/ terraform/ docs/ public/admin/ *.md .github/
+
+FROM gcr.io/distroless/nodejs24-debian12
+
+WORKDIR /app
+COPY --from=build /app /app
 
 ENV NODE_ENV=production
 ENV API_PORT=3000
-ENV PLAYWRIGHT_BROWSERS_PATH=/app/.cache/ms-playwright
 
-USER appuser
 EXPOSE 3000
-
-CMD ["node", "api.js"]
+CMD ["api.js"]
