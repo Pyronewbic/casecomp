@@ -110,9 +110,11 @@ Use `--refresh` to delete all cache files before a run.
 
 ## Authentication flow
 
-1. `authMiddleware`: checks `Authorization: Bearer` header or `?key=` param. Matches owner → sandbox → Firestore developer keys. Local dev (`K_SERVICE` unset) bypasses auth.
-2. `apiAuthMiddleware`: wraps `authMiddleware` with a `?demo=true` bypass that serves canned sample data (360 req/min).
-3. `ownerOnly`: requires the owner `CASECOMP_API_KEY`. Used for admin, error management, check-alerts.
+1. `POST /auth/google`: verifies Google ID token → returns JWT (HS256, 24h expiry) + user profile.
+2. `authMiddleware`: checks `Authorization: Bearer` header or `?key=` param. Tries JWT first (Google OAuth users), falls back to owner → sandbox → Firestore developer keys. Local dev (`K_SERVICE` unset) bypasses auth.
+3. `apiAuthMiddleware`: wraps `authMiddleware` with a `?demo=true` bypass that serves canned sample data (360 req/min).
+4. `ownerOnly`: requires the owner `CASECOMP_API_KEY`. Used for admin, error management, check-alerts.
+5. `portfolioUserId`: JWT users get Google `sub` as userId. API key users get SHA256 hash of key (first 16 chars).
 
 ## AI grading pipeline
 
@@ -125,23 +127,36 @@ Use `--refresh` to delete all cache files before a run.
 
 ## Security pipeline
 
-Deploy workflow: Build (Kaniko) → Get digest → Sign (cosign keyless) → Deploy (by digest) → Scan (parallel).
+Three workflows: `ci.yml` (all checks), `deploy.yml` (build + sign + deploy), `terraform.yml` (infra).
+
+**ci.yml** — runs on push to main/dev + PRs to main:
+
+| Job | What | Required? |
+|-----|------|-----------|
+| unit | 140 unit tests | Yes |
+| smoke | 74 Playwright smoke tests | No (continue-on-error) |
+| codeql | SAST for JavaScript/TypeScript | Yes |
+| scan | SBOM (Syft) + Grype vulnerability scan | No |
+| audit | npm audit + lockfile-lint | No |
+| secrets | gitleaks secret scan | No |
+
+**deploy.yml** — runs on push to main only:
+
+| Step | What |
+|------|------|
+| Kaniko v1.23.2 | Build with `--reproducible`, dual tags |
+| Cosign sign | Keyless signing via GitHub OIDC → Sigstore Rekor |
+| Cosign attest | SLSA provenance attestation |
+| Deploy | Matrix deploy to asia-south1 + us-central1 |
+
+**Other tools:**
 
 | Tool | Stage | What |
 |------|-------|------|
 | Pre-commit hook | Local | Blocks .env, >1MB files, secret patterns |
-| apko + Wolfi | Base image | Custom Node 24 image, manual rebuild via `workflow_dispatch` |
-| Kaniko v1.23.2 | Build | Pinned version, `--reproducible`, dual tags (latest + SHA) |
-| Cosign | Post-build | Keyless signing via GitHub OIDC → Sigstore Rekor |
-| Cosign attest | Post-build | SLSA provenance attestation |
+| apko + Wolfi | Base image | Custom Node 24 image, manual `workflow_dispatch` |
 | Dependabot | Weekly | npm + GitHub Actions version updates |
-| lockfile-lint | PR | Validates package-lock.json integrity (HTTPS, npm registry) |
-| Syft | Post-deploy | SBOM generation (SPDX JSON), 90-day artifact retention |
-| Grype | Post-deploy | CVE scan from SBOM, SARIF → GitHub Security tab |
-| CodeQL | PR + weekly | SAST for JavaScript/TypeScript |
-| Binary Auth | Cloud Run | GCP policy, DRYRUN audit mode (logs unsigned deploys) |
-
-The scan job runs in parallel after deploy — adds zero time to the deploy critical path. CodeQL runs on PRs only (~60s).
+| Binary Auth | Cloud Run | ENFORCED policy (blocks unsigned images) |
 
 ## Scheduled tasks
 
