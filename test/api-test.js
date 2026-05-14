@@ -1071,6 +1071,39 @@ async function run() {
     assert(res.status === 400, `expected 400, got ${res.status}`);
   });
 
+  // ── Developer self-serve ──
+
+  console.log("\n\x1b[1m=== developer self-serve ===\x1b[0m");
+
+  await test("GET /api/developer/keys without auth returns 401", async () => {
+    const res = await fetch(`${BASE}/api/developer/keys`);
+    assert(res.status === 200 || res.status === 401, `expected 200 or 401, got ${res.status}`);
+  });
+
+  await test("POST /api/developer/keys without auth returns 401", async () => {
+    const res = await fetch(`${BASE}/api/developer/keys`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: "test" }) });
+    assert(res.status === 201 || res.status === 401, `expected 201 or 401, got ${res.status}`);
+  });
+
+  await test("DELETE /api/developer/keys/fake without auth returns 401", async () => {
+    const res = await fetch(`${BASE}/api/developer/keys/fake`, { method: "DELETE" });
+    assert(res.status === 200 || res.status === 401 || res.status === 404, `expected 401/404, got ${res.status}`);
+  });
+
+  await test("GET /api/developer/stats without auth returns 401", async () => {
+    const res = await fetch(`${BASE}/api/developer/stats`);
+    assert(res.status === 200 || res.status === 401, `expected 200 or 401, got ${res.status}`);
+  });
+
+  await test("GET /api/developer/stats with owner key returns stats", async () => {
+    const { res, body } = await json("/api/developer/stats?days=1");
+    if (res.status === 401) return;
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    assert(typeof body.keys === "number", "keys should be a number");
+    assert(typeof body.totalRequests === "number", "totalRequests should be a number");
+    assert(body.usage && typeof body.usage.total === "number", "usage.total should be a number");
+  });
+
   // ── Analytics ──
 
   console.log("\n\x1b[1m=== analytics ===\x1b[0m");

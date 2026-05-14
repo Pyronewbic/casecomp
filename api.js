@@ -18,10 +18,10 @@ import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.j
 import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds, trackSearchFrequency, getTopSearchedCards } from "./lib/data/firestore.js";
 import { getDemoSearchResult, getDemoResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
 import { csvEscape, csvRow } from "./lib/data/csv.js";
-import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
+import { createApiKey, listApiKeys, listAllKeys, listKeysByOwner, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
 import { recordSoldPrices, getPriceHistory, computePriceTrend } from "./lib/data/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
-import { logRequest, getAnalytics } from "./lib/data/analytics.js";
+import { logRequest, getAnalytics, getAnalyticsByUser } from "./lib/data/analytics.js";
 import { verifyGoogleToken, generateJwt, verifyJwt } from "./lib/data/auth.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
@@ -104,6 +104,19 @@ function isSandboxKey(req) {
   return token && token === process.env.CASECOMP_SANDBOX_KEY;
 }
 
+const keyRateCounters = new Map();
+function checkKeyRateLimit(keyId, limit) {
+  const now = Date.now();
+  const windowMs = 60_000;
+  let entry = keyRateCounters.get(keyId);
+  if (!entry || now - entry.windowStart > windowMs) {
+    entry = { windowStart: now, count: 0 };
+    keyRateCounters.set(keyId, entry);
+  }
+  entry.count++;
+  return entry.count <= limit;
+}
+
 const isLocal = !process.env.K_SERVICE;
 app.use("/api", (req, res, next) => {
   if (isLocal || req.path === "/health") return next();
@@ -137,6 +150,7 @@ if (!isLocal) {
         status: res.statusCode,
         latencyMs: Date.now() - start,
         tier: classifyTier(req),
+        userId: portfolioUserId(req),
         ipHash: hashIp(req.ip),
         userAgent: (req.headers["user-agent"] || "").substring(0, 200),
         requestId: req.requestId,
@@ -526,7 +540,17 @@ app.post("/auth/google", authLimiter, async (req, res) => {
   try {
     const gUser = await verifyGoogleToken(idToken);
     const jwt = generateJwt(gUser);
-    res.json({ jwt, user: { id: gUser.sub, email: gUser.email, name: gUser.name, picture: gUser.picture } });
+
+    let apiKey = null;
+    const existingKeys = await listKeysByOwner(gUser.sub).catch(() => []);
+    if (existingKeys.length === 0) {
+      const newKey = await createApiKey({ label: `${gUser.name || gUser.email}'s key`, ownerId: gUser.sub }).catch(() => null);
+      if (newKey) apiKey = { key: newKey.key, keyPrefix: newKey.keyPrefix, id: newKey.id, isNew: true };
+    } else {
+      apiKey = { keyPrefix: existingKeys[0].keyPrefix, id: existingKeys[0].id, isNew: false };
+    }
+
+    res.json({ jwt, apiKey, user: { id: gUser.sub, email: gUser.email, name: gUser.name, picture: gUser.picture } });
   } catch (e) {
     res.status(401).json({ error: "Invalid Google token" });
   }
@@ -554,6 +578,125 @@ app.post("/api/upload-url", authMiddleware, async (req, res) => {
     res.json({ uploadUrl: url, imageUrl: publicUrl, key });
   } catch (e) {
     logError("upload", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+function isAdminUser(req) {
+  const adminSub = process.env.CASECOMP_ADMIN_SUB;
+  if (!adminSub) return isOwnerKey(req);
+  const jwtPayload = verifyJwt(getRequestToken(req));
+  return jwtPayload?.sub === adminSub || isOwnerKey(req);
+}
+
+// ── Developer self-serve ─────────────────────────────────────
+
+// GET /api/developer/keys — list your API keys
+app.get("/api/developer/keys", authMiddleware, async (req, res) => {
+  try {
+    const userId = portfolioUserId(req);
+    if (!userId) return res.status(401).json({ error: "Sign in required" });
+    const keys = await listKeysByOwner(userId);
+    res.json({ keys, count: keys.length });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// POST /api/developer/keys — create a new API key (max 3 per user)
+app.post("/api/developer/keys", authMiddleware, async (req, res) => {
+  try {
+    const userId = portfolioUserId(req);
+    if (!userId) return res.status(401).json({ error: "Sign in required" });
+    const existing = await listKeysByOwner(userId);
+    if (existing.length >= 3) return res.status(400).json({ error: "Maximum 3 keys per account" });
+    const { label } = req.body || {};
+    const key = await createApiKey({ label: label || "My key", ownerId: userId });
+    res.status(201).json({ id: key.id, key: key.key, keyPrefix: key.keyPrefix, label: key.label, rateLimit: key.rateLimit });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// DELETE /api/developer/keys/:id — revoke your API key
+app.delete("/api/developer/keys/:id", authMiddleware, async (req, res) => {
+  try {
+    const userId = portfolioUserId(req);
+    if (!userId) return res.status(401).json({ error: "Sign in required" });
+    const key = await getApiKey(req.params.id);
+    if (!key || key.ownerId !== userId) return res.status(404).json({ error: "Key not found" });
+    await deleteApiKey(req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// POST /api/developer/keys/:id/rotate — rotate your key
+app.post("/api/developer/keys/:id/rotate", authMiddleware, async (req, res) => {
+  try {
+    const userId = portfolioUserId(req);
+    if (!userId) return res.status(401).json({ error: "Sign in required" });
+    const key = await getApiKey(req.params.id);
+    if (!key || key.ownerId !== userId) return res.status(404).json({ error: "Key not found" });
+    const rotated = await rotateApiKey(req.params.id);
+    res.json({ id: rotated.id, key: rotated.key, keyPrefix: rotated.keyPrefix });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /api/developer/stats — your usage stats
+app.get("/api/developer/stats", authMiddleware, async (req, res) => {
+  try {
+    const userId = portfolioUserId(req);
+    if (!userId) return res.status(401).json({ error: "Sign in required" });
+    const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+    const [keys, usage] = await Promise.all([
+      listKeysByOwner(userId),
+      getAnalyticsByUser(userId, { days }),
+    ]);
+    const totalRequests = keys.reduce((sum, k) => sum + (k.requestCount || 0), 0);
+    res.json({ keys: keys.length, totalRequests, usage });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// ── Admin key management (admin only) ────────────────────────
+
+// GET /api/admin/keys — list ALL developer keys
+app.get("/api/admin/keys", authMiddleware, async (req, res) => {
+  if (!isAdminUser(req)) return res.status(403).json({ error: "Admin access required" });
+  try {
+    const keys = await listAllKeys();
+    res.json({ keys, count: keys.length });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// PATCH /api/admin/keys/:id — update any key (toggle active, change rate limit)
+app.patch("/api/admin/keys/:id", authMiddleware, async (req, res) => {
+  if (!isAdminUser(req)) return res.status(403).json({ error: "Admin access required" });
+  try {
+    const { active, rateLimit, label } = req.body || {};
+    const updated = await updateApiKey(req.params.id, { active, rateLimit, label });
+    if (!updated) return res.status(404).json({ error: "Key not found" });
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// DELETE /api/admin/keys/:id — delete any key
+app.delete("/api/admin/keys/:id", authMiddleware, async (req, res) => {
+  if (!isAdminUser(req)) return res.status(403).json({ error: "Admin access required" });
+  try {
+    const deleted = await deleteApiKey(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Key not found" });
+    res.json({ ok: true });
+  } catch (e) {
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });
@@ -597,6 +740,10 @@ async function authMiddleware(req, res, next) {
   if (jwtPayload) return next();
   const devKey = await validateApiKey(token);
   if (devKey) {
+    if (!devKey.active) return res.status(403).json({ error: "API key has been deactivated" });
+    if (!checkKeyRateLimit(devKey.id, devKey.rateLimit || 60)) {
+      return res.status(429).json({ error: `Rate limit exceeded (${devKey.rateLimit || 60} req/min)` });
+    }
     req._devKey = devKey;
     return next();
   }

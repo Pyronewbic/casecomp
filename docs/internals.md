@@ -115,6 +115,7 @@ Use `--refresh` to delete all cache files before a run.
 3. `apiAuthMiddleware`: wraps `authMiddleware` with a `?demo=true` bypass that serves canned sample data (360 req/min).
 4. `ownerOnly`: requires the owner `CASECOMP_API_KEY`. Used for admin, error management, check-alerts.
 5. `portfolioUserId`: JWT users get Google `sub` as userId. API key users get SHA256 hash of key (first 16 chars).
+6. Developer self-serve: `GET/POST/DELETE /api/developer/keys` + `GET /api/developer/stats`. Keys linked to Google account via `ownerId`. Usage stats aggregated from `api-analytics` collection.
 
 ## AI grading pipeline
 

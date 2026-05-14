@@ -114,6 +114,12 @@ curl "https://api.casecomp.xyz/api/sets/sv06"
 # Collection tracking (which cards in a set do I own?)
 curl "https://api.casecomp.xyz/api/portfolio/set/sv8a?demo=true"
 
+# Developer self-serve (requires JWT from Google sign-in)
+curl -H "Authorization: Bearer $JWT" "https://api.casecomp.xyz/api/developer/keys"
+curl -X POST -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d '{"label":"My app"}' "https://api.casecomp.xyz/api/developer/keys"
+curl -H "Authorization: Bearer $JWT" "https://api.casecomp.xyz/api/developer/stats?days=7"
+
 # Portfolio
 curl "https://api.casecomp.xyz/api/portfolio?demo=true"
 curl "https://api.casecomp.xyz/api/portfolio/summary?demo=true"
