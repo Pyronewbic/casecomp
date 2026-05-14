@@ -53,45 +53,7 @@ yarn api                      # dashboard on localhost:3000
 
 ## Architecture
 
-```
-api.js              Express API + static dashboard (public/)
-index.js            CLI entry point
-lib/
-  sources/
-    ebay.js         eBay Browse API, OAuth, ship-to filtering
-    magi.js         magi.camp scraper (fetch + cheerio)
-    snkrdunk.js     SNKRDUNK JSON API
-    yahooauctions.js Yahoo Auctions JP scraper
-    tcgplayer.js    TCGPlayer price seeding
-  grading/
-    grading.js      AI pre-grading (per-subgrade, Claude/OpenAI)
-    preprocessing.js Corner crop extraction via sharp
-    psa.js          PSA pop reports, cert lookup, grading signal
-    psaTiers.js     PSA submission tier data
-  data/
-    firestore.js    Firestore: grade logs, drops, webhooks, cache
-    api-keys.js     Developer key management
-    card-identity.js Card identity: canonical IDs, set resolution
-    card-database.js TCGdex card DB (29K cards), set browser, rarity
-    price-history.js Sold comp price tracking
-    demo.js         Sample data (3 multi-source cards)
-    cache.js        File-based cache (legacy)
-    redis-cache.js  Redis cache (optional)
-  search/
-    filters.js      Language, relevance, condition detection, outlier flagging
-    listingQuery.js  eBay search query builder
-    ebayCategories.js eBay category IDs
-    output.js       Markdown/JSON formatters (CLI)
-  swagger.js        OpenAPI 3.0.3 spec
-public/             Root dashboard (search, grade, arbitrage, price history)
-public/admin/       Admin dashboard (keys, stats, errors)
-extension/          Chrome extension: queue auto-join, drop intel
-terraform/          GCP infra: Cloud Run ×2, Firestore, LB + CDN, Secret Manager
-test/
-  unit-test.js      130 unit tests
-  api-test.js       96 API integration tests
-  smoke-test.js     74 Playwright smoke tests (dashboard UI)
-```
+See [docs/internals.md](docs/internals.md) for project layout, caching, security pipeline, multi-region deployment, and AI grading pipeline.
 
 ## Web Dashboard
 
