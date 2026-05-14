@@ -1,4 +1,4 @@
-FROM gcr.io/casecomp-495718/casecomp-node24:latest AS build
+FROM node:24-slim AS build
 
 WORKDIR /app
 
