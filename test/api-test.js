@@ -1048,6 +1048,48 @@ async function run() {
     assert(body.error === "Invalid Google token", `unexpected error: ${body.error}`);
   });
 
+  // ── Upload URL ──
+
+  console.log("\n\x1b[1m=== upload url ===\x1b[0m");
+
+  await test("POST /api/upload-url without auth returns 401", async () => {
+    const res = await fetch(`${BASE}/api/upload-url`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename: "test.jpg", contentType: "image/jpeg" }) });
+    assert(res.status === 200 || res.status === 401, `expected 200 or 401, got ${res.status}`);
+  });
+
+  await test("POST /api/upload-url rejects non-image content type", async () => {
+    const res = await fetch(`${BASE}/api/upload-url`, { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ filename: "test.txt", contentType: "text/plain" }) });
+    if (res.status === 401) return;
+    const body = await res.json();
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+    assert(body.error.includes("JPEG"), `unexpected error: ${body.error}`);
+  });
+
+  await test("POST /api/upload-url requires filename and contentType", async () => {
+    const res = await fetch(`${BASE}/api/upload-url`, { method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    if (res.status === 401) return;
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+  });
+
+  // ── Analytics ──
+
+  console.log("\n\x1b[1m=== analytics ===\x1b[0m");
+
+  await test("GET /api/analytics without owner key returns 403", async () => {
+    const res = await fetch(`${BASE}/api/analytics`);
+    assert(res.status === 200 || res.status === 403, `expected 200 or 403, got ${res.status}`);
+  });
+
+  await test("GET /api/analytics with owner key returns stats", async () => {
+    const { res, body } = await json("/api/analytics?days=1");
+    if (res.status === 403) return;
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    assert(typeof body.total === "number", "total should be a number");
+    assert(typeof body.byTier === "object", "byTier should be an object");
+    assert(typeof body.byPath === "object", "byPath should be an object");
+    assert(typeof body.avgLatencyMs === "number", "avgLatencyMs should be a number");
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);

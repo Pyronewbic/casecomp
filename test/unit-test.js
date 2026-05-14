@@ -26,6 +26,7 @@ import { buildAlertEmailSubject, sendAlertEmail } from "../lib/data/email.js";
 import { csvEscape, csvRow } from "../lib/data/csv.js";
 import { matchesQuery, searchCards, getAllSets, getSetWithCards } from "../lib/data/card-database.js";
 import { computePriceTrend } from "../lib/data/price-history.js";
+import { findCardByCardId } from "../lib/data/card-database.js";
 
 let passed = 0;
 let failed = 0;
@@ -1126,6 +1127,74 @@ test("computePriceTrend: handles all data older than 7 days", () => {
   eq(t !== null, true);
   eq(t.change30d !== null, true);
   eq(typeof t.direction, "string");
+});
+
+// ── JWT auth ──
+
+console.log("\n\x1b[1m=== JWT auth ===\x1b[0m");
+
+{
+  process.env.CASECOMP_JWT_SECRET = "test-secret-key-for-unit-tests-only";
+  const { generateJwt, verifyJwt } = await import("../lib/data/auth.js");
+
+  test("generateJwt: returns 3-part token", () => {
+    const jwt = generateJwt({ sub: "123", email: "test@test.com" });
+    eq(jwt.split(".").length, 3);
+  });
+
+  test("verifyJwt: validates a generated token", () => {
+    const jwt = generateJwt({ sub: "456", email: "a@b.com" });
+    const payload = verifyJwt(jwt);
+    eq(payload.sub, "456");
+    eq(payload.email, "a@b.com");
+  });
+
+  test("verifyJwt: returns null for tampered token", () => {
+    const jwt = generateJwt({ sub: "789", email: "x@y.com" });
+    const tampered = jwt.slice(0, -3) + "xxx";
+    eq(verifyJwt(tampered), null);
+  });
+
+  test("verifyJwt: returns null for expired token", () => {
+    const jwt = generateJwt({ sub: "exp", email: "e@e.com" });
+    const [h, p, s] = jwt.split(".");
+    const data = JSON.parse(Buffer.from(p, "base64url").toString());
+    data.exp = 1;
+    const newP = Buffer.from(JSON.stringify(data)).toString("base64url");
+    eq(verifyJwt(`${h}.${newP}.${s}`), null);
+  });
+
+  test("verifyJwt: returns null for empty string", () => {
+    eq(verifyJwt(""), null);
+  });
+
+  test("verifyJwt: returns null for non-JWT string", () => {
+    eq(verifyJwt("not-a-jwt"), null);
+  });
+
+  test("verifyJwt: returns null for null input", () => {
+    eq(verifyJwt(null), null);
+  });
+}
+
+// ── findCardByCardId ──
+
+console.log("\n\x1b[1m=== findCardByCardId ===\x1b[0m");
+
+test("findCardByCardId: returns null for null input", () => {
+  eq(findCardByCardId(null), null);
+});
+
+test("findCardByCardId: returns null for empty string", () => {
+  eq(findCardByCardId(""), null);
+});
+
+test("findCardByCardId: returns null for invalid format (no slash)", () => {
+  eq(findCardByCardId("sv8a-217-187"), null);
+});
+
+test("findCardByCardId: returns null for missing number part", () => {
+  eq(findCardByCardId("sv8a/"), null);
 });
 
 // ── Summary ──
