@@ -55,6 +55,8 @@ jobs:
       - run: npm install
       - name: npm audit (high + critical)
         run: npm audit --audit-level=high || true
+      - name: Lockfile lint
+        run: npx lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https
 
   secrets:
     runs-on: ubuntu-latest
@@ -94,10 +96,10 @@ jobs:
           path: sbom.spdx.json
           retention-days: 90
 
-      - name: Upload SARIF to GitHub Security
+      - name: Upload Grype report
         if: always() && steps.grype.outputs.sarif != ''
-        uses: github/codeql-action/upload-sarif@v4
-        continue-on-error: true
+        uses: actions/upload-artifact@v5
         with:
-          sarif_file: ${{ steps.grype.outputs.sarif }}
-          category: grype
+          name: grype-sarif-${{ github.sha }}
+          path: ${{ steps.grype.outputs.sarif }}
+          retention-days: 90

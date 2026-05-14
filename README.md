@@ -128,6 +128,7 @@ curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
 - **Reproducible builds** - Kaniko `--reproducible` flag, pinned version
 - **Multi-region** - Cloud Run in asia-south1 + us-central1, global LB auto geo-routes to nearest
 - **Custom base image** - Wolfi + apko Node 24 image, manual rebuild, zero CVEs by design
+- **Supply chain** - SLSA provenance, Dependabot, lockfile-lint, Socket.dev, pre-commit secret blocking
 
 ## Claude Code Skills
 
