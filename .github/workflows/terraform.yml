@@ -28,7 +28,7 @@ jobs:
           workload_identity_provider: projects/129850122606/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: casecomp-deploy@casecomp-495718.iam.gserviceaccount.com
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
@@ -92,7 +92,7 @@ jobs:
           workload_identity_provider: projects/129850122606/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: casecomp-deploy@casecomp-495718.iam.gserviceaccount.com
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
