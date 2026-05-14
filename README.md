@@ -179,6 +179,7 @@ curl "https://api.casecomp.xyz/api/portfolio/set/sv8a?demo=true"
 - **SAST** - CodeQL static analysis on every PR + weekly schedule
 - **Binary Authorization** - GCP policy on both Cloud Run services (audit mode)
 - **Reproducible builds** - Kaniko `--reproducible` flag, pinned version
+- **Multi-region** - Cloud Run in asia-south1 + us-central1, global LB auto geo-routes to nearest
 
 ## Claude Code Skills
 
