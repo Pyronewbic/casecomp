@@ -9,6 +9,7 @@ locals {
     "RESEND_API_KEY",
     "CASECOMP_JWT_SECRET",
     "GOOGLE_OAUTH_CLIENT_ID",
+    "CASECOMP_ADMIN_SUB",
   ]
 }
 
