@@ -23,10 +23,15 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v3
 
-      - uses: chainguard-dev/actions/setup-apko@main
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install apko
+        run: go install chainguard.dev/apko@latest
 
       - name: Build image
-        run: apko build --lockfile images/node24/apko.lock.json images/node24/apko.yaml ${{ env.IMAGE }}:latest image.tar
+        run: apko build images/node24/apko.yaml ${{ env.IMAGE }}:latest image.tar
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker --quiet
