@@ -18,6 +18,11 @@ variable "container_image" {
   default = "gcr.io/casecomp-495718/casecomp-api"
 }
 
+variable "regions" {
+  type    = list(string)
+  default = ["asia-south1", "us-central1"]
+}
+
 variable "alert_email" {
   sensitive = true
 }

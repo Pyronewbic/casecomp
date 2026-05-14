@@ -118,8 +118,9 @@ data "google_project" "current" {
 # ── Cloud Run ─────────────────────────────────────────────────
 
 resource "google_cloud_run_v2_service" "api" {
+  for_each = toset(var.regions)
   name     = "casecomp-api"
-  location = var.region
+  location = each.value
 
   template {
     scaling {
@@ -176,8 +177,9 @@ resource "google_cloud_run_v2_service" "api" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
-  name     = google_cloud_run_v2_service.api.name
-  location = var.region
+  for_each = toset(var.regions)
+  name     = google_cloud_run_v2_service.api[each.value].name
+  location = each.value
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
@@ -212,26 +214,31 @@ resource "google_compute_global_address" "api_ip" {
 }
 
 resource "google_compute_region_network_endpoint_group" "api_neg" {
-  name                  = "casecomp-api-neg"
-  region                = var.region
+  for_each              = toset(var.regions)
+  name                  = each.value == "asia-south1" ? "casecomp-api-neg" : "casecomp-api-neg-${each.value}"
+  region                = each.value
   network_endpoint_type = "SERVERLESS"
 
   cloud_run {
-    service = google_cloud_run_v2_service.api.name
+    service = google_cloud_run_v2_service.api[each.value].name
   }
 }
 
 resource "google_compute_backend_service" "api_backend" {
   name = "cardscrapebot-backend"
 
-  backend {
-    group = google_compute_region_network_endpoint_group.api_neg.id
+  dynamic "backend" {
+    for_each = toset(var.regions)
+    content {
+      group = google_compute_region_network_endpoint_group.api_neg[backend.value].id
+    }
   }
 }
 
 resource "google_cloud_run_v2_service" "site" {
+  for_each = toset(var.regions)
   name     = "casecomp-site"
-  location = var.region
+  location = each.value
 
   template {
     scaling {
@@ -239,7 +246,7 @@ resource "google_cloud_run_v2_service" "site" {
     }
 
     containers {
-      image = "gcr.io/${var.project_id}/casecomp-site"
+      image = "us-docker.pkg.dev/${var.project_id}/casecomp-site/app"
 
       ports {
         container_port = 8080
@@ -269,19 +276,21 @@ resource "google_cloud_run_v2_service" "site" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "site_public" {
-  name     = google_cloud_run_v2_service.site.name
-  location = var.region
+  for_each = toset(var.regions)
+  name     = google_cloud_run_v2_service.site[each.value].name
+  location = each.value
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
 resource "google_compute_region_network_endpoint_group" "site_neg" {
-  name                  = "casecomp-site-neg"
-  region                = var.region
+  for_each              = toset(var.regions)
+  name                  = each.value == "asia-south1" ? "casecomp-site-neg" : "casecomp-site-neg-${each.value}"
+  region                = each.value
   network_endpoint_type = "SERVERLESS"
 
   cloud_run {
-    service = google_cloud_run_v2_service.site.name
+    service = google_cloud_run_v2_service.site[each.value].name
   }
 }
 
@@ -296,8 +305,11 @@ resource "google_compute_backend_service" "site_backend" {
     signed_url_cache_max_age_sec = 0
   }
 
-  backend {
-    group = google_compute_region_network_endpoint_group.site_neg.id
+  dynamic "backend" {
+    for_each = toset(var.regions)
+    content {
+      group = google_compute_region_network_endpoint_group.site_neg[backend.value].id
+    }
   }
 }
 
@@ -525,8 +537,8 @@ resource "google_monitoring_alert_policy" "api_uptime_alert" {
 
 # ── Outputs ───────────────────────────────────────────────────
 
-output "cloud_run_url" {
-  value = google_cloud_run_v2_service.api.uri
+output "cloud_run_urls" {
+  value = { for r in var.regions : r => google_cloud_run_v2_service.api[r].uri }
 }
 
 output "lb_ip" {
