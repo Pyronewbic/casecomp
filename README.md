@@ -8,7 +8,7 @@
 [![SLSA 3](https://img.shields.io/badge/SLSA-Level%203-green)](https://slsa.dev)
 [![Sigstore](https://img.shields.io/badge/signed-sigstore-blue)](https://www.sigstore.dev/)
 
-**[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Dashboard](https://api.casecomp.xyz/dashboard)** | **[Admin](https://api.casecomp.xyz/admin)** | **[Changelog](CHANGELOG.md)**
+**[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Admin](https://api.casecomp.xyz/admin)** | **[Changelog](CHANGELOG.md)**
 
 Search any Pokemon card across four marketplaces in one query. Get live prices, AI condition estimates, and PSA grading signals instead of manually checking eBay, magi.camp, Yahoo Auctions, and SNKRDUNK separately.
 
@@ -23,7 +23,7 @@ Search any Pokemon card across four marketplaces in one query. Get live prices, 
 - **Price history** - sold comp tracking over time with line charts and stats
 - **PSA grading signals** - population data, difficulty, gem 10%, recommended submission tier
 - **Slab comparison** - compare PSA 10 / BGS 9.5 / TAG 10 prices across sources
-- **Dashboard** - search, arbitrage, price history, grade breakdown at `/dashboard`
+- **Portfolio** - track cards, ROI, value over time, grading opportunities
 - **Admin** - API key management, stats KPIs, error log at `/admin`
 - **Set browser** - browse 238 sets with logos, rarity filters, collection tracking (owned/missing)
 - **REST API** - authenticated endpoints with rate limiting, per-key caching, OpenAPI spec
@@ -38,14 +38,14 @@ Search any Pokemon card across four marketplaces in one query. Get live prices, 
 yarn install
 yarn playwright-install
 cp .env.example .env          # add keys (see Environment below)
-yarn api                      # dashboard on localhost:3000
+yarn api                      # API on localhost:3000
 ```
 
 ## Scripts
 
 | Command | What |
 |---------|------|
-| `yarn api` | Start API + dashboard on :3000 |
+| `yarn api` | Start API on :3000 |
 | `yarn start` | CLI search (`node index.js`) |
 | `yarn test` | Full suite: syntax, unit, secrets, API |
 | `yarn test:unit` | Unit tests only (no server) |
@@ -58,11 +58,11 @@ yarn api                      # dashboard on localhost:3000
 
 See [docs/internals.md](docs/internals.md) for project layout, caching, security pipeline, multi-region deployment, and AI grading pipeline.
 
-## Web Dashboard
+## Frontend
 
-[api.casecomp.xyz](https://api.casecomp.xyz) - interactive search with detail panel, AI grade breakdown, PSA signal bar, source filters.
+[casecomp.xyz](https://casecomp.xyz) — search, set browser, portfolio, AI grading. Built with TanStack Start, deployed on Cloud Run + Cloudflare.
 
-Three sample cards work without API keys (`?demo=true`):
+Three sample cards work without sign-in (`?demo=true`):
 - Pikachu ex SAR PSA 10 (multi-source slab: eBay + magi + Yahoo)
 - Mega Greninja ex SAR (SNKRDUNK + AI grade)
 - Umbreon ex SAR 217/187 (eBay + magi + Yahoo + AI grade)
@@ -207,19 +207,19 @@ GCP (Terraform managed): Cloud Run `casecomp-api` (API) + `casecomp-site` (front
 
 ## Chrome Extension
 
-Queue auto-join for Pokemon Center, Walmart, Costco, Target drops. News monitoring from Discord, X, Reddit. Dashboard with KPI tracking.
+Queue auto-join for Pokemon Center, Walmart, Costco, Target drops. News monitoring from Discord, X, Reddit.
 
 Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-290 tests across three layers. CI runs unit + smoke in parallel, both required by branch protection.
+329 tests across three layers. CI required checks: unit + codeql. Smoke is non-blocking.
 
 | Suite | Count | Command | Covers |
 |-------|------:|---------|--------|
-| **Unit** | 128 | `yarn test:unit` | Filters, grading, query builder, card identity, condition detection, image preprocessing, email alerts, portfolio ROI, CSV export, autocomplete matching |
-| **API** | 88 | `yarn test:api` | Search, sold, PSA, grade, auth, admin keys, arbitrage, price history, alerts, share pages, portfolio CRUD, card view, demo validation |
-| **Smoke** | 74 | `yarn test:smoke` | Dashboard UI, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters |
+| **Unit** | 151 | `yarn test:unit` | Filters, grading, query builder, card identity, condition detection, image preprocessing, email alerts, portfolio ROI, CSV export, autocomplete, JWT auth, price trends |
+| **API** | 104 | `yarn test:api` | Search, sold, PSA, grade, auth, admin keys, arbitrage, price history, alerts, share pages, portfolio CRUD, card view, upload-url, analytics, collection tracking |
+| **Smoke** | 74 | `yarn test:smoke` | API root page, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters |
 
 ## Contributing
 
