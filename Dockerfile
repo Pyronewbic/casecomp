@@ -8,7 +8,7 @@ RUN npm install --production
 COPY . .
 RUN rm -rf .git .env* test/ extension/ terraform/ docs/ public/admin/ *.md .github/
 
-FROM gcr.io/distroless/nodejs24-debian12
+FROM gcr.io/casecomp-495718/casecomp-node24:latest
 
 WORKDIR /app
 COPY --from=build /app /app
