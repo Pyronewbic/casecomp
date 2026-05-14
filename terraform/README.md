@@ -55,7 +55,14 @@ CI handles plan (PR comment) and apply (on merge) via `.github/workflows/terrafo
 
 | File | Content |
 |------|---------|
-| `main.tf` | All resource definitions |
+| `main.tf` | Provider, backend, APIs, Binary Auth |
+| `cloud-run.tf` | API + site services, IAM bindings |
+| `networking.tf` | LB, NEGs, backends, URL map, SSL, forwarding |
+| `monitoring.tf` | Scheduler, alerts, uptime checks, logging metric |
+| `secrets.tf` | Secret Manager resources + IAM |
+| `firestore.tf` | Firestore database |
+| `storage.tf` | GCS bucket (legacy) |
+| `outputs.tf` | Output values |
 | `variables.tf` | Input variables with defaults |
 | `terraform.tfvars` | Sensitive values (gitignored) |
 | `.terraform.lock.hcl` | Provider version lock |
