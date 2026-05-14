@@ -1,4 +1,4 @@
-FROM node:24-slim AS build
+FROM gcr.io/casecomp-495718/casecomp-node24:latest AS build
 
 WORKDIR /app
 
@@ -6,7 +6,6 @@ COPY package.json yarn.lock* package-lock.json* ./
 RUN npm install --production
 
 COPY . .
-RUN rm -rf .git .env* test/ extension/ terraform/ docs/ public/admin/ *.md .github/
 
 FROM gcr.io/casecomp-495718/casecomp-node24:latest
 
