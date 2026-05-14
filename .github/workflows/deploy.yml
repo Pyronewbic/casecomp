@@ -72,6 +72,27 @@ jobs:
             --certificate-identity-regexp="github.com/Pyronewbic/casecomp" \
             "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}" || true
 
+      - name: Attest SLSA provenance
+        run: |
+          cat > /tmp/provenance.json << 'PROV'
+          {
+            "buildType": "https://slsa.dev/provenance/v1",
+            "builder": { "id": "https://github.com/Pyronewbic/casecomp/.github/workflows/deploy.yml" },
+            "invocation": {
+              "configSource": {
+                "uri": "git+https://github.com/Pyronewbic/casecomp@refs/heads/main",
+                "digest": { "sha1": "${{ github.sha }}" },
+                "entryPoint": ".github/workflows/deploy.yml"
+              }
+            }
+          }
+          PROV
+          cosign attest --yes \
+            --oidc-issuer=https://token.actions.githubusercontent.com \
+            --predicate /tmp/provenance.json \
+            --type slsaprovenance \
+            "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}"
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
