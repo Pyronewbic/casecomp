@@ -44,8 +44,8 @@ public/admin/         Admin panel (keys, stats, errors)
 extension/            Chrome extension: queue auto-join, drop intel
 terraform/            GCP infra (Cloud Run, Firestore, LB, CDN, Scheduler)
 test/
-  unit-test.js        130 unit tests
-  api-test.js         96 API integration tests
+  unit-test.js        140 unit tests
+  api-test.js         99 API integration tests
   smoke-test.js       74 Playwright UI smoke tests
 ```
 

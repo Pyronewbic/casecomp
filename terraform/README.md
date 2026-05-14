@@ -1,58 +1,55 @@
 # Terraform — Casecomp Infrastructure
 
-GCP infrastructure for Casecomp. State is stored in a GCS bucket (`casecomp-terraform-state`).
+GCP infrastructure for Casecomp. State stored in GCS (`casecomp-terraform-state`). CI: plan on PR, auto-apply on merge, `workflow_dispatch` for manual re-runs.
+
+## Multi-region
+
+Both Cloud Run services deploy to asia-south1 and us-central1. The global HTTPS LB auto geo-routes to the nearest region. Terraform uses `for_each` over `var.regions`.
 
 ## Resources
 
 | Resource | Purpose |
 |----------|---------|
-| Cloud Run `casecomp-api` | API + admin (/admin) + consumer dashboard (/dashboard), asia-south1, scales to 20 |
-| Cloud Run `casecomp-site` | Frontend SSR (TanStack Start), scales to 10 instances |
-| Firestore | Grade logs, drops, webhooks, alerts, caches, api-keys, price-history, error-logs |
-| HTTPS Load Balancer | Global IP (`34.107.143.136`), URL map routes by host |
+| Cloud Run `casecomp-api` | API server, 2 regions, scales to 20 per region |
+| Cloud Run `casecomp-site` | Frontend SSR (TanStack Start), 2 regions, scales to 10 |
+| Firestore | Grade logs, drops, webhooks, alerts, caches, api-keys, price-history, error-logs (asia-south1 only) |
+| HTTPS Load Balancer | Global IP, URL map routes by host, serverless NEGs in both regions |
 | Cloud CDN | Caches static assets from frontend Cloud Run |
-| SSL Certificates | GCP managed cert for `api.casecomp.xyz`; Cloudflare handles `casecomp.xyz` SSL |
-| GCS Bucket `casecomp-site` | (Legacy) Static site bucket, replaced by Cloud Run SSR |
-| Secret Manager | EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY |
-| Cloud Monitoring | Log-based metric on `[ERROR]`, error + uptime alerts → email |
-| APIs enabled | Cloud Run, Compute, Firestore, Cloud Build, Secret Manager, Monitoring |
+| SSL Certificates | GCP managed certs for `api.casecomp.xyz` and `casecomp.xyz` |
+| Secret Manager | EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY, RESEND_API_KEY (auto-replicated) |
+| Binary Authorization | ENFORCED policy on both Cloud Run services |
+| Cloud Monitoring | Log-based error metric, error + uptime alerts |
+| Cloud Scheduler | track-prices + check-alerts every 6h |
 
 ## Routing
 
-Same LB IP (`34.107.143.136`), routed by hostname:
-- `casecomp.xyz` / `www.casecomp.xyz` → Cloudflare (SSL) → GCP LB → Cloud Run `casecomp-site` (CDN enabled)
+Global LB IP, routed by hostname:
+- `casecomp.xyz` → Cloudflare (SSL) → GCP LB → Cloud Run `casecomp-site` (CDN enabled)
 - `api.casecomp.xyz` → GCP LB (managed SSL) → Cloud Run `casecomp-api`
+
+Both backends have NEGs in asia-south1 and us-central1. LB routes to nearest.
 
 ## Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `project_id` | `casecomp-495718` | GCP project |
-| `region` | `asia-south1` | Deploy region |
+| `region` | `asia-south1` | Primary region (Firestore, Scheduler) |
+| `regions` | `["asia-south1", "us-central1"]` | Cloud Run deploy regions |
 | `api_domain` | `api.casecomp.xyz` | API SSL cert domain |
 | `site_domain` | `casecomp.xyz` | Frontend SSL cert domain |
 | `container_image` | `gcr.io/casecomp-495718/casecomp-api` | API Docker image |
-| `alert_email` | *(sensitive, in terraform.tfvars)* | Monitoring alert recipient |
+| `alert_email` | *(sensitive, in terraform.tfvars / GitHub secret)* | Monitoring alert recipient |
 
 ## Usage
 
 ```bash
-terraform init          # first time — downloads providers, connects to GCS backend
+terraform init          # first time — providers + GCS backend
 terraform plan          # preview changes
 terraform apply         # apply changes
 ```
 
-## Importing existing resources
-
-If resources were created manually (outside Terraform), import them before applying:
-
-```bash
-terraform import google_cloud_run_v2_service.api \
-  "projects/casecomp-495718/locations/asia-south1/services/casecomp-api"
-
-terraform import google_cloud_run_v2_service.site \
-  "projects/casecomp-495718/locations/asia-south1/services/casecomp-site"
-```
+CI handles plan (PR comment) and apply (on merge) via `.github/workflows/terraform.yml`.
 
 ## Files
 
