@@ -62,9 +62,25 @@ test/
 
 On startup: eBay OAuth token pre-fetched, TCGdex card database loaded from Firestore cache (24h TTL), set names + logos loaded in parallel.
 
+## Multi-region deployment
+
+Both `casecomp-api` and `casecomp-site` run in asia-south1 (Mumbai) and us-central1 (Iowa). The global HTTPS LB auto-routes requests to the nearest healthy region.
+
+| Component | Region | Notes |
+|---|---|---|
+| Cloud Run (API + site) | asia-south1, us-central1 | `for_each` in Terraform, matrix deploy in CI |
+| Firestore | asia-south1 only | Locked at creation. US reads ~150ms, mitigated by caching |
+| Secret Manager | Global (auto-replicated) | No region changes |
+| Cloud Scheduler | asia-south1 | Hits LB domain, auto-routes |
+| HTTPS LB | Global | Backend services have NEGs in both regions |
+| Artifact Registry (frontend) | us (multi-region) | `us-docker.pkg.dev`, accessible from both regions |
+| GCR (API) | us (multi-region) | `gcr.io`, accessible globally |
+
+Deploy workflow: build once → cosign sign → deploy to both regions via GitHub Actions matrix (parallel, fail-fast: false).
+
 ## Caching
 
-All caches use Firestore (shared across Cloud Run instances). No Redis in production.
+All caches use Firestore (shared across Cloud Run instances, single region). No Redis in production.
 
 | Collection | TTL | Content |
 |-----------|-----|---------|
