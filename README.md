@@ -78,46 +78,31 @@ All endpoints except health and sample data require a `CC_LIVE_` API key.
 Full reference: [api.casecomp.xyz/docs](https://api.casecomp.xyz/docs)
 
 ```bash
-# Sample data (no key needed)
+# ── Public (no key) ──────────────────────────────────────────
+curl "https://api.casecomp.xyz/api/sets"                        # browse 238 sets
+curl "https://api.casecomp.xyz/api/sets/sv06"                   # cards in a set
+curl "https://api.casecomp.xyz/api/autocomplete?q=umbreon"      # card search (29K cards)
+curl "https://api.casecomp.xyz/api/health"                      # service status
+
+# ── Sample data (no key, ?demo=true) ─────────────────────────
 curl "https://api.casecomp.xyz/api/search?q=Umbreon+ex+SAR+217/187&demo=true"
-
-# Arbitrage - cross-source price comparison
+curl "https://api.casecomp.xyz/api/card/view/sv8a/217-187?demo=true"
 curl "https://api.casecomp.xyz/api/arbitrage?q=Pikachu+ex+SAR+234/193+PSA+10&demo=true"
-
-# Price history
 curl "https://api.casecomp.xyz/api/price-history?q=Umbreon+ex+SAR+217/187&days=90&demo=true"
+curl "https://api.casecomp.xyz/api/portfolio?demo=true"
+curl "https://api.casecomp.xyz/api/portfolio/set/sv8a?demo=true"
 
-# Live search (key required)
+# ── Authenticated (CC_LIVE_ key) ─────────────────────────────
 curl -H "Authorization: Bearer $CASECOMP_KEY" \
   "https://api.casecomp.xyz/api/search?q=Pikachu+ex+SAR&source=magi&format=slab&slab_provider=PSA&slab_grade=10"
 
-# Drop intelligence
 curl -H "Authorization: Bearer $CASECOMP_KEY" \
   "https://api.casecomp.xyz/v1/drops"
 
-# Error monitoring
-curl -H "Authorization: Bearer $CASECOMP_KEY" \
-  "https://api.casecomp.xyz/api/errors"
-
-# Set an arbitrage alert (notify when spread > 10%)
 curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
   -H "Content-Type: application/json" \
   -d '{"email":"you@email.com","query":"Umbreon ex SAR 217/187","type":"arbitrage","spreadThreshold":10}' \
   "https://api.casecomp.xyz/api/alerts"
-
-# Portfolio (sample data)
-curl "https://api.casecomp.xyz/api/portfolio?demo=true"
-curl "https://api.casecomp.xyz/api/portfolio/summary?demo=true"
-curl "https://api.casecomp.xyz/api/portfolio/history?days=30&demo=true"
-curl "https://api.casecomp.xyz/api/portfolio/export?format=csv&demo=true"
-curl "https://api.casecomp.xyz/api/portfolio/grading-opportunities?demo=true"
-
-# Set browser
-curl "https://api.casecomp.xyz/api/sets"
-curl "https://api.casecomp.xyz/api/sets/sv06"
-
-# Collection tracking (which cards in a set do I own?)
-curl "https://api.casecomp.xyz/api/portfolio/set/sv8a?demo=true"
 ```
 
 ### Rate limits
