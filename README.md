@@ -1,6 +1,6 @@
 # <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
-[![Version](https://img.shields.io/badge/version-1.1.0-d9b676)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-d9b676)](CHANGELOG.md)
 [![CI](https://github.com/Pyronewbic/casecomp/actions/workflows/ci.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/ci.yml)
 [![Deploy](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
