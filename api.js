@@ -23,7 +23,7 @@ import { recordSoldPrices, getPriceHistory, computePriceTrend } from "./lib/data
 import { sendAlertEmail } from "./lib/data/email.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
-import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards } from "./lib/data/card-database.js";
+import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId } from "./lib/data/card-database.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -882,6 +882,15 @@ app.get("/api/card/view/:setCode/:number", apiAuthMiddleware, async (req, res) =
     const cardData = await findCardByQuery(searchQuery).catch(() => null);
     const identity = cardData || parseCardIdentity(searchQuery);
     if (identity.setCode) identity.setName = SET_NAME_MAP[identity.setCode] || identity.setCode;
+
+    const tcgCard = findCardByCardId(cardId);
+    if (tcgCard) {
+      if (!identity.name || identity.name === identity.setName) identity.name = tcgCard.name;
+      if (!identity.rarity && tcgCard.rarity) identity.rarity = tcgCard.rarity;
+      if (!identity.setName && tcgCard.setName) identity.setName = tcgCard.setName;
+      identity.imageUrl = tcgCard.imageUrl || null;
+      identity.nameJa = tcgCard.nameJa || null;
+    }
 
     let rawResults = { active: [], sold: [] };
     let slabResults = { active: [], sold: [] };
