@@ -85,6 +85,7 @@ jobs:
           sbom: sbom.spdx.json
           fail-build: false
           severity-cutoff: critical
+          add-cpes-if-none: true
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v5
@@ -96,6 +97,7 @@ jobs:
       - name: Upload SARIF to GitHub Security
         if: always() && steps.grype.outputs.sarif != ''
         uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
         with:
           sarif_file: ${{ steps.grype.outputs.sarif }}
           category: grype
