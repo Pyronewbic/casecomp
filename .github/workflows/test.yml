@@ -82,7 +82,7 @@ jobs:
           output-file: sbom.spdx.json
 
       - name: Vulnerability scan (Grype)
-        uses: anchore/scan-action@v6
+        uses: anchore/scan-action@v7
         id: grype
         with:
           sbom: sbom.spdx.json
