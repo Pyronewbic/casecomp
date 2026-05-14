@@ -519,7 +519,8 @@ app.get("/api/health", async (req, res) => {
 });
 
 // POST /auth/google
-app.post("/auth/google", async (req, res) => {
+const authLimiter = rateLimit({ windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many auth attempts, try again later" } });
+app.post("/auth/google", authLimiter, async (req, res) => {
   const { idToken } = req.body || {};
   if (!idToken) return res.status(400).json({ error: "idToken required" });
   try {
