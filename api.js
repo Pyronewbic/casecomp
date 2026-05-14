@@ -21,6 +21,7 @@ import { csvEscape, csvRow } from "./lib/data/csv.js";
 import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
 import { recordSoldPrices, getPriceHistory, computePriceTrend } from "./lib/data/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
+import { logRequest, getAnalytics } from "./lib/data/analytics.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
 import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId } from "./lib/data/card-database.js";
@@ -110,6 +111,41 @@ app.use("/api", (req, res, next) => {
   return apiLimiter(req, res, next);
 });
 if (!isLocal) app.use("/v1", apiLimiter);
+
+function classifyTier(req) {
+  const token = getRequestToken(req);
+  if (!token) return req.query.demo === "true" ? "demo" : "public";
+  if (token === process.env.CASECOMP_API_KEY) return "owner";
+  if (token === process.env.CASECOMP_SANDBOX_KEY) return "sandbox";
+  if (req.query.demo === "true") return "demo";
+  return "developer";
+}
+
+function hashIp(ip) {
+  return crypto.createHash("sha256").update(ip || "unknown").digest("hex").slice(0, 8);
+}
+
+if (!isLocal) {
+  app.use("/api", (req, res, next) => {
+    if (req.path === "/health") return next();
+    const start = Date.now();
+    res.on("finish", () => {
+      logRequest({
+        path: req.path,
+        method: req.method,
+        status: res.statusCode,
+        latencyMs: Date.now() - start,
+        tier: classifyTier(req),
+        ipHash: hashIp(req.ip),
+        userAgent: (req.headers["user-agent"] || "").substring(0, 200),
+        requestId: req.requestId,
+        query: req.query.q || null,
+        ts: new Date().toISOString(),
+      }).catch(() => {});
+    });
+    next();
+  });
+}
 
 function safeErrorMessage(e) {
   const msg = e.message || String(e);
@@ -451,6 +487,17 @@ app.delete("/api/errors", ownerOnly, async (req, res) => {
   try {
     const cleared = await clearErrorLogs();
     res.json({ ok: true, cleared });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /api/analytics
+app.get("/api/analytics", ownerOnly, async (req, res) => {
+  const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+  try {
+    const stats = await getAnalytics({ days });
+    res.json(stats);
   } catch (e) {
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
