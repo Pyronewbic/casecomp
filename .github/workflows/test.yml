@@ -55,6 +55,8 @@ jobs:
       - run: npm install
       - name: npm audit (high + critical)
         run: npm audit --audit-level=high || true
+      - name: Lockfile lint
+        run: npx lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https
 
   secrets:
     runs-on: ubuntu-latest
