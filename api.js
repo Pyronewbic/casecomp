@@ -22,6 +22,7 @@ import { createApiKey, listApiKeys, getApiKey, updateApiKey, deleteApiKey, rotat
 import { recordSoldPrices, getPriceHistory, computePriceTrend } from "./lib/data/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
 import { logRequest, getAnalytics } from "./lib/data/analytics.js";
+import { verifyGoogleToken, generateJwt, verifyJwt } from "./lib/data/auth.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
 import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId } from "./lib/data/card-database.js";
@@ -517,6 +518,20 @@ app.get("/api/health", async (req, res) => {
   });
 });
 
+// POST /auth/google
+const authLimiter = rateLimit({ windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many auth attempts, try again later" } });
+app.post("/auth/google", authLimiter, async (req, res) => {
+  const { idToken } = req.body || {};
+  if (!idToken) return res.status(400).json({ error: "idToken required" });
+  try {
+    const gUser = await verifyGoogleToken(idToken);
+    const jwt = generateJwt(gUser);
+    res.json({ jwt, user: { id: gUser.sub, email: gUser.email, name: gUser.name, picture: gUser.picture } });
+  } catch (e) {
+    res.status(401).json({ error: "Invalid Google token" });
+  }
+});
+
 // GET /api/autocomplete
 app.get("/api/autocomplete", (req, res) => {
   const q = (req.query.q || "").trim();
@@ -552,6 +567,8 @@ async function authMiddleware(req, res, next) {
   const token = getRequestToken(req);
   if (!token) return res.status(401).json({ error: "Invalid or missing API key" });
   if (token === ownerKey || token === sandboxKey) return next();
+  const jwtPayload = verifyJwt(token);
+  if (jwtPayload) return next();
   const devKey = await validateApiKey(token);
   if (devKey) {
     req._devKey = devKey;
@@ -1287,6 +1304,8 @@ const DEMO_CURRENT_PRICES = {
 function portfolioUserId(req) {
   const token = getRequestToken(req);
   if (!token) return isLocal ? "local-dev" : null;
+  const jwtPayload = verifyJwt(token);
+  if (jwtPayload) return jwtPayload.sub;
   return crypto.createHash("sha256").update(token).digest("hex").slice(0, 16);
 }
 

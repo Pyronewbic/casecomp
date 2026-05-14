@@ -1030,6 +1030,24 @@ async function run() {
     assert(body._demo === true, "missing _demo flag");
   });
 
+  // ── Google OAuth ──
+
+  console.log("\n\x1b[1m=== google oauth ===\x1b[0m");
+
+  await test("POST /auth/google with missing idToken returns 400", async () => {
+    const res = await fetch(`${BASE}/auth/google`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+    const body = await res.json();
+    assert(body.error === "idToken required", `unexpected error: ${body.error}`);
+  });
+
+  await test("POST /auth/google with invalid idToken returns 401", async () => {
+    const res = await fetch(`${BASE}/auth/google`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: "invalid.token.here" }) });
+    assert(res.status === 401, `expected 401, got ${res.status}`);
+    const body = await res.json();
+    assert(body.error === "Invalid Google token", `unexpected error: ${body.error}`);
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);

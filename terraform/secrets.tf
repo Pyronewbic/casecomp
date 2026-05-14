@@ -7,6 +7,8 @@ locals {
     "CASECOMP_API_KEY",
     "CASECOMP_SANDBOX_KEY",
     "RESEND_API_KEY",
+    "CASECOMP_JWT_SECRET",
+    "GOOGLE_OAUTH_CLIENT_ID",
   ]
 }
 
