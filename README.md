@@ -2,8 +2,12 @@
 
 [![Version](https://img.shields.io/badge/version-1.1.0-d9b676)](CHANGELOG.md)
 [![Tests](https://github.com/Pyronewbic/casecomp/actions/workflows/test.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/test.yml)
+[![Deploy](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml)
+[![CodeQL](https://github.com/Pyronewbic/casecomp/actions/workflows/codeql.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/codeql.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![API](https://img.shields.io/badge/API-docs-d9b676)](https://api.casecomp.xyz/docs)
+[![SLSA 3](https://img.shields.io/badge/SLSA-Level%203-green)](https://slsa.dev)
+[![Sigstore](https://img.shields.io/badge/signed-sigstore-blue)](https://www.sigstore.dev/)
 
 **[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Dashboard](https://api.casecomp.xyz/dashboard)** | **[Admin](https://api.casecomp.xyz/admin)** | **[Changelog](CHANGELOG.md)**
 
