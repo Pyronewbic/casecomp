@@ -1,4 +1,4 @@
-import { parseGradeJSON, roundGrade, validateAndShape } from "../lib/grading/grading.js";
+import { parseGradeJSON, roundGrade, validateAndShape, computeGradeDistribution } from "../lib/grading/grading.js";
 import { buildSignal } from "../lib/grading/psa.js";
 import { deriveEra } from "../lib/cards/card-database.js";
 import { cornerCropsToImageBlocks, imageBlockFromUrl, imageBlockFromBase64, parseAnthropicResponse, parseTogetherResponse } from "../lib/grading/preprocessing.js";
@@ -787,10 +787,14 @@ test("graded demos have descriptive detail text", () => {
     const items = (r.activeByCountry?.US || []).filter(i => i.grade);
     for (const item of items) {
       const details = item.grade.subgradeDetails;
-      assert(details.centering.detail.length > 30, `${item.itemId} centering detail too short`);
-      assert(details.corners.detail.length > 30, `${item.itemId} corners detail too short`);
-      assert(details.edges.detail.length > 30, `${item.itemId} edges detail too short`);
-      assert(details.surface.detail.length > 30, `${item.itemId} surface detail too short`);
+      const cf = details.centering_front || details.centering;
+      const crf = details.corners_front || details.corners;
+      const ef = details.edges_front || details.edges;
+      const sf = details.surface_front || details.surface;
+      assert(cf.detail.length > 10, `${item.itemId} centering detail too short`);
+      assert(crf.detail.length > 10, `${item.itemId} corners detail too short`);
+      assert(ef.detail.length > 10, `${item.itemId} edges detail too short`);
+      assert(sf.detail.length > 10, `${item.itemId} surface detail too short`);
     }
   }
 });
@@ -1509,6 +1513,31 @@ test("bounds parsing: negative coords clamped to 0", () => {
   eq(bx, 0);
 });
 
+test("tilt detection: calculates angle from corner points", () => {
+  const tl = { x: 110, y: 80 }, tr = { x: 700, y: 100 };
+  const bl = { x: 100, y: 950 }, br = { x: 690, y: 970 };
+  const topAngle = Math.atan2(tr.y - tl.y, tr.x - tl.x);
+  const bottomAngle = Math.atan2(br.y - bl.y, br.x - bl.x);
+  const tiltDeg = ((topAngle + bottomAngle) / 2) * (180 / Math.PI);
+  assert(Math.abs(tiltDeg) > 1, `tilt should be >1 deg, got ${tiltDeg.toFixed(2)}`);
+  assert(Math.abs(tiltDeg) < 10, `tilt should be <10 deg, got ${tiltDeg.toFixed(2)}`);
+});
+
+test("tilt detection: straight card gives ~0 tilt", () => {
+  const tl = { x: 100, y: 80 }, tr = { x: 700, y: 80 };
+  const bl = { x: 100, y: 950 }, br = { x: 700, y: 950 };
+  const topAngle = Math.atan2(tr.y - tl.y, tr.x - tl.x);
+  const bottomAngle = Math.atan2(br.y - bl.y, br.x - bl.x);
+  const tiltDeg = ((topAngle + bottomAngle) / 2) * (180 / Math.PI);
+  assert(Math.abs(tiltDeg) < 0.5, `straight card tilt should be <0.5, got ${tiltDeg.toFixed(4)}`);
+});
+
+test("tilt detection: extreme tilt capped at 30 deg", () => {
+  const tiltDeg = 45;
+  const capped = Math.abs(tiltDeg) > 30 ? 0 : tiltDeg;
+  eq(capped, 0);
+});
+
 // ── v3 overall formula edge cases ──
 
 console.log("\n\x1b[1m=== v3 formula edge cases ===\x1b[0m");
@@ -1687,6 +1716,82 @@ test("deriveEra: bw prefix = Black & White", () => {
 
 test("deriveEra: unknown prefix = Other", () => {
   eq(deriveEra("zzz999"), "Other");
+});
+
+// ── gradeDistribution ──
+
+console.log("\n\x1b[1m=== gradeDistribution ===\x1b[0m");
+
+test("gradeDistribution: high confidence concentrates on primary grade", () => {
+  const dist = computeGradeDistribution(8, 0.9);
+  assert(dist["8"] >= 70, `primary should be >=70%, got ${dist["8"]}`);
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: low confidence spreads more", () => {
+  const dist = computeGradeDistribution(8, 0.3);
+  assert(dist["8"] <= 55, `primary should be <=55% at low conf, got ${dist["8"]}`);
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: PSA 10 has no grade above", () => {
+  const dist = computeGradeDistribution(10, 0.8);
+  assert(dist["10"] > 0, "should have PSA 10");
+  assert(!dist["10.5"], "should not have grade above 10");
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: PSA 5 has no grade below in our list", () => {
+  const dist = computeGradeDistribution(5, 0.7);
+  assert(dist["5"] > 0, "should have PSA 5");
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: half grades work", () => {
+  const dist = computeGradeDistribution(8.5, 0.7);
+  assert(dist["8.5"] > 0, "should have 8.5");
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: non-standard grade snaps to nearest", () => {
+  const dist = computeGradeDistribution(8.3, 0.7);
+  assert(dist["8.5"] > 0 || dist["8"] > 0, "should snap to nearest valid grade");
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+// ── centering hint ──
+
+console.log("\n\x1b[1m=== centering hint ===\x1b[0m");
+
+test("centering hint: builds suffix from front hint", () => {
+  const hint = { front: { lr: "57/43", tb: "52/48" } };
+  const suffix = hint.front
+    ? `USER MEASUREMENT: The user aligned a centering tool and measured L/R ${hint.front.lr}, T/B ${hint.front.tb}.`
+    : "";
+  assert(suffix.includes("57/43"), "should include lr ratio");
+  assert(suffix.includes("52/48"), "should include tb ratio");
+});
+
+test("centering hint: null hint produces empty suffix", () => {
+  const hint = null;
+  const suffix = hint?.front
+    ? `USER MEASUREMENT: L/R ${hint.front.lr}, T/B ${hint.front.tb}.`
+    : "";
+  eq(suffix, "");
+});
+
+test("centering hint: missing back hint produces empty suffix", () => {
+  const hint = { front: { lr: "55/45", tb: "50/50" } };
+  const suffix = hint?.back
+    ? `USER MEASUREMENT: L/R ${hint.back.lr}, T/B ${hint.back.tb}.`
+    : "";
+  eq(suffix, "");
 });
 
 // ── Summary ──

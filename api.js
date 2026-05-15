@@ -438,7 +438,7 @@ app.get("/api/psa", apiAuthMiddleware, (req, res, next) => { req._errorType = "p
 
 // POST /api/grade
 app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "grade"; next(); }, async (req, res) => {
-  const { imageUrl, extraImages, provider, model, cardName, source, listingId, listingPrice, condition } = req.body;
+  const { imageUrl, extraImages, provider, model, cardName, source, listingId, listingPrice, condition, centeringHint } = req.body;
   if (!imageUrl) return res.status(400).json({ error: "Missing required field: imageUrl" });
   try {
     const config = {
@@ -450,7 +450,7 @@ app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "g
       },
     };
     const extras = (extraImages || []).map(u => ({ imageUrl: u }));
-    const grade = await gradeImage(imageUrl, config, extras);
+    const grade = await gradeImage(imageUrl, config, extras, centeringHint);
 
     if (grade && !grade.error) {
       await storeGradeLog({
@@ -471,6 +471,66 @@ app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "g
     res.json({ grade, stored: !!(grade && !grade.error) });
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /api/grade/report/:id — shareable grade report as PNG
+app.get("/api/grade/report/:id", async (req, res) => {
+  try {
+    const records = await getGradeLogs({ limit: 1, query: req.params.id });
+    const record = records.find(r => r.id === req.params.id);
+    if (!record?.grade || record.grade.error) return res.status(404).json({ error: "Grade not found" });
+
+    const { default: sharp } = await import("sharp");
+    const grade = record.grade;
+    const overall = grade.overall || "?";
+    const conf = Math.round((grade.confidence || 0) * 100);
+    const dist = grade.gradeDistribution || {};
+    const limiter = grade.notes || "";
+
+    const scores = [
+      ["Centering", grade.centering],
+      ["Corners", grade.corners],
+      ["Edges", grade.edges],
+      ["Surface", grade.surface],
+    ];
+
+    const distLines = Object.entries(dist)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([g, p]) => `PSA ${g}: ${p}%`)
+      .join("  ·  ");
+
+    const barsSvg = scores.map(([name, score], i) => {
+      const y = 180 + i * 48;
+      const barW = Math.round(((score || 0) / 10) * 260);
+      const color = score >= 9 ? "#7ce0a8" : score >= 7 ? "#d9b676" : "#ff5d5d";
+      return `
+        <text x="30" y="${y}" fill="rgba(255,255,255,0.5)" font-size="14" font-family="sans-serif">${name}</text>
+        <text x="320" y="${y}" fill="white" font-size="14" font-family="monospace" text-anchor="end">${score || "?"}</text>
+        <rect x="30" y="${y + 6}" width="${barW}" height="4" rx="2" fill="${color}"/>
+        <rect x="30" y="${y + 6}" width="260" height="4" rx="2" fill="rgba(255,255,255,0.05)"/>
+        <rect x="30" y="${y + 6}" width="${barW}" height="4" rx="2" fill="${color}"/>`;
+    }).join("");
+
+    const svg = `<svg width="400" height="500" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="500" fill="#07070a"/>
+      <rect x="15" y="15" width="370" height="470" rx="12" fill="#0c0d12" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <text x="200" y="50" fill="#d9b676" font-size="12" font-family="sans-serif" text-anchor="middle" letter-spacing="2">CASECOMP AI GRADE</text>
+      <text x="200" y="110" fill="white" font-size="56" font-family="sans-serif" font-weight="bold" text-anchor="middle">${overall}</text>
+      <text x="200" y="135" fill="rgba(255,255,255,0.4)" font-size="12" font-family="sans-serif" text-anchor="middle">${conf}% confidence</text>
+      <text x="200" y="158" fill="rgba(255,255,255,0.3)" font-size="11" font-family="monospace" text-anchor="middle">${distLines}</text>
+      ${barsSvg}
+      <text x="30" y="400" fill="rgba(255,255,255,0.25)" font-size="11" font-family="sans-serif">${limiter.substring(0, 60)}</text>
+      <text x="200" y="460" fill="rgba(255,255,255,0.15)" font-size="10" font-family="sans-serif" text-anchor="middle">casecomp.xyz</text>
+    </svg>`;
+
+    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(png);
+  } catch (e) {
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
 });

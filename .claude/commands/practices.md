@@ -47,7 +47,9 @@ raw = (frontOverall * 0.60) + (backOverall * 0.40)
 overall = roundGrade(min(raw, lowestSubgrade + 1))
 ```
 
-- Card detection uses Sonnet (reliable vision), subgrades use configured model
+- Card detection uses Together AI (GLM-4.6V-Flash) when `TOGETHER_API_KEY` set, falls back to Claude Sonnet
+- Subgrades use configured model (default Claude Sonnet)
+- SSRF protection: `validateImageUrl()` in preprocessing.js — DNS resolution, private IP blocking, blocked hosts
 - `gradeSubgrade` receives pre-built image blocks (not URLs) — use `imageBlockFromUrl()` or `imageBlockFromBase64()`
 - `cropCorners()` accepts URL or Buffer
 - Back-only subgrades skipped when no back image — front score substituted
@@ -73,7 +75,7 @@ overall = roundGrade(min(raw, lowestSubgrade + 1))
 
 ```javascript
 if (req.query.demo === "true") {
-  // return canned data from lib/data/demo.js
+  // return canned data from lib/cards/demo.js
   return res.json({ ...demoData, _demo: true });
 }
 // ... live data path
@@ -92,7 +94,7 @@ if (req.query.demo === "true") {
 
 ## Testing pattern
 
-Unit tests (test/unit-test.js, ~172 tests):
+Unit tests (test/unit-test.js, ~212 tests):
 ```javascript
 test("descriptive name", () => {
   eq(actualValue, expectedValue);
@@ -100,7 +102,7 @@ test("descriptive name", () => {
 ```
 - Sync test harness, no async support (use dynamic import for modules needing env setup)
 - Group with `console.log("\n\x1b[1m=== section ===\x1b[0m")`
-- Sections: parseGradeJSON, buildEbaySearchQuery, detectLanguage, tokenizeQuery, extractPokemonName, normalizeListingLanguage, parseListingLanguagesFromInput, filterByLanguage, titleLooksGradedSlab, titleMatchesSlabListing, parseSellerSlabFromConditionText, filterByListingFormat, filterRelevantResults, querySeeksJapaneseMarket, filterToLikelyTcgCards, demo data, detectCondition, filterByCondition, flagPriceOutliers, parseCardIdentity, resolveCardIdToQuery, findDemoByNumber, demo multi-source + sold dates, cornerCropsToImageBlocks, demo image resolution, demo grade confidence, alert email, portfolio, portfolio history + gainers/losers, csvEscape + csvRow, isGradedCard, card database, price trend, JWT auth, findCardByCardId, roundGrade, image block helpers, subgrade prompt keys, computePriceTrend edge cases
+- Sections: parseGradeJSON, buildEbaySearchQuery, detectLanguage, tokenizeQuery, extractPokemonName, normalizeListingLanguage, parseListingLanguagesFromInput, filterByLanguage, titleLooksGradedSlab, titleMatchesSlabListing, parseSellerSlabFromConditionText, filterByListingFormat, filterRelevantResults, querySeeksJapaneseMarket, filterToLikelyTcgCards, demo data, detectCondition, filterByCondition, flagPriceOutliers, parseCardIdentity, resolveCardIdToQuery, findDemoByNumber, demo multi-source + sold dates, cornerCropsToImageBlocks, demo image resolution, demo grade confidence, alert email, portfolio, portfolio history + gainers/losers, csvEscape + csvRow, isGradedCard, card database, price trend, JWT auth, findCardByCardId, roundGrade, image block helpers, subgrade prompt keys, computePriceTrend edge cases, API response parsing (mock), card detection bounds, validateAndShape, buildSignal, deriveEra, v3 formula edge cases
 
 API tests (test/api-test.js, ~130 tests):
 ```javascript
@@ -111,6 +113,9 @@ await test("GET /api/endpoint returns expected", async () => {
 ```
 - `json()` for auth'd requests, `jsonNoAuth()` for public
 - Auth tests accept both success and 401 (local dev disables auth)
+- Mock pattern: extract response parsers as pure exported functions, test with sample payloads (no framework needed)
+  - `parseAnthropicResponse(data)` / `parseTogetherResponse(data)` in preprocessing.js
+  - `validateAndShape(provider, mode, o, raw)`, `buildSignal({...})`, `deriveEra(setCode)` — exported for testing
 - Sections: health, drops, webhooks, comps, search, sold, psa, grade, auth, admin keys, condition, card, arbitrage, price-history, track-prices, errors, demo data, portfolio, portfolio/history, portfolio/export, grading-opportunities, card/view, set browser, price trend, collection tracking, google oauth, upload url, developer self-serve, analytics, autocomplete, set detail, grading dataset, grade validation
 
 ## Naming conventions
