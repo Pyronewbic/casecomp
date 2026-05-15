@@ -13,6 +13,7 @@
     "test:unit": "node test/unit-test.js",
     "test:api": "node test/api-test.js",
     "test:live": "API_URL=https://api.casecomp.xyz node test/api-test.js",
+    "test:api:local": "bash scripts/test-api-local.sh",
     "test:smoke": "node test/smoke-test.js",
     "scan": "node scan.js",
     "psa": "node scripts/psa-report.js",
