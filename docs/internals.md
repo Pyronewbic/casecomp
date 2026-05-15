@@ -134,6 +134,11 @@ Use `--refresh` to delete all cache files before a run.
 8. Rounding: <0.25 down, 0.25-0.74 to .5, >=0.75 up.
 9. Falls back to single combined prompt for non-Claude providers or missing back image.
 10. Token usage + estimated cost tracked per grade ($3/$15 per 1M for Claude).
+11. `gradeDistribution` computed from overall + confidence (e.g. `{"8": 65, "8.5": 12, "7.5": 23}`).
+12. Optional `centeringHint` in request — user-measured ratios appended to centering prompts.
+13. `GET /api/grade/report/:id` generates shareable PNG card (SVG→sharp→PNG).
+14. Grade logs store `userId` + `cardId` for per-user history and ML training data.
+15. `GET /api/grades/mine` returns user's grade history. `DELETE /api/grades/:id` removes a grade.
 
 **ML dataset pipeline**: `track-prices` passively saves graded slab images (PSA/BGS/CGC/TAG) from eBay sold listings into `grading-dataset` Firestore collection. `GET /api/grading-dataset/stats` monitors progress.
 

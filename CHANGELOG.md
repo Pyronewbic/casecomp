@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Grade history: cardId/userId stored in grade logs, GET /api/grades/mine, DELETE /api/grades/:id
+- POST /api/grade returns gradeId for share links + grade management
+- Front-only uploads now get v3 results (no longer falls back to v2)
+- Card detection resilient to failures (continues without cropping)
+
 ## 1.3.0 (2026-05-15)
 
 - AI grading v3: 8 subgrades (front/back), 60/40 weighting, centering ratios (lr/tb), tilt correction
