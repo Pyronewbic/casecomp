@@ -1,6 +1,6 @@
 # <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
-[![Version](https://img.shields.io/badge/version-1.2.0-d9b676)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-d9b676)](CHANGELOG.md)
 [![CI](https://github.com/Pyronewbic/casecomp/actions/workflows/ci.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/ci.yml)
 [![Deploy](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -19,7 +19,7 @@ Search any Pokemon card across four marketplaces in one query. Get live prices, 
 - **Multi-source search** - eBay, magi.camp, Yahoo Auctions JP, SNKRDUNK in one query
 - **Cross-source arbitrage** - compares lowest prices across sources, highlights spread
 - **Condition detection** - auto-detects card condition across sources (EN: NM/LP/MP, JP: 状態A/美品)
-- **AI pre-grading** - per-subgrade analysis (centering, corners, edges, surface) from listing photos
+- **AI pre-grading** - 8-subgrade front/back analysis with card detection, 60/40 weighting, PSA rubric
 - **Price history** - sold comp tracking over time with line charts and stats
 - **PSA grading signals** - population data, difficulty, gem 10%, recommended submission tier
 - **Slab comparison** - compare PSA 10 / BGS 9.5 / TAG 10 prices across sources

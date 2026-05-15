@@ -1,5 +1,5 @@
-import { parseGradeJSON } from "../lib/grading/grading.js";
-import { cornerCropsToImageBlocks } from "../lib/grading/preprocessing.js";
+import { parseGradeJSON, roundGrade } from "../lib/grading/grading.js";
+import { cornerCropsToImageBlocks, imageBlockFromUrl, imageBlockFromBase64 } from "../lib/grading/preprocessing.js";
 import { buildEbaySearchQuery, describeListingSearch } from "../lib/search/listingQuery.js";
 import {
   filterByCondition,
@@ -1195,6 +1195,180 @@ test("findCardByCardId: returns null for invalid format (no slash)", () => {
 
 test("findCardByCardId: returns null for missing number part", () => {
   eq(findCardByCardId("sv8a/"), null);
+});
+
+// ── roundGrade (v3 grading formula) ──
+
+console.log("\n\x1b[1m=== roundGrade ===\x1b[0m");
+
+test("roundGrade: 8.0 stays 8", () => {
+  eq(roundGrade(8.0), 8);
+});
+
+test("roundGrade: 8.1 rounds down to 8", () => {
+  eq(roundGrade(8.1), 8);
+});
+
+test("roundGrade: 8.24 rounds down to 8", () => {
+  eq(roundGrade(8.24), 8);
+});
+
+test("roundGrade: 8.25 rounds to 8.5", () => {
+  eq(roundGrade(8.25), 8.5);
+});
+
+test("roundGrade: 8.5 stays 8.5", () => {
+  eq(roundGrade(8.5), 8.5);
+});
+
+test("roundGrade: 8.74 rounds to 8.5", () => {
+  eq(roundGrade(8.74), 8.5);
+});
+
+test("roundGrade: 8.75 rounds up to 9", () => {
+  eq(roundGrade(8.75), 9);
+});
+
+test("roundGrade: 8.99 rounds up to 9", () => {
+  eq(roundGrade(8.99), 9);
+});
+
+test("roundGrade: 10.0 stays 10", () => {
+  eq(roundGrade(10.0), 10);
+});
+
+test("roundGrade: v3 overall formula — front 9 avg, back 7 avg, 60/40 weighting", () => {
+  const frontOverall = (9 + 9 + 9 + 9) / 4;
+  const backOverall = (7 + 7 + 7 + 7) / 4;
+  const raw = (frontOverall * 0.60) + (backOverall * 0.40);
+  eq(raw, 8.2);
+  eq(roundGrade(raw), 8);
+});
+
+test("roundGrade: v3 excessive defect cap — raw 8.6 but lowest is 6, capped at 7", () => {
+  const raw = 8.6;
+  const lowestSubgrade = 6;
+  const capped = Math.min(raw, lowestSubgrade + 1);
+  eq(roundGrade(capped), 7);
+});
+
+test("roundGrade: v3 cap doesn't apply when no single subgrade drags", () => {
+  const raw = 8.5;
+  const lowestSubgrade = 8;
+  const capped = Math.min(raw, lowestSubgrade + 1);
+  eq(roundGrade(capped), 8.5);
+});
+
+// ── imageBlockFromUrl / imageBlockFromBase64 ──
+
+console.log("\n\x1b[1m=== image block helpers ===\x1b[0m");
+
+test("imageBlockFromUrl: correct structure", () => {
+  const block = imageBlockFromUrl("https://example.com/card.jpg");
+  eq(block.type, "image");
+  eq(block.source.type, "url");
+  eq(block.source.url, "https://example.com/card.jpg");
+});
+
+test("imageBlockFromBase64: correct structure with default mediaType", () => {
+  const block = imageBlockFromBase64("abc123");
+  eq(block.type, "image");
+  eq(block.source.type, "base64");
+  eq(block.source.media_type, "image/jpeg");
+  eq(block.source.data, "abc123");
+});
+
+test("imageBlockFromBase64: custom mediaType", () => {
+  const block = imageBlockFromBase64("abc123", "image/png");
+  eq(block.source.media_type, "image/png");
+});
+
+// ── SUBGRADE_PROMPTS keys ──
+
+console.log("\n\x1b[1m=== subgrade prompt keys ===\x1b[0m");
+
+test("parseGradeJSON: v3 response shape with front/back subgrades", () => {
+  const json = JSON.stringify({
+    score: 8, confidence: 0.85, detail: "Minor whitening on bottom-left corner"
+  });
+  const r = parseGradeJSON(json);
+  assert(!r.error, `unexpected error: ${r.error}`);
+  eq(r.ok.score, 8);
+  eq(r.ok.confidence, 0.85);
+  assert(r.ok.detail.includes("whitening"), "detail should mention whitening");
+});
+
+test("roundGrade: v3 full pipeline simulation — mixed front/back scores", () => {
+  const front = { centering: 9, corners: 8, edges: 9, surface: 8 };
+  const back = { centering: 7, corners: 6, edges: 7, surface: 7 };
+  const frontAvg = (front.centering + front.corners + front.edges + front.surface) / 4;
+  const backAvg = (back.centering + back.corners + back.edges + back.surface) / 4;
+  eq(frontAvg, 8.5);
+  eq(backAvg, 6.75);
+  const raw = (frontAvg * 0.60) + (backAvg * 0.40);
+  eq(raw, 7.8);
+  const lowest = Math.min(front.centering, front.corners, front.edges, front.surface,
+    back.centering, back.corners, back.edges, back.surface);
+  eq(lowest, 6);
+  const capped = Math.min(raw, lowest + 1);
+  eq(capped, 7);
+  eq(roundGrade(capped), 7);
+});
+
+test("roundGrade: v3 front-only mode — back copies front scores", () => {
+  const front = { centering: 9, corners: 9, edges: 8, surface: 9 };
+  const frontAvg = (front.centering + front.corners + front.edges + front.surface) / 4;
+  const backAvg = frontAvg;
+  const raw = (frontAvg * 0.60) + (backAvg * 0.40);
+  eq(raw, frontAvg);
+  eq(roundGrade(raw), 9);
+});
+
+// ── computePriceTrend edge cases ──
+
+console.log("\n\x1b[1m=== computePriceTrend edge cases ===\x1b[0m");
+
+test("computePriceTrend: single source falling", () => {
+  const now = new Date();
+  const history = [
+    { recordedAt: new Date(now - 25 * 86400000).toISOString(), price: 100, source: "ebay" },
+    { recordedAt: new Date(now - 15 * 86400000).toISOString(), price: 90, source: "ebay" },
+    { recordedAt: new Date(now - 5 * 86400000).toISOString(), price: 70, source: "ebay" },
+    { recordedAt: new Date(now - 2 * 86400000).toISOString(), price: 65, source: "ebay" },
+    { recordedAt: new Date(now - 1 * 86400000).toISOString(), price: 60, source: "ebay" },
+  ];
+  const trend = computePriceTrend(history, now);
+  assert(trend !== null, "trend should not be null for 5 entries");
+  eq(trend.direction, "falling");
+  assert(trend.bySource.ebay, "should have ebay source");
+});
+
+test("computePriceTrend: stable prices within 5%", () => {
+  const now = new Date();
+  const history = [
+    { recordedAt: new Date(now - 25 * 86400000).toISOString(), price: 100, source: "ebay" },
+    { recordedAt: new Date(now - 15 * 86400000).toISOString(), price: 101, source: "ebay" },
+    { recordedAt: new Date(now - 5 * 86400000).toISOString(), price: 100, source: "magi" },
+    { recordedAt: new Date(now - 1 * 86400000).toISOString(), price: 99, source: "magi" },
+  ];
+  const trend = computePriceTrend(history, now);
+  assert(trend !== null, "trend should not be null");
+  eq(trend.direction, "stable");
+});
+
+test("computePriceTrend: rising prices give wait signal", () => {
+  const now = new Date();
+  const history = [
+    { recordedAt: new Date(now - 25 * 86400000).toISOString(), price: 50, source: "ebay" },
+    { recordedAt: new Date(now - 15 * 86400000).toISOString(), price: 60, source: "ebay" },
+    { recordedAt: new Date(now - 5 * 86400000).toISOString(), price: 80, source: "ebay" },
+    { recordedAt: new Date(now - 2 * 86400000).toISOString(), price: 85, source: "ebay" },
+    { recordedAt: new Date(now - 1 * 86400000).toISOString(), price: 90, source: "ebay" },
+  ];
+  const trend = computePriceTrend(history, now);
+  assert(trend !== null, "trend should not be null");
+  eq(trend.direction, "rising");
+  eq(trend.signal, "wait");
 });
 
 // ── Summary ──

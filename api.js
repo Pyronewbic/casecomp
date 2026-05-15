@@ -22,6 +22,7 @@ import { createApiKey, listApiKeys, listAllKeys, listKeysByOwner, getApiKey, upd
 import { recordSoldPrices, getPriceHistory, computePriceTrend } from "./lib/data/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
 import { logRequest, getAnalytics, getAnalyticsByUser } from "./lib/data/analytics.js";
+import { saveGradedImages } from "./lib/data/grading-dataset.js";
 import { verifyGoogleToken, generateJwt, verifyJwt } from "./lib/data/auth.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
@@ -512,6 +513,17 @@ app.get("/api/analytics", ownerOnly, async (req, res) => {
   const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
   try {
     const stats = await getAnalytics({ days });
+    res.json(stats);
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /api/grading-dataset/stats
+app.get("/api/grading-dataset/stats", ownerOnly, async (req, res) => {
+  try {
+    const { getDatasetStats } = await import("./lib/data/grading-dataset.js");
+    const stats = await getDatasetStats();
     res.json(stats);
   } catch (e) {
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
@@ -1915,6 +1927,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
           ebaySold = soldRes.items || [];
           if (ebaySold.length) {
             await recordSoldPrices(card, ebaySold, "ebay");
+            saveGradedImages(ebaySold, "ebay").catch(() => {});
           }
         } catch (e) {
           logError("track-prices", `eBay fetch failed for "${card}": ${e.message}`, "/api/track-prices");

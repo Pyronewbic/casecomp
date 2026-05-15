@@ -15,8 +15,8 @@ lib/
     snkrdunk.js       SNKRDUNK JSON API
     tcgplayer.js      TCGPlayer price seeding
   grading/
-    grading.js        AI pre-grading (per-subgrade, Claude/OpenAI)
-    preprocessing.js  Corner crop extraction via sharp
+    grading.js        AI pre-grading (8-subgrade v3, Claude/OpenAI)
+    preprocessing.js  Card detection, corner crops, SSRF-safe image fetch
     psa.js            PSA pop reports, cert lookup, grading signal
     psaTiers.js       PSA submission tier data
   data/
@@ -31,6 +31,9 @@ lib/
     email.js          Alert emails via Resend
     csv.js            CSV export helpers
     portfolio.js      Portfolio CRUD (Firestore subcollection)
+    analytics.js      Request analytics (Firestore, 30d TTL)
+    auth.js           Google OAuth token verification, JWT (HS256)
+    grading-dataset.js  ML slab image collection from eBay sold listings
   search/
     filters.js        Language, relevance, condition detection, outlier flagging
     listingQuery.js   eBay search query builder (raw vs slab)
@@ -44,8 +47,8 @@ public/admin/         Admin panel (keys, stats, errors)
 extension/            Chrome extension: queue auto-join, drop intel
 terraform/            GCP infra (Cloud Run, Firestore, LB, CDN, Scheduler)
 test/
-  unit-test.js        140 unit tests
-  api-test.js         99 API integration tests
+  unit-test.js        172 unit tests
+  api-test.js         ~130 API integration tests
   smoke-test.js       74 Playwright UI smoke tests
 ```
 
@@ -53,8 +56,8 @@ test/
 
 `api.js` is the primary entry point for production. Express 5 with:
 
-- **Auth middleware**: owner key (`CC_LIVE_`) → sandbox → Firestore developer keys (30s cache). `apiAuthMiddleware` adds demo bypass.
-- **Rate limiting**: 60/min authenticated, 360/min demo, 5/min sandbox.
+- **Auth middleware**: owner key (`CC_LIVE_`) → sandbox → JWT (Google OAuth) → Firestore developer keys (30s cache). `apiAuthMiddleware` adds demo bypass.
+- **Rate limiting**: 60/min authenticated, 360/min demo, 5/min sandbox, 10/min auth endpoint.
 - **Security**: Helmet headers, trust proxy = 1, request IDs, compression, `safeErrorMessage()` on all errors.
 - **CORS**: wildcard `*` — API key is the access control layer.
 - **Dashboard**: static files from `public/` served at `/` and `/admin`.
@@ -93,6 +96,8 @@ All caches use Firestore (shared across Cloud Run instances, single region). No 
 | `price-history` | permanent | Sold comp prices over time |
 | `api-keys` | permanent | Developer API keys (hashed) |
 | `error-logs` | permanent | API errors with request IDs |
+| `api-analytics` | 30 days | Request analytics (tier, path, latency) |
+| `grading-dataset` | permanent | ML training data: slab images + parsed grades |
 
 Stale-while-revalidate on active listings for owner key. File-based cache (`.json` files) still used by the CLI.
 
@@ -117,14 +122,19 @@ Use `--refresh` to delete all cache files before a run.
 5. `portfolioUserId`: JWT users get Google `sub` as userId. API key users get SHA256 hash of key (first 16 chars).
 6. Developer self-serve: `GET/POST/DELETE /api/developer/keys` + `GET /api/developer/stats`. Keys linked to Google account via `ownerId`. Usage stats aggregated from `api-analytics` collection.
 
-## AI grading pipeline
+## AI grading pipeline (v3)
 
 1. Listing images fetched, upgraded to `s-l1600` resolution for eBay.
-2. `preprocessing.js` crops 4 corners (20% region) from front + back via `sharp` (~100ms).
-3. Four parallel LLM calls: centering, corners, edges, surface — each with the full PSA rubric (grades 5-10).
-4. Corners subgrade receives front + back URLs + 8 magnified corner crops. Others receive all listing images.
-5. Overall = minimum of all subgrades (matches PSA methodology).
-6. Falls back to single combined prompt for non-Claude providers or missing back image.
+2. **Card detection**: Haiku preflight identifies card bounding box. If card fills <80% of frame (user photo with background), crops to card only. Skips for clean listing images.
+3. **SSRF protection**: all image URLs validated — DNS resolution, private IP blocking, blocked hosts (metadata endpoints).
+4. `preprocessing.js` crops 4 corners (20% region) from front and back separately via `sharp`.
+5. **8 parallel LLM calls**: centering/corners/edges/surface x front/back. Each receives only its target side image.
+6. Overall = `(frontAvg x 0.60) + (backAvg x 0.40)`, capped at `lowestSubgrade + 1` (excessive defect rule).
+7. Rounding: <0.25 down, 0.25-0.74 to .5, >=0.75 up.
+8. Falls back to single combined prompt for non-Claude providers or missing back image.
+9. Token usage + estimated cost tracked per grade ($3/$15 per 1M for Claude).
+
+**ML dataset pipeline**: `track-prices` passively saves graded slab images (PSA/BGS/CGC/TAG) from eBay sold listings into `grading-dataset` Firestore collection. `GET /api/grading-dataset/stats` monitors progress.
 
 ## Security pipeline
 
@@ -134,7 +144,7 @@ Three workflows: `ci.yml` (all checks), `deploy.yml` (build + sign + deploy), `t
 
 | Job | What | Required? |
 |-----|------|-----------|
-| unit | 140 unit tests | Yes |
+| unit | 172 unit tests | Yes |
 | smoke | 74 Playwright smoke tests | No (continue-on-error) |
 | codeql | SAST for JavaScript/TypeScript | Yes |
 | scan | SBOM (Syft) + Grype vulnerability scan | No |
