@@ -1123,6 +1123,87 @@ async function run() {
     assert(typeof body.avgLatencyMs === "number", "avgLatencyMs should be a number");
   });
 
+  // ── Autocomplete ──
+
+  console.log("\n\x1b[1m=== autocomplete ===\x1b[0m");
+
+  await test("GET /api/autocomplete requires q", async () => {
+    const { res } = await jsonNoAuth("/api/autocomplete");
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+  });
+
+  await test("GET /api/autocomplete?q=pika returns results", async () => {
+    const { res, body } = await jsonNoAuth("/api/autocomplete?q=pika");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(Array.isArray(body.results), "results should be array");
+  });
+
+  await test("GET /api/autocomplete?q=x returns empty for nonsense", async () => {
+    const { res, body } = await jsonNoAuth("/api/autocomplete?q=zzzznonexistent");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(Array.isArray(body.results), "results should be array");
+    assert(body.results.length === 0, `expected 0 results, got ${body.results.length}`);
+  });
+
+  // ── Set detail ──
+
+  console.log("\n\x1b[1m=== set detail ===\x1b[0m");
+
+  await test("GET /api/sets/sv8a returns set with cards", async () => {
+    const { res, body } = await jsonNoAuth("/api/sets/sv8a");
+    assert(res.status === 200, `status ${res.status}`);
+    assert(body.setCode === "sv8a", `expected sv8a, got ${body.setCode}`);
+    assert(Array.isArray(body.cards), "cards should be array");
+    assert(typeof body.name === "string", "name should be string");
+  });
+
+  await test("GET /api/sets/nonexistent returns 404", async () => {
+    const { res } = await jsonNoAuth("/api/sets/zzz_nonexistent");
+    assert(res.status === 404, `expected 404, got ${res.status}`);
+  });
+
+  // ── Grading dataset stats ──
+
+  console.log("\n\x1b[1m=== grading dataset ===\x1b[0m");
+
+  await test("GET /api/grading-dataset/stats without owner key returns 401/403", async () => {
+    const res = await fetch(`${BASE}/api/grading-dataset/stats`);
+    assert(res.status === 401 || res.status === 403, `expected 401/403, got ${res.status}`);
+  });
+
+  await test("GET /api/grading-dataset/stats with owner key returns stats", async () => {
+    const { res, body } = await json("/api/grading-dataset/stats");
+    if (res.status === 403) return;
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    assert(typeof body.total === "number", "total should be a number");
+    assert(typeof body.byGrade === "object", "byGrade should be an object");
+    assert(typeof body.byProvider === "object", "byProvider should be an object");
+  });
+
+  // ── Grade endpoint validation ──
+
+  console.log("\n\x1b[1m=== grade validation ===\x1b[0m");
+
+  await test("POST /api/grade rejects missing imageUrl", async () => {
+    const res = await fetch(`${BASE}/api/grade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(API_KEY ? { "x-api-key": API_KEY } : {}) },
+      body: JSON.stringify({}),
+    });
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+    const body = await res.json();
+    assert(body.error.includes("imageUrl"), `error should mention imageUrl: ${body.error}`);
+  });
+
+  await test("POST /api/grade rejects empty imageUrl", async () => {
+    const res = await fetch(`${BASE}/api/grade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(API_KEY ? { "x-api-key": API_KEY } : {}) },
+      body: JSON.stringify({ imageUrl: "" }),
+    });
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);
