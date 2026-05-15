@@ -53,7 +53,10 @@ overall = roundGrade(min(raw, lowestSubgrade + 1))
 - `gradeSubgrade` receives pre-built image blocks (not URLs) — use `imageBlockFromUrl()` or `imageBlockFromBase64()`
 - `cropCorners()` accepts URL or Buffer
 - Back-only subgrades skipped when no back image — front score substituted
-- Response includes `cardDetection.front`/`.back` with crop bounds when background detected
+- Response includes `cardDetection.front`/`.back` with crop bounds + `tiltDeg` when background detected
+- `gradeDistribution` field: probability spread across adjacent PSA grades (computed from overall + confidence)
+- `centeringHint` in request: optional user-measured ratios, appended to centering prompts via `promptSuffix`
+- `GET /api/grade/report/:id` returns shareable PNG (SVG→sharp→PNG, 400x500, cached 24h)
 - Mode: `"llm-detailed-v3"` (distinguishes from v2 `"llm-detailed"`)
 
 ## Firestore patterns
@@ -64,6 +67,12 @@ overall = roundGrade(min(raw, lowestSubgrade + 1))
 - Always `try { ... } catch {}` for non-critical Firestore writes (analytics, search frequency)
 - Use `Firestore.FieldValue.increment(1)` for counters
 - TTL via `ts` field + Firestore TTL policy (api-analytics: 30d)
+- **Composite indexes required** for any `where()` + `orderBy()` on different fields. Create via `gcloud firestore indexes composite create`. Current indexes:
+  - `api-keys`: ownerId + createdAt desc
+  - `grade-logs`: userId + createdAt desc, source + createdAt desc
+  - `api-analytics`: userId + ts desc
+  - `price-history`: cardKey + recordedAt desc
+- **When adding a new compound query:** add the index to `terraform/firestore.tf` in `local.composite_indexes`. CI will create it on merge. Test locally first — Firestore gives a direct link to create the missing index in the error message.
 
 ## Error handling
 
@@ -94,7 +103,7 @@ if (req.query.demo === "true") {
 
 ## Testing pattern
 
-Unit tests (test/unit-test.js, ~212 tests):
+Unit tests (test/unit-test.js, ~224 tests):
 ```javascript
 test("descriptive name", () => {
   eq(actualValue, expectedValue);
