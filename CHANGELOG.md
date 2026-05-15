@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 1.3.0 (2026-05-15)
+
+### Added
+- AI grading v3: 8 subgrades (centering/corners/edges/surface x front/back) with 60/40 weighting
+- Card boundary detection: Haiku preflight auto-crops card from background in user photos
+- ML dataset pipeline: passive slab image collection from eBay sold listings (grading-dataset Firestore)
+- GET /api/grading-dataset/stats: owner-only endpoint to monitor dataset collection
+- SSRF protection: URL validation with DNS resolution, private IP blocking, blocked hosts
+- Token usage + estimated cost tracking per grade
+- Coding practices skill (.claude/commands/practices.md)
+- 21 new unit tests (172 total), 13 new API tests (~130 total)
+
+### Changed
+- Overall grade formula: (front avg x 0.60) + (back avg x 0.40), capped at lowest subgrade + 1
+- Grade response mode: "llm-detailed-v3" (was "llm-detailed")
+- Corner crops now labeled per side (front/back), passed only to their respective subgrade
+- gradeSubgrade accepts pre-built image blocks instead of URLs
+- cropCorners accepts Buffer or URL
+
+## 1.2.0 (2026-05-15)
+
 ## 1.1.0 (2026-05-15)
 
 ### Added
