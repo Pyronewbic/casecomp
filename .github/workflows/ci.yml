@@ -46,6 +46,32 @@ jobs:
         run: npx playwright install-deps chromium
       - run: node test/smoke-test.js
 
+  api:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      FIRESTORE_EMULATOR_HOST: localhost:8686
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm install
+      - name: Start Firestore emulator
+        run: |
+          npm install -g firebase-tools
+          firebase emulators:start --only firestore --project casecomp-test &
+          until curl -sf http://localhost:8686/ > /dev/null 2>&1; do sleep 1; done
+          echo "Firestore emulator ready"
+      - name: Seed test data
+        run: node test/seed.js
+      - name: Start API server
+        run: node api.js &
+      - name: Wait for server
+        run: until curl -sf http://localhost:3000/api/health > /dev/null; do sleep 1; done
+      - name: Run API tests
+        run: node test/api-test.js
+
   codeql:
     runs-on: ubuntu-latest
     steps:

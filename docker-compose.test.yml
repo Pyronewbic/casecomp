@@ -1,0 +1,14 @@
+services:
+  firestore:
+    image: google/cloud-sdk:slim
+    command: >
+      gcloud emulators firestore start
+      --host-port=0.0.0.0:8686
+      --project=casecomp-test
+    ports:
+      - "8686:8686"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8686/"]
+      interval: 2s
+      timeout: 5s
+      retries: 10

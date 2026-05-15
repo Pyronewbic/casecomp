@@ -1,0 +1,11 @@
+{
+  "emulators": {
+    "firestore": {
+      "port": 8686,
+      "host": "localhost"
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
+}
