@@ -29,7 +29,7 @@ import { searchMagi } from "./lib/sources/magi.js";
 import { searchYahooAuctions } from "./lib/sources/yahooauctions.js";
 import { searchSnkrdunk } from "./lib/sources/snkrdunk.js";
 import { getPsaGradingSignal } from "./lib/grading/psa.js";
-import { getDemoSearchResult, listDemoCards } from "./lib/data/demo.js";
+import { getDemoSearchResult, listDemoCards } from "./lib/cards/demo.js";
 
 export const CARDS = [
   "Giratina V Alt Art"

@@ -1,6 +1,6 @@
 import { parseGradeJSON, roundGrade, validateAndShape } from "../lib/grading/grading.js";
 import { buildSignal } from "../lib/grading/psa.js";
-import { deriveEra } from "../lib/data/card-database.js";
+import { deriveEra } from "../lib/cards/card-database.js";
 import { cornerCropsToImageBlocks, imageBlockFromUrl, imageBlockFromBase64, parseAnthropicResponse, parseTogetherResponse } from "../lib/grading/preprocessing.js";
 import { buildEbaySearchQuery, describeListingSearch } from "../lib/search/listingQuery.js";
 import {
@@ -22,13 +22,13 @@ import {
   filterToLikelyTcgCards,
   isGradedCard,
 } from "../lib/search/filters.js";
-import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards, findDemoByNumber } from "../lib/data/demo.js";
-import { parseCardIdentity, buildCardId, SET_NAME_MAP, resolveCardIdToQuery } from "../lib/data/card-identity.js";
+import { isDemoQuery, getDemoResult, getDemoSearchResult, listDemoCards, findDemoByNumber } from "../lib/cards/demo.js";
+import { parseCardIdentity, buildCardId, SET_NAME_MAP, resolveCardIdToQuery } from "../lib/cards/card-identity.js";
 import { buildAlertEmailSubject, sendAlertEmail } from "../lib/data/email.js";
 import { csvEscape, csvRow } from "../lib/data/csv.js";
-import { matchesQuery, searchCards, getAllSets, getSetWithCards } from "../lib/data/card-database.js";
-import { computePriceTrend } from "../lib/data/price-history.js";
-import { findCardByCardId } from "../lib/data/card-database.js";
+import { matchesQuery, searchCards, getAllSets, getSetWithCards } from "../lib/cards/card-database.js";
+import { computePriceTrend } from "../lib/cards/price-history.js";
+import { findCardByCardId } from "../lib/cards/card-database.js";
 
 let passed = 0;
 let failed = 0;
@@ -1137,7 +1137,7 @@ console.log("\n\x1b[1m=== JWT auth ===\x1b[0m");
 
 {
   process.env.CASECOMP_JWT_SECRET = "test-secret-key-for-unit-tests-only";
-  const { generateJwt, verifyJwt } = await import("../lib/data/auth.js");
+  const { generateJwt, verifyJwt } = await import("../lib/auth/auth.js");
 
   test("generateJwt: returns 3-part token", () => {
     const jwt = generateJwt({ sub: "123", email: "test@test.com" });
