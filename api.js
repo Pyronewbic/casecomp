@@ -16,17 +16,17 @@ import { parseListingLanguagesFromInput, filterByCondition, detectCondition, fla
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
 import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds, trackSearchFrequency, getTopSearchedCards } from "./lib/data/firestore.js";
-import { getDemoSearchResult, getDemoResult, listDemoCards, findDemoByNumber } from "./lib/data/demo.js";
+import { getDemoSearchResult, getDemoResult, listDemoCards, findDemoByNumber } from "./lib/cards/demo.js";
 import { csvEscape, csvRow } from "./lib/data/csv.js";
-import { createApiKey, listApiKeys, listAllKeys, listKeysByOwner, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/data/api-keys.js";
-import { recordSoldPrices, getPriceHistory, computePriceTrend } from "./lib/data/price-history.js";
+import { createApiKey, listApiKeys, listAllKeys, listKeysByOwner, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/auth/api-keys.js";
+import { recordSoldPrices, getPriceHistory, computePriceTrend } from "./lib/cards/price-history.js";
 import { sendAlertEmail } from "./lib/data/email.js";
 import { logRequest, getAnalytics, getAnalyticsByUser } from "./lib/data/analytics.js";
-import { saveGradedImages } from "./lib/data/grading-dataset.js";
-import { verifyGoogleToken, generateJwt, verifyJwt } from "./lib/data/auth.js";
+import { saveGradedImages } from "./lib/cards/grading-dataset.js";
+import { verifyGoogleToken, generateJwt, verifyJwt } from "./lib/auth/auth.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
-import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/data/card-identity.js";
-import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId } from "./lib/data/card-database.js";
+import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/cards/card-identity.js";
+import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId } from "./lib/cards/card-database.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -522,7 +522,7 @@ app.get("/api/analytics", ownerOnly, async (req, res) => {
 // GET /api/grading-dataset/stats
 app.get("/api/grading-dataset/stats", ownerOnly, async (req, res) => {
   try {
-    const { getDatasetStats } = await import("./lib/data/grading-dataset.js");
+    const { getDatasetStats } = await import("./lib/cards/grading-dataset.js");
     const stats = await getDatasetStats();
     res.json(stats);
   } catch (e) {
