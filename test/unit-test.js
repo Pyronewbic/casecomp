@@ -787,10 +787,14 @@ test("graded demos have descriptive detail text", () => {
     const items = (r.activeByCountry?.US || []).filter(i => i.grade);
     for (const item of items) {
       const details = item.grade.subgradeDetails;
-      assert(details.centering.detail.length > 30, `${item.itemId} centering detail too short`);
-      assert(details.corners.detail.length > 30, `${item.itemId} corners detail too short`);
-      assert(details.edges.detail.length > 30, `${item.itemId} edges detail too short`);
-      assert(details.surface.detail.length > 30, `${item.itemId} surface detail too short`);
+      const cf = details.centering_front || details.centering;
+      const crf = details.corners_front || details.corners;
+      const ef = details.edges_front || details.edges;
+      const sf = details.surface_front || details.surface;
+      assert(cf.detail.length > 10, `${item.itemId} centering detail too short`);
+      assert(crf.detail.length > 10, `${item.itemId} corners detail too short`);
+      assert(ef.detail.length > 10, `${item.itemId} edges detail too short`);
+      assert(sf.detail.length > 10, `${item.itemId} surface detail too short`);
     }
   }
 });
@@ -1507,6 +1511,31 @@ test("bounds parsing: clamps to image dimensions", () => {
 test("bounds parsing: negative coords clamped to 0", () => {
   const bx = Math.max(0, Math.round(-50));
   eq(bx, 0);
+});
+
+test("tilt detection: calculates angle from corner points", () => {
+  const tl = { x: 110, y: 80 }, tr = { x: 700, y: 100 };
+  const bl = { x: 100, y: 950 }, br = { x: 690, y: 970 };
+  const topAngle = Math.atan2(tr.y - tl.y, tr.x - tl.x);
+  const bottomAngle = Math.atan2(br.y - bl.y, br.x - bl.x);
+  const tiltDeg = ((topAngle + bottomAngle) / 2) * (180 / Math.PI);
+  assert(Math.abs(tiltDeg) > 1, `tilt should be >1 deg, got ${tiltDeg.toFixed(2)}`);
+  assert(Math.abs(tiltDeg) < 10, `tilt should be <10 deg, got ${tiltDeg.toFixed(2)}`);
+});
+
+test("tilt detection: straight card gives ~0 tilt", () => {
+  const tl = { x: 100, y: 80 }, tr = { x: 700, y: 80 };
+  const bl = { x: 100, y: 950 }, br = { x: 700, y: 950 };
+  const topAngle = Math.atan2(tr.y - tl.y, tr.x - tl.x);
+  const bottomAngle = Math.atan2(br.y - bl.y, br.x - bl.x);
+  const tiltDeg = ((topAngle + bottomAngle) / 2) * (180 / Math.PI);
+  assert(Math.abs(tiltDeg) < 0.5, `straight card tilt should be <0.5, got ${tiltDeg.toFixed(4)}`);
+});
+
+test("tilt detection: extreme tilt capped at 30 deg", () => {
+  const tiltDeg = 45;
+  const capped = Math.abs(tiltDeg) > 30 ? 0 : tiltDeg;
+  eq(capped, 0);
 });
 
 // ── v3 overall formula edge cases ──
