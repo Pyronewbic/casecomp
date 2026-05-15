@@ -10,6 +10,7 @@ locals {
     "CASECOMP_JWT_SECRET",
     "GOOGLE_OAUTH_CLIENT_ID",
     "CASECOMP_ADMIN_SUB",
+    "TOGETHER_API_KEY",
   ]
 }
 

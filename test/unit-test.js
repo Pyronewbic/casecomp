@@ -1,5 +1,7 @@
-import { parseGradeJSON, roundGrade } from "../lib/grading/grading.js";
-import { cornerCropsToImageBlocks, imageBlockFromUrl, imageBlockFromBase64 } from "../lib/grading/preprocessing.js";
+import { parseGradeJSON, roundGrade, validateAndShape } from "../lib/grading/grading.js";
+import { buildSignal } from "../lib/grading/psa.js";
+import { deriveEra } from "../lib/data/card-database.js";
+import { cornerCropsToImageBlocks, imageBlockFromUrl, imageBlockFromBase64, parseAnthropicResponse, parseTogetherResponse } from "../lib/grading/preprocessing.js";
 import { buildEbaySearchQuery, describeListingSearch } from "../lib/search/listingQuery.js";
 import {
   filterByCondition,
@@ -1369,6 +1371,322 @@ test("computePriceTrend: rising prices give wait signal", () => {
   assert(trend !== null, "trend should not be null");
   eq(trend.direction, "rising");
   eq(trend.signal, "wait");
+});
+
+// ── API response parsing (mock payloads) ──
+
+console.log("\n\x1b[1m=== API response parsing ===\x1b[0m");
+
+test("parseAnthropicResponse: extracts text and tokens from valid response", () => {
+  const data = {
+    content: [{ type: "text", text: '{"x": 100, "y": 50, "width": 400, "height": 560}' }],
+    usage: { input_tokens: 1800, output_tokens: 42 },
+  };
+  const r = parseAnthropicResponse(data);
+  eq(r.text, '{"x": 100, "y": 50, "width": 400, "height": 560}');
+  eq(r.tokens.input, 1800);
+  eq(r.tokens.output, 42);
+});
+
+test("parseAnthropicResponse: handles missing content gracefully", () => {
+  const r = parseAnthropicResponse({});
+  eq(r.text, "");
+  eq(r.tokens.input, 0);
+  eq(r.tokens.output, 0);
+});
+
+test("parseAnthropicResponse: handles null data", () => {
+  const r = parseAnthropicResponse(null);
+  eq(r.text, "");
+  eq(r.tokens.input, 0);
+  eq(r.tokens.output, 0);
+});
+
+test("parseAnthropicResponse: filters non-text content blocks", () => {
+  const data = {
+    content: [
+      { type: "image", source: {} },
+      { type: "text", text: '{"fills_frame": true}' },
+    ],
+    usage: { input_tokens: 500, output_tokens: 10 },
+  };
+  const r = parseAnthropicResponse(data);
+  eq(r.text, '{"fills_frame": true}');
+});
+
+test("parseTogetherResponse: extracts text and tokens from OpenAI format", () => {
+  const data = {
+    choices: [{ message: { content: '{"x": 120, "y": 80, "width": 400, "height": 560}' } }],
+    usage: { prompt_tokens: 2000, completion_tokens: 35 },
+  };
+  const r = parseTogetherResponse(data);
+  eq(r.text, '{"x": 120, "y": 80, "width": 400, "height": 560}');
+  eq(r.tokens.input, 2000);
+  eq(r.tokens.output, 35);
+});
+
+test("parseTogetherResponse: handles empty choices", () => {
+  const r = parseTogetherResponse({ choices: [] });
+  eq(r.text, "");
+  eq(r.tokens.input, 0);
+  eq(r.tokens.output, 0);
+});
+
+test("parseTogetherResponse: handles null data", () => {
+  const r = parseTogetherResponse(null);
+  eq(r.text, "");
+  eq(r.tokens.input, 0);
+  eq(r.tokens.output, 0);
+});
+
+test("parseTogetherResponse: fills_frame response", () => {
+  const data = {
+    choices: [{ message: { content: '{"fills_frame": true}' } }],
+    usage: { prompt_tokens: 1500, completion_tokens: 8 },
+  };
+  const r = parseTogetherResponse(data);
+  const parsed = JSON.parse(r.text);
+  eq(parsed.fills_frame, true);
+});
+
+test("both parsers: same JSON output parsed identically", () => {
+  const json = '{"x": 100, "y": 50, "width": 400, "height": 560}';
+  const anthropic = parseAnthropicResponse({ content: [{ type: "text", text: json }], usage: {} });
+  const together = parseTogetherResponse({ choices: [{ message: { content: json } }], usage: {} });
+  eq(anthropic.text, together.text);
+  eq(JSON.parse(anthropic.text).x, JSON.parse(together.text).x);
+});
+
+// ── card detection bounds parsing ──
+
+console.log("\n\x1b[1m=== card detection bounds ===\x1b[0m");
+
+test("bounds parsing: fills_frame skips crop", () => {
+  const bounds = { fills_frame: true };
+  eq(bounds.fills_frame, true);
+});
+
+test("bounds parsing: valid bounding box", () => {
+  const bounds = { x: 120, y: 80, width: 400, height: 560 };
+  const imgW = 800, imgH = 1000;
+  const bx = Math.max(0, Math.round(bounds.x));
+  const by = Math.max(0, Math.round(bounds.y));
+  const bw = Math.min(Math.round(bounds.width), imgW - bx);
+  const bh = Math.min(Math.round(bounds.height), imgH - by);
+  eq(bx, 120);
+  eq(by, 80);
+  eq(bw, 400);
+  eq(bh, 560);
+  const ratio = (bw * bh) / (imgW * imgH);
+  assert(ratio < 0.80, `area ratio ${ratio} should be below threshold`);
+});
+
+test("bounds parsing: card fills >80% skips crop", () => {
+  const bounds = { x: 10, y: 10, width: 780, height: 980 };
+  const imgW = 800, imgH = 1000;
+  const bw = Math.min(bounds.width, imgW - bounds.x);
+  const bh = Math.min(bounds.height, imgH - bounds.y);
+  const ratio = (bw * bh) / (imgW * imgH);
+  assert(ratio >= 0.80, `area ratio ${ratio} should exceed threshold`);
+});
+
+test("bounds parsing: too-small detection rejected", () => {
+  const bounds = { x: 0, y: 0, width: 50, height: 50 };
+  assert(bounds.width < 100 || bounds.height < 100, "should reject small detections");
+});
+
+test("bounds parsing: clamps to image dimensions", () => {
+  const bounds = { x: 700, y: 900, width: 500, height: 500 };
+  const imgW = 800, imgH = 1000;
+  const bw = Math.min(Math.round(bounds.width), imgW - bounds.x);
+  const bh = Math.min(Math.round(bounds.height), imgH - bounds.y);
+  eq(bw, 100);
+  eq(bh, 100);
+});
+
+test("bounds parsing: negative coords clamped to 0", () => {
+  const bx = Math.max(0, Math.round(-50));
+  eq(bx, 0);
+});
+
+// ── v3 overall formula edge cases ──
+
+console.log("\n\x1b[1m=== v3 formula edge cases ===\x1b[0m");
+
+test("v3 formula: all 10s gives 10", () => {
+  const frontAvg = 10, backAvg = 10;
+  const raw = (frontAvg * 0.60) + (backAvg * 0.40);
+  eq(roundGrade(Math.min(raw, 10 + 1)), 10);
+});
+
+test("v3 formula: one axis at 5 caps overall at 6", () => {
+  const frontAvg = (10 + 10 + 10 + 10) / 4;
+  const backAvg = (5 + 10 + 10 + 10) / 4;
+  const raw = (frontAvg * 0.60) + (backAvg * 0.40);
+  const lowestSubgrade = 5;
+  const capped = Math.min(raw, lowestSubgrade + 1);
+  eq(capped, 6);
+  eq(roundGrade(capped), 6);
+});
+
+test("v3 formula: symmetric front/back gives same as single-side", () => {
+  const avg = 8.5;
+  const raw = (avg * 0.60) + (avg * 0.40);
+  eq(raw, avg);
+});
+
+// ── validateAndShape (mock grade responses) ──
+
+console.log("\n\x1b[1m=== validateAndShape ===\x1b[0m");
+
+test("validateAndShape: valid grade object", () => {
+  const r = validateAndShape("claude", "llm", {
+    overall: 8.5, centering: 9, corners: 8, edges: 8, surface: 9,
+    confidence: 0.85, notes: "Good card", limitations: "",
+  }, {});
+  eq(r.provider, "claude");
+  eq(r.overall, 8.5);
+  eq(r.centering, 9);
+  eq(r.confidence, 0.85);
+  eq(r.notes, "Good card");
+  assert(!r.error, "should not have error");
+});
+
+test("validateAndShape: clamps scores above 10", () => {
+  const r = validateAndShape("claude", "llm", {
+    overall: 12, centering: 11, corners: 10, edges: 10, surface: 10,
+    confidence: 1.5,
+  }, {});
+  eq(r.overall, 10);
+  eq(r.centering, 10);
+  eq(r.confidence, 1);
+});
+
+test("validateAndShape: clamps scores below 1", () => {
+  const r = validateAndShape("claude", "llm", {
+    overall: 0, centering: -1, corners: 1, edges: 1, surface: 1,
+    confidence: -0.5,
+  }, {});
+  eq(r.overall, 1);
+  eq(r.centering, 1);
+  eq(r.confidence, 0);
+});
+
+test("validateAndShape: returns error for missing fields", () => {
+  const r = validateAndShape("claude", "llm", { overall: 8 }, {});
+  assert(r.error, "should return error for missing subgrades");
+});
+
+test("validateAndShape: null overall clamps to 1", () => {
+  const r = validateAndShape("claude", "llm", {
+    overall: null, centering: 8, corners: 8, edges: 8, surface: 8,
+  }, {});
+  eq(r.overall, 1);
+  assert(!r.error, "should not error — null clamps to 1");
+});
+
+test("validateAndShape: non-string notes defaults to empty", () => {
+  const r = validateAndShape("claude", "llm", {
+    overall: 8, centering: 8, corners: 8, edges: 8, surface: 8,
+    notes: 123, limitations: null,
+  }, {});
+  eq(r.notes, "");
+  eq(r.limitations, "");
+});
+
+// ── buildSignal (mock PSA pop data) ──
+
+console.log("\n\x1b[1m=== buildSignal ===\x1b[0m");
+
+test("buildSignal: normal pop data — 5% gem rate = Moderate", () => {
+  const s = buildSignal({ pop10: 50, pop9: 200, popTotal: 1000 });
+  eq(s.psa10Chance, 5);
+  eq(s.psa10Count, 50);
+  eq(s.psa9Count, 200);
+  eq(s.psa9to10Ratio, 4);
+  eq(s.psaPopulation, 1000);
+  eq(s.difficulty, "Moderate");
+});
+
+test("buildSignal: zero pop total — no division by zero", () => {
+  const s = buildSignal({ pop10: 0, pop9: 0, popTotal: 0 });
+  eq(s.psa10Chance, null);
+  eq(s.psa9to10Ratio, null);
+});
+
+test("buildSignal: null pop10", () => {
+  const s = buildSignal({ pop10: null, pop9: 100, popTotal: 500 });
+  eq(s.psa10Chance, null);
+  eq(s.psa10Count, null);
+});
+
+test("buildSignal: pop10 is 0 with nonzero total = Brutal", () => {
+  const s = buildSignal({ pop10: 0, pop9: 300, popTotal: 1000 });
+  eq(s.psa10Chance, 0);
+  eq(s.psa9to10Ratio, null);
+  eq(s.difficulty, "Brutal");
+});
+
+test("buildSignal: high gem rate = Easy", () => {
+  const s = buildSignal({ pop10: 800, pop9: 100, popTotal: 1000 });
+  eq(s.psa10Chance, 80);
+  eq(s.difficulty, "Easy");
+});
+
+// ── deriveEra (set classification) ──
+
+console.log("\n\x1b[1m=== deriveEra ===\x1b[0m");
+
+test("deriveEra: sv prefix = Scarlet & Violet", () => {
+  eq(deriveEra("sv8a"), "Scarlet & Violet");
+  eq(deriveEra("sv1"), "Scarlet & Violet");
+});
+
+test("deriveEra: m prefix = Scarlet & Violet", () => {
+  eq(deriveEra("m2a"), "Scarlet & Violet");
+  eq(deriveEra("m4"), "Scarlet & Violet");
+});
+
+test("deriveEra: swsh prefix = Sword & Shield", () => {
+  eq(deriveEra("swsh1"), "Sword & Shield");
+  eq(deriveEra("swsh12pt5"), "Sword & Shield");
+});
+
+test("deriveEra: s prefix (JP) = Sword & Shield", () => {
+  eq(deriveEra("s1"), "Sword & Shield");
+  eq(deriveEra("s8a"), "Sword & Shield");
+});
+
+test("deriveEra: sm prefix = Sun & Moon", () => {
+  eq(deriveEra("sm1"), "Sun & Moon");
+  eq(deriveEra("sm115"), "Sun & Moon");
+});
+
+test("deriveEra: xy prefix = XY", () => {
+  eq(deriveEra("xy1"), "XY");
+});
+
+test("deriveEra: a prefix = Pocket", () => {
+  eq(deriveEra("a1"), "Pokemon TCG Pocket");
+  eq(deriveEra("a2"), "Pokemon TCG Pocket");
+});
+
+test("deriveEra: classic sets", () => {
+  eq(deriveEra("base1"), "Classic");
+  eq(deriveEra("gym1"), "Classic");
+  eq(deriveEra("neo1"), "Classic");
+});
+
+test("deriveEra: dp prefix = Diamond & Pearl", () => {
+  eq(deriveEra("dp1"), "Diamond & Pearl");
+});
+
+test("deriveEra: bw prefix = Black & White", () => {
+  eq(deriveEra("bw1"), "Black & White");
+});
+
+test("deriveEra: unknown prefix = Other", () => {
+  eq(deriveEra("zzz999"), "Other");
 });
 
 // ── Summary ──

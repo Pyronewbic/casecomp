@@ -47,7 +47,7 @@ raw = (frontOverall * 0.60) + (backOverall * 0.40)
 overall = roundGrade(min(raw, lowestSubgrade + 1))
 ```
 
-- Card detection uses Haiku (cheapest), subgrades use configured model
+- Card detection uses Sonnet (reliable vision), subgrades use configured model
 - `gradeSubgrade` receives pre-built image blocks (not URLs) — use `imageBlockFromUrl()` or `imageBlockFromBase64()`
 - `cropCorners()` accepts URL or Buffer
 - Back-only subgrades skipped when no back image — front score substituted
