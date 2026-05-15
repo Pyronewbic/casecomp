@@ -6,6 +6,7 @@
 - POST /api/grade returns gradeId for share links + grade management
 - Front-only uploads now get v3 results (no longer falls back to v2)
 - Card detection resilient to failures (continues without cropping)
+- Firestore composite indexes managed in Terraform (5 indexes, import blocks for existing)
 
 ## 1.3.0 (2026-05-15)
 
