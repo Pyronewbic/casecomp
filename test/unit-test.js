@@ -1,4 +1,4 @@
-import { parseGradeJSON, roundGrade, validateAndShape } from "../lib/grading/grading.js";
+import { parseGradeJSON, roundGrade, validateAndShape, computeGradeDistribution } from "../lib/grading/grading.js";
 import { buildSignal } from "../lib/grading/psa.js";
 import { deriveEra } from "../lib/cards/card-database.js";
 import { cornerCropsToImageBlocks, imageBlockFromUrl, imageBlockFromBase64, parseAnthropicResponse, parseTogetherResponse } from "../lib/grading/preprocessing.js";
@@ -1716,6 +1716,53 @@ test("deriveEra: bw prefix = Black & White", () => {
 
 test("deriveEra: unknown prefix = Other", () => {
   eq(deriveEra("zzz999"), "Other");
+});
+
+// ── gradeDistribution ──
+
+console.log("\n\x1b[1m=== gradeDistribution ===\x1b[0m");
+
+test("gradeDistribution: high confidence concentrates on primary grade", () => {
+  const dist = computeGradeDistribution(8, 0.9);
+  assert(dist["8"] >= 70, `primary should be >=70%, got ${dist["8"]}`);
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: low confidence spreads more", () => {
+  const dist = computeGradeDistribution(8, 0.3);
+  assert(dist["8"] <= 55, `primary should be <=55% at low conf, got ${dist["8"]}`);
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: PSA 10 has no grade above", () => {
+  const dist = computeGradeDistribution(10, 0.8);
+  assert(dist["10"] > 0, "should have PSA 10");
+  assert(!dist["10.5"], "should not have grade above 10");
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: PSA 5 has no grade below in our list", () => {
+  const dist = computeGradeDistribution(5, 0.7);
+  assert(dist["5"] > 0, "should have PSA 5");
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: half grades work", () => {
+  const dist = computeGradeDistribution(8.5, 0.7);
+  assert(dist["8.5"] > 0, "should have 8.5");
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
+test("gradeDistribution: non-standard grade snaps to nearest", () => {
+  const dist = computeGradeDistribution(8.3, 0.7);
+  assert(dist["8.5"] > 0 || dist["8"] > 0, "should snap to nearest valid grade");
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  eq(total, 100);
 });
 
 // ── centering hint ──
