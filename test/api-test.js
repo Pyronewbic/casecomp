@@ -1204,6 +1204,33 @@ async function run() {
     assert(res.status === 400, `expected 400, got ${res.status}`);
   });
 
+  // ── Grade history ──
+
+  console.log("\n\x1b[1m=== grade history ===\x1b[0m");
+
+  await test("GET /api/grades/mine returns user grades", async () => {
+    const { res, body } = await json("/api/grades/mine");
+    if (res.status === 401) return;
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    assert(Array.isArray(body.grades), "grades should be array");
+    assert(typeof body.count === "number", "count should be number");
+  });
+
+  await test("GET /api/grades/mine without auth returns 401", async () => {
+    const res = await fetch(`${BASE}/api/grades/mine`);
+    if (res.status === 200) return;
+    assert(res.status === 401, `expected 401, got ${res.status}`);
+  });
+
+  await test("DELETE /api/grades/nonexistent returns 404", async () => {
+    const res = await fetch(`${BASE}/api/grades/nonexistent`, {
+      method: "DELETE",
+      headers: API_KEY ? { "x-api-key": API_KEY } : {},
+    });
+    if (res.status === 401) return;
+    assert(res.status === 404, `expected 404, got ${res.status}`);
+  });
+
   // ── Summary ──
 
   console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);
