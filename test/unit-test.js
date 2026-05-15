@@ -1718,6 +1718,35 @@ test("deriveEra: unknown prefix = Other", () => {
   eq(deriveEra("zzz999"), "Other");
 });
 
+// ── centering hint ──
+
+console.log("\n\x1b[1m=== centering hint ===\x1b[0m");
+
+test("centering hint: builds suffix from front hint", () => {
+  const hint = { front: { lr: "57/43", tb: "52/48" } };
+  const suffix = hint.front
+    ? `USER MEASUREMENT: The user aligned a centering tool and measured L/R ${hint.front.lr}, T/B ${hint.front.tb}.`
+    : "";
+  assert(suffix.includes("57/43"), "should include lr ratio");
+  assert(suffix.includes("52/48"), "should include tb ratio");
+});
+
+test("centering hint: null hint produces empty suffix", () => {
+  const hint = null;
+  const suffix = hint?.front
+    ? `USER MEASUREMENT: L/R ${hint.front.lr}, T/B ${hint.front.tb}.`
+    : "";
+  eq(suffix, "");
+});
+
+test("centering hint: missing back hint produces empty suffix", () => {
+  const hint = { front: { lr: "55/45", tb: "50/50" } };
+  const suffix = hint?.back
+    ? `USER MEASUREMENT: L/R ${hint.back.lr}, T/B ${hint.back.tb}.`
+    : "";
+  eq(suffix, "");
+});
+
 // ── Summary ──
 
 console.log(`\n\x1b[1m=== ${passed} passed, ${failed} failed ===\x1b[0m\n`);

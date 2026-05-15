@@ -438,7 +438,7 @@ app.get("/api/psa", apiAuthMiddleware, (req, res, next) => { req._errorType = "p
 
 // POST /api/grade
 app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "grade"; next(); }, async (req, res) => {
-  const { imageUrl, extraImages, provider, model, cardName, source, listingId, listingPrice, condition } = req.body;
+  const { imageUrl, extraImages, provider, model, cardName, source, listingId, listingPrice, condition, centeringHint } = req.body;
   if (!imageUrl) return res.status(400).json({ error: "Missing required field: imageUrl" });
   try {
     const config = {
@@ -450,7 +450,7 @@ app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "g
       },
     };
     const extras = (extraImages || []).map(u => ({ imageUrl: u }));
-    const grade = await gradeImage(imageUrl, config, extras);
+    const grade = await gradeImage(imageUrl, config, extras, centeringHint);
 
     if (grade && !grade.error) {
       await storeGradeLog({

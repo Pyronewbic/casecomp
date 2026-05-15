@@ -125,14 +125,15 @@ Use `--refresh` to delete all cache files before a run.
 ## AI grading pipeline (v3)
 
 1. Listing images fetched, upgraded to `s-l1600` resolution for eBay.
-2. **Card detection**: Haiku preflight identifies card bounding box. If card fills <80% of frame (user photo with background), crops to card only. Skips for clean listing images.
+2. **Card detection**: Sonnet (or Together AI GLM-4.6V) identifies 4 card corners. Tilt angle calculated and corrected via `sharp.rotate()`. If card fills <80% of frame, crops to card. Skips for clean listing images.
 3. **SSRF protection**: all image URLs validated — DNS resolution, private IP blocking, blocked hosts (metadata endpoints).
 4. `preprocessing.js` crops 4 corners (20% region) from front and back separately via `sharp`.
 5. **8 parallel LLM calls**: centering/corners/edges/surface x front/back. Each receives only its target side image.
-6. Overall = `(frontAvg x 0.60) + (backAvg x 0.40)`, capped at `lowestSubgrade + 1` (excessive defect rule).
-7. Rounding: <0.25 down, 0.25-0.74 to .5, >=0.75 up.
-8. Falls back to single combined prompt for non-Claude providers or missing back image.
-9. Token usage + estimated cost tracked per grade ($3/$15 per 1M for Claude).
+6. Centering subgrades return `lr`/`tb` ratio fields (e.g. "55/45", "52/48") for frontend overlay positioning.
+7. Overall = `(frontAvg x 0.60) + (backAvg x 0.40)`, capped at `lowestSubgrade + 1` (excessive defect rule).
+8. Rounding: <0.25 down, 0.25-0.74 to .5, >=0.75 up.
+9. Falls back to single combined prompt for non-Claude providers or missing back image.
+10. Token usage + estimated cost tracked per grade ($3/$15 per 1M for Claude).
 
 **ML dataset pipeline**: `track-prices` passively saves graded slab images (PSA/BGS/CGC/TAG) from eBay sold listings into `grading-dataset` Firestore collection. `GET /api/grading-dataset/stats` monitors progress.
 
