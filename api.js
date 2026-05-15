@@ -15,7 +15,7 @@ import { gradeImage } from "./lib/grading/grading.js";
 import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers, filterRelevantResults, isGradedCard } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
-import { saveGradeLog, getGradeLogs, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds, trackSearchFrequency, getTopSearchedCards } from "./lib/data/firestore.js";
+import { saveGradeLog, getGradeLogs, getGradeLogsByUser, getGradeLog, deleteGradeLog, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds, trackSearchFrequency, getTopSearchedCards } from "./lib/data/firestore.js";
 import { getDemoSearchResult, getDemoResult, listDemoCards, findDemoByNumber } from "./lib/cards/demo.js";
 import { csvEscape, csvRow } from "./lib/data/csv.js";
 import { createApiKey, listApiKeys, listAllKeys, listKeysByOwner, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/auth/api-keys.js";
@@ -438,7 +438,7 @@ app.get("/api/psa", apiAuthMiddleware, (req, res, next) => { req._errorType = "p
 
 // POST /api/grade
 app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "grade"; next(); }, async (req, res) => {
-  const { imageUrl, extraImages, provider, model, cardName, source, listingId, listingPrice, condition, centeringHint } = req.body;
+  const { imageUrl, extraImages, provider, model, cardName, cardId, source, listingId, listingPrice, condition, centeringHint } = req.body;
   if (!imageUrl) return res.status(400).json({ error: "Missing required field: imageUrl" });
   try {
     const config = {
@@ -452,9 +452,13 @@ app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "g
     const extras = (extraImages || []).map(u => ({ imageUrl: u }));
     const grade = await gradeImage(imageUrl, config, extras, centeringHint);
 
+    let gradeId = null;
     if (grade && !grade.error) {
-      await storeGradeLog({
+      const userId = portfolioUserId(req);
+      gradeId = await storeGradeLog({
         ts: new Date().toISOString(),
+        userId: userId || null,
+        cardId: cardId || null,
         cardName: cardName || "unknown",
         source: source || "api",
         listingId: listingId || null,
@@ -468,7 +472,7 @@ app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "g
       });
     }
 
-    res.json({ grade, stored: !!(grade && !grade.error) });
+    res.json({ grade, gradeId, stored: !!(grade && !grade.error) });
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
@@ -530,6 +534,34 @@ app.get("/api/grade/report/:id", async (req, res) => {
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(png);
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /api/grades/mine — user's grade history
+app.get("/api/grades/mine", authMiddleware, async (req, res) => {
+  try {
+    const userId = portfolioUserId(req);
+    if (!userId) return res.status(401).json({ error: "Sign in required" });
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const grades = await getGradeLogsByUser(userId, { limit });
+    res.json({ grades, count: grades.length });
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// DELETE /api/grades/:id — delete your grade
+app.delete("/api/grades/:id", authMiddleware, async (req, res) => {
+  try {
+    const userId = portfolioUserId(req);
+    if (!userId) return res.status(401).json({ error: "Sign in required" });
+    const record = await getGradeLog(req.params.id);
+    if (!record) return res.status(404).json({ error: "Grade not found" });
+    if (record.userId !== userId && !isAdminUser(req)) return res.status(403).json({ error: "Not your grade" });
+    await deleteGradeLog(req.params.id);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
