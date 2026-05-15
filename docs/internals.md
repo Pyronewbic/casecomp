@@ -140,6 +140,16 @@ Use `--refresh` to delete all cache files before a run.
 14. Grade logs store `userId` + `cardId` for per-user history and ML training data.
 15. `GET /api/grades/mine` returns user's grade history. `DELETE /api/grades/:id` removes a grade.
 
+**Firestore composite indexes** (managed in `terraform/firestore.tf`):
+
+| Collection | Fields | Purpose |
+|---|---|---|
+| `api-keys` | ownerId + createdAt desc | List keys by owner |
+| `grade-logs` | userId + createdAt desc | User grade history |
+| `grade-logs` | source + createdAt desc | Filter grades by source |
+| `api-analytics` | userId + ts desc | Per-user analytics |
+| `price-history` | cardKey + recordedAt desc | Card price history |
+
 **ML dataset pipeline**: `track-prices` passively saves graded slab images (PSA/BGS/CGC/TAG) from eBay sold listings into `grading-dataset` Firestore collection. `GET /api/grading-dataset/stats` monitors progress.
 
 ## Security pipeline

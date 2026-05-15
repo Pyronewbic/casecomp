@@ -19,7 +19,8 @@ Search any Pokemon card across four marketplaces in one query. Get live prices, 
 - **Multi-source search** - eBay, magi.camp, Yahoo Auctions JP, SNKRDUNK in one query
 - **Cross-source arbitrage** - compares lowest prices across sources, highlights spread
 - **Condition detection** - auto-detects card condition across sources (EN: NM/LP/MP, JP: 状態A/美品)
-- **AI pre-grading** - 8-subgrade front/back analysis with card detection, 60/40 weighting, PSA rubric
+- **AI pre-grading** - 8-subgrade front/back analysis with card detection, tilt correction, grade distribution, shareable reports
+- **Grade history** - track your graded cards, view results, share as social cards
 - **Price history** - sold comp tracking over time with line charts and stats
 - **PSA grading signals** - population data, difficulty, gem 10%, recommended submission tier
 - **Slab comparison** - compare PSA 10 / BGS 9.5 / TAG 10 prices across sources
