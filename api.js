@@ -628,11 +628,23 @@ app.get("/api/health", async (req, res) => {
   let ebayUsage = null;
   try { ebayUsage = await getEbayUsageToday(); } catch {}
   const isOwner = getRequestToken(req) === process.env.CASECOMP_API_KEY;
+  const { searchCards: sc } = await import("./lib/cards/card-database.js");
+  const cardDbLoaded = sc("test", 1).length >= 0;
+  const mem = process.memoryUsage();
+  const secrets = {
+    anthropic: !!process.env.ANTHROPIC_API_KEY,
+    ebay: !!(clientId && clientSecret),
+    jwt: !!process.env.CASECOMP_JWT_SECRET,
+    together: !!(process.env.TOGETHER_API_KEY && process.env.TOGETHER_API_KEY.length > 20),
+  };
   res.json({
     status: "ok",
     uptime: Math.floor(process.uptime()),
     firestore: firestoreStatus,
-    ebay: { configured: !!(clientId && clientSecret), ...(isOwner ? { usageToday: ebayUsage, dailyCap: DAILY_CAP } : {}) },
+    cardDatabase: cardDbLoaded,
+    secrets,
+    ebay: { configured: secrets.ebay, ...(isOwner ? { usageToday: ebayUsage, dailyCap: DAILY_CAP } : {}) },
+    ...(isOwner ? { memory: { rss: Math.round(mem.rss / 1048576), heap: Math.round(mem.heapUsed / 1048576) } } : {}),
   });
 });
 
