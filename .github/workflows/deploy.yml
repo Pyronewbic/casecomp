@@ -116,3 +116,22 @@ jobs:
             --project ${{ env.PROJECT_ID }} \
             --port 3000 \
             --allow-unauthenticated
+
+      - name: Health check (${{ matrix.region }})
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE }} \
+            --region ${{ matrix.region }} \
+            --project ${{ env.PROJECT_ID }} \
+            --format='value(status.url)')
+          echo "Checking $URL/api/health..."
+          for i in $(seq 1 10); do
+            STATUS=$(curl -sf "$URL/api/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null)
+            if [ "$STATUS" = "ok" ]; then
+              echo "Healthy (attempt $i)"
+              exit 0
+            fi
+            echo "  attempt $i: $STATUS"
+            sleep 5
+          done
+          echo "Health check failed after 10 attempts"
+          exit 1
