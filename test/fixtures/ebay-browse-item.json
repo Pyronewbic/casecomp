@@ -1,0 +1,24 @@
+{
+  "itemId": "v1|366397520173|0",
+  "title": "Pokemon Card Umbreon ex SAR 217/187 SV8a Terastal Festival ex Japanese",
+  "price": { "value": "400.00", "currency": "USD" },
+  "shippingOptions": [{ "shippingCost": { "value": "0.00", "currency": "USD" }, "type": "FIXED" }],
+  "image": { "imageUrl": "https://i.ebayimg.com/images/g/XYkAAeSw8fBp9JS-/s-l500.jpg" },
+  "additionalImages": [
+    { "imageUrl": "https://i.ebayimg.com/images/g/dvIAAeSwCB9p3n5z/s-l500.jpg" }
+  ],
+  "itemWebUrl": "https://www.ebay.com/itm/366397520173",
+  "condition": "Ungraded",
+  "conditionId": "3000",
+  "localizedAspects": [
+    { "type": "STRING", "name": "Language", "value": "Japanese" },
+    { "type": "STRING", "name": "Condition", "value": "Ungraded" }
+  ],
+  "seller": {
+    "username": "card_seller_jp",
+    "feedbackPercentage": "99.5",
+    "feedbackScore": 1523
+  },
+  "itemLocation": { "country": "JP", "city": "Tokyo" },
+  "leafCategoryIds": ["183454"]
+}

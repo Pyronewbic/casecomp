@@ -14,6 +14,7 @@
     "test:api": "node test/api-test.js",
     "test:live": "API_URL=https://api.casecomp.xyz node test/api-test.js",
     "test:api:local": "bash scripts/test-api-local.sh",
+    "test:coverage": "npx c8 --exclude=test/** --exclude=node_modules/** --exclude=public/** --exclude=extension/** --reporter=text --reporter=text-summary node test/unit-test.js",
     "test:smoke": "node test/smoke-test.js",
     "scan": "node scan.js",
     "psa": "node scripts/psa-report.js",
@@ -41,6 +42,7 @@
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "devDependencies": {
+    "c8": "^11.0.0",
     "lockfile-lint": "^5.0.0"
   }
 }

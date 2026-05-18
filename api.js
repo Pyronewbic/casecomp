@@ -11,7 +11,7 @@ import { searchSnkrdunk } from "./lib/sources/snkrdunk.js";
 import { searchMagi } from "./lib/sources/magi.js";
 import { searchYahooAuctions } from "./lib/sources/yahooauctions.js";
 import { getPsaGradingSignal } from "./lib/grading/psa.js";
-import { gradeImage } from "./lib/grading/grading.js";
+import { gradeImage, medianGrade } from "./lib/grading/grading.js";
 import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers, filterRelevantResults, isGradedCard } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
@@ -438,19 +438,39 @@ app.get("/api/psa", apiAuthMiddleware, (req, res, next) => { req._errorType = "p
 
 // POST /api/grade
 app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "grade"; next(); }, async (req, res) => {
-  const { imageUrl, extraImages, provider, model, cardName, cardId, source, listingId, listingPrice, condition, centeringHint } = req.body;
+  const { imageUrl, extraImages, provider, model, cardName, cardId, source, listingId, listingPrice, condition, centeringHint, passes: rawPasses } = req.body;
   if (!imageUrl) return res.status(400).json({ error: "Missing required field: imageUrl" });
+  const passes = Math.min(3, Math.max(1, Number(rawPasses) || 1));
   try {
-    const config = {
-      aiGrading: {
-        enabled: true,
-        mode: "llm",
-        llm: { provider: provider || "claude", model: model || "claude-opus-4-7", maxTokens: 500 },
-        cacheGrades: true,
-      },
-    };
     const extras = (extraImages || []).map(u => ({ imageUrl: u }));
-    const grade = await gradeImage(imageUrl, config, extras, centeringHint);
+
+    let grade;
+    if (passes > 1) {
+      const results = [];
+      for (let i = 0; i < passes; i++) {
+        const config = {
+          aiGrading: {
+            enabled: true,
+            mode: "llm",
+            llm: { provider: provider || "claude", model: model || "claude-opus-4-7", maxTokens: 500 },
+            cacheGrades: false,
+          },
+        };
+        const r = await gradeImage(imageUrl, config, extras, centeringHint);
+        if (r && !r.error) results.push(r);
+      }
+      grade = results.length ? medianGrade(results) : { error: "All passes failed" };
+    } else {
+      const config = {
+        aiGrading: {
+          enabled: true,
+          mode: "llm",
+          llm: { provider: provider || "claude", model: model || "claude-opus-4-7", maxTokens: 500 },
+          cacheGrades: true,
+        },
+      };
+      grade = await gradeImage(imageUrl, config, extras, centeringHint);
+    }
 
     let gradeId = null;
     if (grade && !grade.error) {
@@ -464,12 +484,17 @@ app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "g
         listingId: listingId || null,
         imageUrl,
         extraImages: extraImages || [],
-        provider: config.aiGrading.llm.provider,
-        model: config.aiGrading.llm.model,
+        provider: (provider || "claude"),
+        model: (model || "claude-opus-4-7"),
         grade,
         listingPrice: listingPrice || null,
         condition: condition || null,
       });
+      if (passes === 1) {
+        const { cacheGrade } = await import("./lib/grading/grading.js");
+        const cacheConfig = { aiGrading: { mode: "llm", llm: { provider: provider || "claude", model: model || "claude-opus-4-7" }, cacheGrades: true } };
+        await cacheGrade(imageUrl, cacheConfig, grade).catch(() => {});
+      }
     }
 
     res.json({ grade, gradeId, stored: !!(grade && !grade.error) });
@@ -2007,7 +2032,16 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
     alertCards = [...new Set(alerts.map(a => a.query).filter(Boolean))];
   } catch {}
 
-  const cards = req.body?.cards || [...new Set([...defaultCards, ...alertCards])];
+  let portfolioQueries = [];
+  try {
+    const userIds = await listPortfolioUserIds();
+    for (const uid of userIds.slice(0, 100)) {
+      const pCards = await getPortfolio(uid);
+      portfolioQueries.push(...pCards.map(c => c.query).filter(Boolean));
+    }
+  } catch {}
+
+  const cards = req.body?.cards || [...new Set([...defaultCards, ...alertCards, ...portfolioQueries])];
   const hasEbay = !!(clientId && clientSecret);
   const results = [];
   for (const card of cards) {
@@ -2138,7 +2172,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
   }
 
   refreshCardDatabase().catch(() => {});
-  res.json({ tracked: results.length, results, portfolioSnapshots, portfolioWarmed, frequencyWarmed });
+  res.json({ tracked: results.length, results, portfolioSnapshots, portfolioWarmed, portfolioCardsTracked: portfolioQueries.length, frequencyWarmed });
 });
 
 // GET /api/arbitrage — cross-source price comparison for a card

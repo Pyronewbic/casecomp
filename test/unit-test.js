@@ -1,4 +1,9 @@
-import { parseGradeJSON, roundGrade, validateAndShape, computeGradeDistribution } from "../lib/grading/grading.js";
+import fs from "fs";
+import { parseGradeJSON, roundGrade, validateAndShape, computeGradeDistribution, medianGrade } from "../lib/grading/grading.js";
+import { normalizeBrowseItem, insightsToSold } from "../lib/sources/ebay.js";
+import { parseJPY, gradeFromTitle } from "../lib/sources/magi.js";
+import { normalizeActive as normalizeSnkrdunk } from "../lib/sources/snkrdunk.js";
+import { parseSpecPopItem } from "../lib/grading/psa.js";
 import { buildSignal } from "../lib/grading/psa.js";
 import { deriveEra } from "../lib/cards/card-database.js";
 import { cornerCropsToImageBlocks, imageBlockFromUrl, imageBlockFromBase64, parseAnthropicResponse, parseTogetherResponse } from "../lib/grading/preprocessing.js";
@@ -1765,6 +1770,113 @@ test("gradeDistribution: non-standard grade snaps to nearest", () => {
   eq(total, 100);
 });
 
+// ── medianGrade ──
+
+console.log("\n\x1b[1m=== medianGrade ===\x1b[0m");
+
+const mockGrade = (scores) => ({
+  provider: "claude",
+  mode: "llm-detailed-v3",
+  overall: 8,
+  confidence: 0.75,
+  limitations: "",
+  cardDetection: { front: null, back: null },
+  tokenUsage: { input: 15000, output: 700 },
+  estimatedCost: 0.06,
+  subgradeDetails: {
+    centering_front: { score: scores[0], confidence: 0.8, detail: "test" },
+    centering_back: { score: scores[1], confidence: 0.7, detail: "test" },
+    corners_front: { score: scores[2], confidence: 0.7, detail: "test" },
+    corners_back: { score: scores[3], confidence: 0.6, detail: "test" },
+    edges_front: { score: scores[4], confidence: 0.8, detail: "test" },
+    edges_back: { score: scores[5], confidence: 0.6, detail: "test" },
+    surface_front: { score: scores[6], confidence: 0.7, detail: "test" },
+    surface_back: { score: scores[7], confidence: 0.6, detail: "test" },
+  },
+});
+
+test("medianGrade: single pass returns same grade", () => {
+  const g = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const result = medianGrade([g]);
+  eq(result, g);
+});
+
+test("medianGrade: 3 passes takes median per subgrade", () => {
+  const g1 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const g2 = mockGrade([8, 7, 9, 8, 8, 8, 8, 7]);
+  const g3 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const result = medianGrade([g1, g2, g3]);
+  eq(result.subgradeDetails.centering_front.score, 9);
+  eq(result.subgradeDetails.centering_back.score, 8);
+  eq(result.subgradeDetails.corners_front.score, 8);
+  eq(result.subgradeDetails.corners_back.score, 7);
+  eq(result.passes, 3);
+});
+
+test("medianGrade: consistency shows stddev", () => {
+  const g1 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const g2 = mockGrade([7, 8, 8, 7, 9, 7, 9, 8]);
+  const g3 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const result = medianGrade([g1, g2, g3]);
+  assert(result.consistency.centering_front > 0, "centering_front should have stddev > 0");
+  eq(result.consistency.corners_back, 0);
+});
+
+test("medianGrade: token usage sums across passes", () => {
+  const g1 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const g2 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const result = medianGrade([g1, g2]);
+  eq(result.tokenUsage.input, 30000);
+  eq(result.tokenUsage.output, 1400);
+});
+
+test("medianGrade: notes mentions pass count", () => {
+  const g1 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const g2 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const result = medianGrade([g1, g2]);
+  assert(result.notes.includes("2 passes"), `notes should mention passes: ${result.notes}`);
+});
+
+test("medianGrade: empty array returns null", () => {
+  eq(medianGrade([]), null);
+});
+
+test("medianGrade: all identical scores gives 0 stddev", () => {
+  const g1 = mockGrade([8, 8, 8, 8, 8, 8, 8, 8]);
+  const g2 = mockGrade([8, 8, 8, 8, 8, 8, 8, 8]);
+  const g3 = mockGrade([8, 8, 8, 8, 8, 8, 8, 8]);
+  const result = medianGrade([g1, g2, g3]);
+  for (const key of Object.keys(result.consistency)) {
+    eq(result.consistency[key], 0);
+  }
+});
+
+test("medianGrade: 2 passes averages (even count median)", () => {
+  const g1 = mockGrade([8, 8, 8, 8, 8, 8, 8, 8]);
+  const g2 = mockGrade([10, 10, 10, 10, 10, 10, 10, 10]);
+  const result = medianGrade([g1, g2]);
+  eq(result.subgradeDetails.centering_front.score, 9);
+  eq(result.subgradeDetails.corners_back.score, 9);
+});
+
+test("medianGrade: max variance across passes", () => {
+  const g1 = mockGrade([5, 5, 5, 5, 5, 5, 5, 5]);
+  const g2 = mockGrade([10, 10, 10, 10, 10, 10, 10, 10]);
+  const g3 = mockGrade([7, 7, 7, 7, 7, 7, 7, 7]);
+  const result = medianGrade([g1, g2, g3]);
+  eq(result.subgradeDetails.centering_front.score, 7);
+  assert(result.consistency.centering_front > 2, "high variance expected");
+});
+
+test("medianGrade: has gradeDistribution", () => {
+  const g1 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const g2 = mockGrade([9, 8, 8, 7, 9, 7, 9, 8]);
+  const result = medianGrade([g1, g2]);
+  assert(result.gradeDistribution, "should have gradeDistribution");
+  const total = Object.values(result.gradeDistribution).reduce((a, b) => a + b, 0);
+  eq(total, 100);
+});
+
 // ── centering hint ──
 
 console.log("\n\x1b[1m=== centering hint ===\x1b[0m");
@@ -1792,6 +1904,155 @@ test("centering hint: missing back hint produces empty suffix", () => {
     ? `USER MEASUREMENT: L/R ${hint.back.lr}, T/B ${hint.back.tb}.`
     : "";
   eq(suffix, "");
+});
+
+// ── fixture: eBay normalizeBrowseItem ──
+
+console.log("\n\x1b[1m=== fixture: normalizeBrowseItem ===\x1b[0m");
+
+const ebayFixture = JSON.parse(fs.readFileSync("test/fixtures/ebay-browse-item.json", "utf8"));
+
+test("normalizeBrowseItem: extracts itemId", () => {
+  const r = normalizeBrowseItem(ebayFixture);
+  eq(r.itemId, "v1|366397520173|0");
+});
+
+test("normalizeBrowseItem: extracts price as number", () => {
+  const r = normalizeBrowseItem(ebayFixture);
+  eq(r.price, 400);
+  eq(r.priceCurrency, "USD");
+});
+
+test("normalizeBrowseItem: extracts shipping cost", () => {
+  const r = normalizeBrowseItem(ebayFixture);
+  eq(r.shippingCost, 0);
+  eq(r.totalCost, 400);
+});
+
+test("normalizeBrowseItem: extracts seller info", () => {
+  const r = normalizeBrowseItem(ebayFixture);
+  eq(r.seller.username, "card_seller_jp");
+  eq(r.seller.feedbackScore, 1523);
+});
+
+test("normalizeBrowseItem: upgrades image to s-l1600", () => {
+  const r = normalizeBrowseItem(ebayFixture);
+  assert(r.imageUrl.includes("s-l1600"), `expected s-l1600, got ${r.imageUrl}`);
+});
+
+test("normalizeBrowseItem: handles missing price (NaN)", () => {
+  const r = normalizeBrowseItem({ ...ebayFixture, price: null });
+  assert(Number.isNaN(r.price), `expected NaN, got ${r.price}`);
+});
+
+test("normalizeBrowseItem: handles missing seller", () => {
+  const r = normalizeBrowseItem({ ...ebayFixture, seller: null });
+  eq(r.seller, null);
+});
+
+// ── fixture: eBay insightsToSold ──
+
+console.log("\n\x1b[1m=== fixture: insightsToSold ===\x1b[0m");
+
+const insightsFixture = JSON.parse(fs.readFileSync("test/fixtures/ebay-insights-entry.json", "utf8"));
+
+test("insightsToSold: extracts price from lastSoldPrice", () => {
+  const r = insightsToSold(insightsFixture);
+  eq(r.price, 610);
+  eq(r.currency, "USD");
+});
+
+test("insightsToSold: extracts date", () => {
+  const r = insightsToSold(insightsFixture);
+  assert(r.endedDate, "should have endedDate");
+});
+
+test("insightsToSold: extracts image", () => {
+  const r = insightsToSold(insightsFixture);
+  assert(r.imageUrl.includes("ebayimg"), "should have eBay image");
+});
+
+test("insightsToSold: handles missing price fields", () => {
+  const r = insightsToSold({ title: "test", itemWebUrl: "https://ebay.com" });
+  eq(r.price, null);
+});
+
+// ── fixture: parseJPY ──
+
+console.log("\n\x1b[1m=== fixture: parseJPY ===\x1b[0m");
+
+test("parseJPY: standard format", () => { eq(parseJPY("¥46,800"), 46800); });
+test("parseJPY: with space", () => { eq(parseJPY("¥ 1,000"), 1000); });
+test("parseJPY: no yen sign", () => { eq(parseJPY("46800"), null); });
+test("parseJPY: empty string", () => { eq(parseJPY(""), null); });
+test("parseJPY: null input", () => { eq(parseJPY(null), null); });
+test("parseJPY: free text", () => { eq(parseJPY("Free"), null); });
+test("parseJPY: large amount", () => { eq(parseJPY("¥1,234,567"), 1234567); });
+
+// ── fixture: gradeFromTitle ──
+
+console.log("\n\x1b[1m=== fixture: gradeFromTitle ===\x1b[0m");
+
+test("gradeFromTitle: JP bracket format", () => { eq(gradeFromTitle("【PSA10】Umbreon ex SAR"), "PSA 10"); });
+test("gradeFromTitle: English format", () => { eq(gradeFromTitle("Umbreon ex SAR PSA 10 Gem Mint"), "PSA 10"); });
+test("gradeFromTitle: BGS with decimal", () => { eq(gradeFromTitle("BGS 9.5 Umbreon ex"), "BGS 9.5"); });
+test("gradeFromTitle: CGC", () => { eq(gradeFromTitle("CGC 10 Pristine Pikachu"), "CGC 10"); });
+test("gradeFromTitle: no grade", () => { eq(gradeFromTitle("Umbreon ex SAR 217/187 raw"), null); });
+test("gradeFromTitle: null input", () => { eq(gradeFromTitle(null), null); });
+
+// ── fixture: SNKRDUNK normalizeActive ──
+
+console.log("\n\x1b[1m=== fixture: normalizeActive (SNKRDUNK) ===\x1b[0m");
+
+const snkrFixture = JSON.parse(fs.readFileSync("test/fixtures/snkrdunk-listing.json", "utf8"));
+
+test("normalizeActive: extracts itemId", () => {
+  const r = normalizeSnkrdunk(snkrFixture, "Mega Greninja ex SAR");
+  assert(r.itemId, "should have itemId");
+});
+
+test("normalizeActive: extracts price", () => {
+  const r = normalizeSnkrdunk(snkrFixture, "Mega Greninja ex SAR");
+  eq(r.price, 46800);
+  eq(r.priceCurrency, "JPY");
+});
+
+test("normalizeActive: extracts image", () => {
+  const r = normalizeSnkrdunk(snkrFixture, "Mega Greninja ex SAR");
+  assert(r.imageUrl.includes("snkrdunk"), "should have SNKRDUNK image");
+});
+
+test("normalizeActive: builds title with product name", () => {
+  const r = normalizeSnkrdunk(snkrFixture, "Mega Greninja ex SAR");
+  assert(r.title.includes("Mega Greninja"), `title should include product name: ${r.title}`);
+});
+
+// ── fixture: parseSpecPopItem ──
+
+console.log("\n\x1b[1m=== fixture: parseSpecPopItem ===\x1b[0m");
+
+const psaFixture = JSON.parse(fs.readFileSync("test/fixtures/psa-pop-response.json", "utf8"));
+
+test("parseSpecPopItem: extracts pop data", () => {
+  const r = parseSpecPopItem(psaFixture);
+  eq(r.pop10, 5415);
+  eq(r.pop9, 620);
+  eq(r.popTotal, 6182);
+});
+
+test("parseSpecPopItem: handles missing PSAPop", () => {
+  eq(parseSpecPopItem({}), null);
+});
+
+test("parseSpecPopItem: handles null input", () => {
+  eq(parseSpecPopItem(null), null);
+});
+
+test("parseSpecPopItem: handles partial data", () => {
+  const r = parseSpecPopItem({ PSAPop: { Grade10: 100, Total: 500 } });
+  eq(r.pop10, 100);
+  eq(r.pop9, null);
+  eq(r.popTotal, 500);
 });
 
 // ── Summary ──
