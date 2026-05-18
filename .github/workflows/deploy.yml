@@ -135,3 +135,23 @@ jobs:
           done
           echo "Health check failed after 10 attempts"
           exit 1
+
+  dast:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.9.0
+        with:
+          target: https://api.casecomp.xyz/docs/spec.json
+          format: openapi
+          fail_action: false
+          cmd_options: '-a'
+      - name: Upload DAST report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zap-report-${{ github.sha }}
+          path: report_html.html
+          retention-days: 30
