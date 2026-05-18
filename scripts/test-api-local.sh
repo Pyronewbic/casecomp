@@ -4,16 +4,13 @@ set -e
 PORT=3033
 
 cleanup() {
-  echo "Cleaning up..."
   [ -n "$SERVER_PID" ] && kill $SERVER_PID 2>/dev/null
-  wait $SERVER_PID 2>/dev/null
-  echo "Done."
+  wait $SERVER_PID 2>/dev/null || true
 }
 trap cleanup EXIT
 
 echo "Starting API server on :$PORT..."
 API_PORT=$PORT node api.js 2>/dev/null &
-SERVER_PID=$!
 SERVER_PID=$!
 
 echo "Waiting for server..."
