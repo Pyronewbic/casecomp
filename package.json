@@ -25,7 +25,7 @@
     "@google-cloud/firestore": "^8.5.0",
     "@google-cloud/storage": "^7.19.0",
     "axios": "^1.7.9",
-    "axios-cookiejar-support": "^5.0.5",
+    "axios-cookiejar-support": "^7.0.0",
     "cheerio": "^1.0.0",
     "compression": "^1.8.1",
     "dotenv": "^17.4.2",
