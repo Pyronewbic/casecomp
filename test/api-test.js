@@ -3,6 +3,7 @@ import "dotenv/config";
 const BASE = process.env.API_URL || "http://localhost:3000";
 const API_KEY = process.env.CASECOMP_API_KEY || "";
 const IS_LOCAL = !process.env.K_SERVICE && !process.env.CI_FIRESTORE;
+let cardDbLoaded = false;
 let passed = 0;
 let failed = 0;
 let skipped = 0;
@@ -25,6 +26,16 @@ function skipLocal(name) {
 
 async function testDb(name, fn) {
   if (IS_LOCAL) return skipLocal(name);
+  return test(name, fn);
+}
+
+function skipNoCardDb(name) {
+  console.log(`  \x1b[33m⊘\x1b[0m ${name} (skipped — card DB not loaded)`);
+  skipped++;
+}
+
+async function testCardDb(name, fn) {
+  if (!cardDbLoaded) return skipNoCardDb(name);
   return test(name, fn);
 }
 
@@ -81,6 +92,7 @@ async function run() {
     assert(body.status === "ok", `expected ok, got ${body.status}`);
     assert(typeof body.uptime === "number");
     assert("ebay" in body);
+    cardDbLoaded = body.cardDatabase === true;
   });
 
   // ── Drops + Webhooks (require Firestore) ──
@@ -938,7 +950,7 @@ async function run() {
 
   console.log("\n\x1b[1m=== collection tracking ===\x1b[0m");
 
-  await test("GET /api/portfolio/set/sv8a?demo=true returns Umbreon as owned", async () => {
+  await testCardDb("GET /api/portfolio/set/sv8a?demo=true returns Umbreon as owned", async () => {
     const { res, body } = await jsonNoAuth("/api/portfolio/set/sv8a?demo=true");
     assert(res.status === 200, `status ${res.status}`);
     assert(body.setCode === "sv8a", `expected sv8a, got ${body.setCode}`);
@@ -947,7 +959,7 @@ async function run() {
     assert(body.totalCards > 0, "totalCards should be positive");
   });
 
-  await test("GET /api/portfolio/set/swsh7?demo=true returns 0 owned for unrelated set", async () => {
+  await testCardDb("GET /api/portfolio/set/swsh7?demo=true returns 0 owned for unrelated set", async () => {
     const { res, body } = await jsonNoAuth("/api/portfolio/set/swsh7?demo=true");
     assert(res.status === 200, `status ${res.status}`);
     assert(body.ownedCount === 0, `expected 0 owned, got ${body.ownedCount}`);
@@ -960,7 +972,7 @@ async function run() {
     assert(res.status === 404, `expected 404, got ${res.status}`);
   });
 
-  await test("Collection response has _demo flag", async () => {
+  await testCardDb("Collection response has _demo flag", async () => {
     const { body } = await jsonNoAuth("/api/portfolio/set/sv8a?demo=true");
     assert(body._demo === true, "missing _demo flag");
   });
@@ -1084,7 +1096,7 @@ async function run() {
 
   console.log("\n\x1b[1m=== set detail ===\x1b[0m");
 
-  await test("GET /api/sets/sv8a returns set with cards", async () => {
+  await testCardDb("GET /api/sets/sv8a returns set with cards", async () => {
     const { res, body } = await jsonNoAuth("/api/sets/sv8a");
     assert(res.status === 200, `status ${res.status}`);
     assert(body.setCode === "sv8a", `expected sv8a, got ${body.setCode}`);

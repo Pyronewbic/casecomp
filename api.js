@@ -653,8 +653,7 @@ app.get("/api/health", async (req, res) => {
   let ebayUsage = null;
   try { ebayUsage = await getEbayUsageToday(); } catch {}
   const isOwner = getRequestToken(req) === process.env.CASECOMP_API_KEY;
-  const { searchCards: sc } = await import("./lib/cards/card-database.js");
-  const cardDbLoaded = sc("test", 1).length >= 0;
+  const cardDbLoaded = getAllSets().length > 0;
   const mem = process.memoryUsage();
   const secrets = {
     anthropic: !!process.env.ANTHROPIC_API_KEY,
