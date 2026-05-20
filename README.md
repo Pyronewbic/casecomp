@@ -1,12 +1,13 @@
 # <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
-[![Version](https://img.shields.io/badge/version-1.3.0-d9b676)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-d9b676)](CHANGELOG.md)
 [![CI](https://github.com/Pyronewbic/casecomp/actions/workflows/ci.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/ci.yml)
 [![Deploy](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![API](https://img.shields.io/badge/API-docs-d9b676)](https://api.casecomp.xyz/docs)
 [![SLSA 3](https://img.shields.io/badge/SLSA-Level%203-green)](https://slsa.dev)
 [![Sigstore](https://img.shields.io/badge/signed-sigstore-blue)](https://www.sigstore.dev/)
+[![SBOM](https://img.shields.io/badge/SBOM-SPDX-blue)](https://spdx.dev)
 
 **[casecomp.xyz](https://casecomp.xyz)** | **[API Docs](https://api.casecomp.xyz/docs)** | **[Admin](https://api.casecomp.xyz/admin)** | **[Changelog](CHANGELOG.md)**
 

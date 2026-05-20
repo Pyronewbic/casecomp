@@ -1,6 +1,6 @@
 {
   "name": "casecomp",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "Pokemon TCG card research — live listings from eBay, magi.camp, Yahoo Auctions & SNKRDUNK with AI pre-grading and PSA signals",
   "type": "module",
   "engines": {
