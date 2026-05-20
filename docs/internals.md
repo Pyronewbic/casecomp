@@ -80,7 +80,7 @@ Both `casecomp-api` and `casecomp-site` run in asia-south1 (Mumbai) and us-centr
 | Cloud Scheduler | asia-south1 | Hits LB domain, auto-routes |
 | HTTPS LB | Global | Backend services have NEGs in both regions |
 | Artifact Registry (frontend) | us (multi-region) | `us-docker.pkg.dev`, accessible from both regions |
-| GCR (API) | us (multi-region) | `gcr.io`, accessible globally |
+| Artifact Registry (API) | us (multi-region) | `us-docker.pkg.dev`, accessible globally |
 
 Deploy workflow: build once → cosign sign → SBOM attest → SLSA attest → deploy to both regions via GitHub Actions matrix (parallel, fail-fast: false) → health check → ZAP DAST.
 

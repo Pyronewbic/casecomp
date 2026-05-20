@@ -8,22 +8,22 @@ permissions:
 
 env:
   PROJECT_ID: casecomp-495718
-  IMAGE: gcr.io/casecomp-495718/casecomp-node24
+  IMAGE: us-docker.pkg.dev/casecomp-495718/casecomp-node24/node24
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: google-github-actions/auth@v3
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: projects/129850122606/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: casecomp-deploy@casecomp-495718.iam.gserviceaccount.com
 
-      - uses: google-github-actions/setup-gcloud@v3
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.24"
 
@@ -34,7 +34,7 @@ jobs:
         run: apko build images/node24/apko.yaml ${{ env.IMAGE }}:latest image.tar
 
       - name: Configure Docker auth
-        run: gcloud auth configure-docker --quiet
+        run: gcloud auth configure-docker us-docker.pkg.dev --quiet
 
       - name: Load image
         run: docker load < image.tar

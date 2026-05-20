@@ -15,7 +15,7 @@ variable "site_domain" {
 }
 
 variable "container_image" {
-  default = "gcr.io/casecomp-495718/casecomp-api"
+  default = "us-docker.pkg.dev/casecomp-495718/casecomp-api/app"
 }
 
 variable "regions" {
