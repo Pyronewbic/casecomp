@@ -6,11 +6,12 @@ on:
 permissions:
   contents: read
   id-token: write
+  attestations: write
 
 env:
   PROJECT_ID: casecomp-495718
   SERVICE: casecomp-api
-  IMAGE: gcr.io/casecomp-495718/casecomp-api
+  IMAGE: us-docker.pkg.dev/casecomp-495718/casecomp-api/app
 
 jobs:
   build:
@@ -48,14 +49,14 @@ jobs:
       - name: Get image digest
         id: digest
         run: |
-          DIGEST=$(gcloud container images describe ${{ env.IMAGE }}:latest \
+          DIGEST=$(gcloud artifacts docker images describe ${{ env.IMAGE }}:latest \
             --project ${{ env.PROJECT_ID }} \
             --format='value(image_summary.digest)')
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
           echo "Image digest: $DIGEST"
 
-      - name: Configure Docker auth for GCR
-        run: gcloud auth configure-docker --quiet
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker us-docker.pkg.dev --quiet
 
       - uses: sigstore/cosign-installer@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v3
 
@@ -70,7 +71,14 @@ jobs:
           cosign verify \
             --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
             --certificate-identity-regexp="github.com/Pyronewbic/casecomp" \
-            "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}" || true
+            "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}"
+
+      - name: Create Binary Auth attestation
+        run: |
+          gcloud beta container binauthz attestations sign-and-create \
+            --artifact-url="${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}" \
+            --attestor="projects/${{ env.PROJECT_ID }}/attestors/deploy-attestor" \
+            --keyversion="projects/${{ env.PROJECT_ID }}/locations/global/keyRings/binary-auth/cryptoKeys/attestor-key/cryptoKeyVersions/1"
 
       - name: Generate container SBOM (Syft)
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
@@ -88,26 +96,12 @@ jobs:
             --type spdxjson \
             "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}"
 
-      - name: Attest SLSA provenance
-        run: |
-          cat > /tmp/provenance.json << 'PROV'
-          {
-            "buildType": "https://slsa.dev/provenance/v1",
-            "builder": { "id": "https://github.com/Pyronewbic/casecomp/.github/workflows/deploy.yml" },
-            "invocation": {
-              "configSource": {
-                "uri": "git+https://github.com/Pyronewbic/casecomp@refs/heads/main",
-                "digest": { "sha1": "${{ github.sha }}" },
-                "entryPoint": ".github/workflows/deploy.yml"
-              }
-            }
-          }
-          PROV
-          cosign attest --yes \
-            --oidc-issuer=https://token.actions.githubusercontent.com \
-            --predicate /tmp/provenance.json \
-            --type slsaprovenance \
-            "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
 
   deploy:
     needs: build

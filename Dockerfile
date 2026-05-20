@@ -7,7 +7,7 @@ RUN npm install --production
 
 COPY . .
 
-FROM gcr.io/casecomp-495718/casecomp-node24:latest
+FROM us-docker.pkg.dev/casecomp-495718/casecomp-node24/node24:latest
 
 WORKDIR /app
 COPY --from=build /app /app

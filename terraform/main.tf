@@ -68,15 +68,13 @@ resource "google_project_service" "monitoring" {
   disable_on_destroy = false
 }
 
-# ── Binary Authorization ──────────────────────────────────────
-
-resource "google_binary_authorization_policy" "default" {
-  global_policy_evaluation_mode = "ENABLE"
-
-  default_admission_rule {
-    evaluation_mode  = "ALWAYS_ALLOW"
-    enforcement_mode = "ENFORCED_BLOCK_AND_AUDIT_LOG"
-  }
-
-  depends_on = [google_project_service.binaryauthorization]
+resource "google_project_service" "artifactregistry" {
+  service            = "artifactregistry.googleapis.com"
+  disable_on_destroy = false
 }
+
+resource "google_project_service" "cloudkms" {
+  service            = "cloudkms.googleapis.com"
+  disable_on_destroy = false
+}
+

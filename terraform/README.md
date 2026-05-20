@@ -38,7 +38,7 @@ Both backends have NEGs in asia-south1 and us-central1. LB routes to nearest.
 | `regions` | `["asia-south1", "us-central1"]` | Cloud Run deploy regions |
 | `api_domain` | `api.casecomp.xyz` | API SSL cert domain |
 | `site_domain` | `casecomp.xyz` | Frontend SSL cert domain |
-| `container_image` | `gcr.io/casecomp-495718/casecomp-api` | API Docker image |
+| `container_image` | `us-docker.pkg.dev/casecomp-495718/casecomp-api/app` | API Docker image |
 | `alert_email` | *(sensitive, in terraform.tfvars / GitHub secret)* | Monitoring alert recipient |
 
 ## Usage

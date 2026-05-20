@@ -112,10 +112,10 @@ Strict palette — no deviations:
 - GCP: Cloud Run in asia-south1 + us-central1, Firestore (asia-south1), HTTPS LB (global, geo-routes), Cloud CDN, Secret Manager, Cloud Scheduler
 - Terraform: GCS state, 8 files by resource type, CI plan/apply, `for_each` over regions
 - **CI (ci.yml):** single workflow. Jobs: unit, api (demo-based, continue-on-error), smoke (non-blocking), codeql, scan (SBOM+Grype), audit (npm+lockfile-lint), secrets (gitleaks). Required: unit + codeql.
-- **Deploy:** Kaniko v1.23.2 --reproducible → cosign sign → SBOM attest (Syft SPDX from container) → SLSA provenance attest → deploy by digest → both regions → health check → OWASP ZAP DAST
-- **Custom Wolfi base image:** gcr.io/casecomp-495718/casecomp-node24. Built with apko. 9 smoke tests. 0 CVEs.
-- **Supply chain:** SBOM + SLSA attestations on image digest, Dependabot, lockfile-lint, Socket.dev, pre-commit hook (blocks .env, secrets, large files)
-- **Binary Authorization:** ENFORCED on both Cloud Run services
+- **Deploy:** Kaniko v1.23.2 --reproducible → cosign sign → Binary Auth attestation (KMS) → SBOM attest (Syft SPDX from container) → build provenance (actions/attest-build-provenance) → deploy by digest → both regions → health check → OWASP ZAP DAST
+- **Custom Wolfi base image:** us-docker.pkg.dev/casecomp-495718/casecomp-node24/node24. Built with apko. 9 smoke tests. 0 CVEs.
+- **Supply chain:** SBOM + SLSA attestations on image digest, SHA-pinned GitHub Actions, Dependabot, lockfile-lint, Socket.dev, pre-commit hook (blocks .env, secrets, large files)
+- **Binary Authorization:** ENFORCED on both Cloud Run services, KMS-backed attestor, deploy pipeline creates attestations
 - **Secret workflow:** Add to secrets.tf → CI creates → `gcloud secrets versions add` for value. Never `gcloud secrets create`.
 - Secrets: EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, TOGETHER_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY, RESEND_API_KEY, CASECOMP_JWT_SECRET, GOOGLE_OAUTH_CLIENT_ID, CASECOMP_ADMIN_SUB
 
