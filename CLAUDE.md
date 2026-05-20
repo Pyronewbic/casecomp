@@ -115,7 +115,7 @@ Strict palette — no deviations:
 - **Deploy:** Kaniko v1.23.2 --reproducible → cosign sign → Binary Auth attestation (KMS) → SBOM attest (Syft SPDX from container) → build provenance (actions/attest-build-provenance) → deploy by digest → both regions → health check → OWASP ZAP DAST
 - **Custom Wolfi base image:** us-docker.pkg.dev/casecomp-495718/casecomp-node24/node24. Built with apko. 9 smoke tests. 0 CVEs.
 - **Supply chain:** SBOM + SLSA attestations on image digest, SHA-pinned GitHub Actions, Dependabot, lockfile-lint, Socket.dev, pre-commit hook (blocks .env, secrets, large files)
-- **Binary Authorization:** ENFORCED on both Cloud Run services, KMS-backed attestor, deploy pipeline creates attestations
+- **Binary Authorization:** REQUIRE_ATTESTATION enforced on both Cloud Run services, KMS-backed attestor (EC P256, deploy-attestor), deploy pipeline creates attestations via `gcloud beta container binauthz attestations sign-and-create`
 - **Secret workflow:** Add to secrets.tf → CI creates → `gcloud secrets versions add` for value. Never `gcloud secrets create`.
 - Secrets: EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, TOGETHER_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY, RESEND_API_KEY, CASECOMP_JWT_SECRET, GOOGLE_OAUTH_CLIENT_ID, CASECOMP_ADMIN_SUB
 
