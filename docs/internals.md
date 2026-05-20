@@ -35,6 +35,8 @@ lib/
     email.js          Alert emails via Resend
     firestore.js      Firestore: grade logs, drops, webhooks, cache
     redis-cache.js    Redis cache (optional)
+  security/
+    rasp.js           RASP middleware, detection rules, anomaly scoring, event logging
   search/
     filters.js        Language, relevance, condition detection, outlier flagging
     listingQuery.js   eBay search query builder (raw vs slab)
@@ -59,7 +61,7 @@ test/
 
 - **Auth middleware**: owner key (`CC_LIVE_`) → sandbox → JWT (Google OAuth) → Firestore developer keys (30s cache). `apiAuthMiddleware` adds demo bypass.
 - **Rate limiting**: 60/min authenticated, 360/min demo, 5/min sandbox, 10/min auth endpoint.
-- **Security**: Helmet headers, trust proxy = 1, request IDs, compression, `safeErrorMessage()` on all errors. Global JSON 404 catch-all + error handler at bottom of file.
+- **Security**: Helmet headers, trust proxy = 1, request IDs, compression, `safeErrorMessage()` on all errors. Global JSON 404 catch-all + error handler at bottom of file. RASP middleware on all routes.
 - **CORS**: wildcard `*` — API key is the access control layer.
 - **Dashboard**: static files from `public/` served at `/` and `/admin`.
 - **Docs**: Swagger UI at `/docs`, spec at `/docs/spec.json`.
@@ -184,6 +186,7 @@ Three workflows: `ci.yml` (all checks), `deploy.yml` (build + sign + deploy), `t
 | Pre-commit hook | Local | Blocks .env, >1MB files, secret patterns |
 | apko + Wolfi | Base image | Custom Node 24 image, manual `workflow_dispatch` |
 | Dependabot | Weekly | npm + GitHub Actions version updates |
+| RASP | Runtime | SQLi/XSS/cmdi/traversal/NoSQLi/proto-pollution detection, anomaly scoring |
 | Binary Auth | Cloud Run | ENFORCED policy (blocks unsigned images) |
 
 ## Scheduled tasks

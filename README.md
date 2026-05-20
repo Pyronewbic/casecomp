@@ -129,6 +129,7 @@ curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
 - **Reproducible builds** - Kaniko `--reproducible` flag, pinned version
 - **Multi-region** - Cloud Run in asia-south1 + us-central1, global LB auto geo-routes to nearest
 - **Custom base image** - Wolfi + apko Node 24 image, manual rebuild, zero CVEs by design
+- **RASP** - runtime request inspection for SQLi, XSS, command injection, path traversal, NoSQL injection, prototype pollution. Per-IP anomaly scoring, bot fingerprinting, Firestore event logging
 - **Supply chain** - SLSA provenance, Dependabot, lockfile-lint, Socket.dev, pre-commit secret blocking
 
 ## Claude Code Skills

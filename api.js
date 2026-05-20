@@ -27,6 +27,7 @@ import { verifyGoogleToken, generateJwt, verifyJwt } from "./lib/auth/auth.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/cards/card-identity.js";
 import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId } from "./lib/cards/card-database.js";
+import { raspMiddleware, getSecurityEvents } from "./lib/security/rasp.js";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -43,9 +44,10 @@ app.use(helmet({
 
 app.use(compression());
 app.use(express.json({ limit: "100kb" }));
+app.use(raspMiddleware({ mode: process.env.RASP_MODE || "monitor" }));
 
 app.use((req, res, next) => {
-  req.requestId = crypto.randomUUID().slice(0, 8);
+  req.requestId = req.requestId || crypto.randomUUID().slice(0, 8);
   res.setHeader("X-Request-Id", req.requestId);
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
@@ -642,6 +644,17 @@ app.get("/api/grading-dataset/stats", ownerOnly, async (req, res) => {
     const { getDatasetStats } = await import("./lib/cards/grading-dataset.js");
     const stats = await getDatasetStats();
     res.json(stats);
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+app.get("/api/security/events", ownerOnly, async (req, res) => {
+  const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+  const category = req.query.category || null;
+  try {
+    const events = await getSecurityEvents({ days, limit: 200, category });
+    res.json({ events, count: events.length, days });
   } catch (e) {
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
   }
