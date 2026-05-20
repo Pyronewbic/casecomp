@@ -101,7 +101,7 @@ jobs:
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.digest.outputs.digest }}
-          push-to-registry: true
+          push-to-registry: false
 
   deploy:
     needs: build
