@@ -51,7 +51,10 @@ Copy **`.env.example`** to **`.env`** and fill in the required values.
 | `API_URL` | `http://localhost:3000` | API base URL (used in responses) |
 | `CASECOMP_API_KEY` | *(none)* | Owner API key (`CC_LIVE_` prefix, 60 req/min) |
 | `CASECOMP_SANDBOX_KEY` | *(none)* | Public sandbox key (`CC_LIVE_SANDBOX_` prefix, 5 req/min) |
-| `GOOGLE_OAUTH_CLIENT_ID` | *(none)* | Google OAuth client ID (configured but not yet implemented) |
+| `CASECOMP_JWT_SECRET` | *(none)* | Secret for signing/verifying JWT tokens (HS256) |
+| `CASECOMP_ADMIN_SUB` | *(none)* | Google account `sub` claim for admin access |
+| `GOOGLE_OAUTH_CLIENT_ID` | *(none)* | Google OAuth client ID for sign-in (popup flow) |
+| `TOGETHER_API_KEY` | *(none)* | Together AI key for card detection (GLM-4.6V, falls back to Claude Sonnet) |
 
 ## Email notifications
 

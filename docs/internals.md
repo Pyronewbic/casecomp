@@ -19,21 +19,22 @@ lib/
     preprocessing.js  Card detection, corner crops, SSRF-safe image fetch
     psa.js            PSA pop reports, cert lookup, grading signal
     psaTiers.js       PSA submission tier data
-  data/
-    firestore.js      Firestore: grade logs, drops, webhooks, cache
-    api-keys.js       Developer key management
-    card-identity.js  Canonical IDs, set resolution, SET_TOTAL_MAP
-    card-database.js  TCGdex card DB (29K EN+JP cards), set browser, rarity
-    price-history.js  Sold comp tracking + TCGPlayer seeding
-    demo.js           Sample data (3 multi-source cards)
-    cache.js          File-based cache (legacy CLI)
-    redis-cache.js    Redis cache (optional)
-    email.js          Alert emails via Resend
-    csv.js            CSV export helpers
-    portfolio.js      Portfolio CRUD (Firestore subcollection)
-    analytics.js      Request analytics (Firestore, 30d TTL)
+  auth/
     auth.js           Google OAuth token verification, JWT (HS256)
+    api-keys.js       Developer key management
+  cards/
+    card-database.js  TCGdex card DB (29K EN+JP cards), set browser, rarity
+    card-identity.js  Canonical IDs, set resolution, SET_TOTAL_MAP
+    demo.js           Sample data (3 multi-source cards)
     grading-dataset.js  ML slab image collection from eBay sold listings
+    price-history.js  Sold comp tracking + TCGPlayer seeding
+  data/
+    analytics.js      Request analytics (Firestore, 30d TTL)
+    cache.js          File-based cache (legacy CLI)
+    csv.js            CSV export helpers
+    email.js          Alert emails via Resend
+    firestore.js      Firestore: grade logs, drops, webhooks, cache
+    redis-cache.js    Redis cache (optional)
   search/
     filters.js        Language, relevance, condition detection, outlier flagging
     listingQuery.js   eBay search query builder (raw vs slab)
@@ -47,9 +48,9 @@ public/admin/         Admin panel (keys, stats, errors)
 extension/            Chrome extension: queue auto-join, drop intel
 terraform/            GCP infra (Cloud Run, Firestore, LB, CDN, Scheduler)
 test/
-  unit-test.js        172 unit tests
-  api-test.js         ~130 API integration tests
-  smoke-test.js       74 Playwright UI smoke tests
+  unit-test.js        266 unit tests
+  api-test.js         97 API integration tests
+  smoke-test.js       71 Playwright UI smoke tests
 ```
 
 ## API server
@@ -58,7 +59,7 @@ test/
 
 - **Auth middleware**: owner key (`CC_LIVE_`) → sandbox → JWT (Google OAuth) → Firestore developer keys (30s cache). `apiAuthMiddleware` adds demo bypass.
 - **Rate limiting**: 60/min authenticated, 360/min demo, 5/min sandbox, 10/min auth endpoint.
-- **Security**: Helmet headers, trust proxy = 1, request IDs, compression, `safeErrorMessage()` on all errors.
+- **Security**: Helmet headers, trust proxy = 1, request IDs, compression, `safeErrorMessage()` on all errors. Global JSON 404 catch-all + error handler at bottom of file.
 - **CORS**: wildcard `*` — API key is the access control layer.
 - **Dashboard**: static files from `public/` served at `/` and `/admin`.
 - **Docs**: Swagger UI at `/docs`, spec at `/docs/spec.json`.

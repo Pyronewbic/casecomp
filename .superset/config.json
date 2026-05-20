@@ -1,0 +1,8 @@
+{
+  "setup": [
+    "yarn install",
+    "[ ! -f .env ] && cp .env.example .env"
+  ],
+  "teardown": [],
+  "run": []
+}
