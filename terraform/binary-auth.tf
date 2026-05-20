@@ -16,10 +16,6 @@ resource "google_kms_crypto_key" "attestor_key" {
   }
 }
 
-data "google_kms_crypto_key_version" "attestor" {
-  crypto_key = google_kms_crypto_key.attestor_key.id
-}
-
 resource "google_container_analysis_note" "deploy_attestor" {
   name = "deploy-attestor"
 
@@ -39,16 +35,14 @@ resource "google_binary_authorization_attestor" "deploy" {
     note_reference = google_container_analysis_note.deploy_attestor.name
 
     public_keys {
-      id = data.google_kms_crypto_key_version.attestor.id
-
-      pkix_public_key {
-        public_key_pem      = data.google_kms_crypto_key_version.attestor.public_key[0].pem
-        signature_algorithm = "ECDSA_P256_SHA256"
-      }
+      id = "${google_kms_crypto_key.attestor_key.id}/cryptoKeyVersions/1"
     }
   }
 
-  depends_on = [google_project_service.binaryauthorization]
+  depends_on = [
+    google_project_service.binaryauthorization,
+    google_kms_crypto_key.attestor_key,
+  ]
 }
 
 resource "google_binary_authorization_policy" "default" {
