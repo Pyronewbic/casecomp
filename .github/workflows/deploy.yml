@@ -75,7 +75,7 @@ jobs:
 
       - name: Create Binary Auth attestation
         run: |
-          gcloud beta container binauthz attestations sign-and-create \
+          gcloud beta container binauthz attestations sign-and-create --quiet \
             --artifact-url="${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}" \
             --attestor="projects/${{ env.PROJECT_ID }}/attestors/deploy-attestor" \
             --keyversion="projects/${{ env.PROJECT_ID }}/locations/global/keyRings/binary-auth/cryptoKeys/attestor-key/cryptoKeyVersions/1"
