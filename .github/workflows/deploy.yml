@@ -72,6 +72,22 @@ jobs:
             --certificate-identity-regexp="github.com/Pyronewbic/casecomp" \
             "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}" || true
 
+      - name: Generate container SBOM (Syft)
+        uses: anchore/sbom-action@v0
+        with:
+          image: "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}"
+          format: spdx-json
+          output-file: /tmp/sbom.spdx.json
+          upload-artifact: false
+
+      - name: Attest SBOM to image
+        run: |
+          cosign attest --yes \
+            --oidc-issuer=https://token.actions.githubusercontent.com \
+            --predicate /tmp/sbom.spdx.json \
+            --type spdxjson \
+            "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}"
+
       - name: Attest SLSA provenance
         run: |
           cat > /tmp/provenance.json << 'PROV'

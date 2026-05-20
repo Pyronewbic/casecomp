@@ -69,7 +69,7 @@ Strict palette — no deviations:
 - **Grade probability distribution:** `gradeDistribution` field in response (e.g. `{"8": 65, "8.5": 12, "7.5": 23}`). Computed from overall + confidence.
 - **Centering hint:** POST `/api/grade` accepts optional `centeringHint` with user-measured ratios, appended to centering prompts.
 - **Shareable reports:** `GET /api/grade/report/:id` returns PNG card (SVG→sharp→PNG) with scores, distribution, limiter.
-- **ML dataset pipeline:** track-prices passively collects graded slab images (eBay sold) into `grading-dataset` Firestore collection. Parses PSA/BGS/CGC/TAG grade from listing title. `GET /api/grading-dataset/stats` (owner-only) monitors collection.
+- **ML dataset pipeline:** graded slab images passively collected into `grading-dataset` Firestore collection from eBay sold (track-prices + /api/sold), magi sold (track-prices), and search sold results (/api/search). Parses PSA/BGS/CGC/TAG grade from listing title or grade label. `GET /api/grading-dataset/stats` (owner-only) monitors collection.
 - **Roadmap:** multi-pass median for deterministic grading, defect heatmap overlay, accuracy calibration once dataset reaches ~500 images.
 
 ## Set browser
@@ -112,9 +112,9 @@ Strict palette — no deviations:
 - GCP: Cloud Run in asia-south1 + us-central1, Firestore (asia-south1), HTTPS LB (global, geo-routes), Cloud CDN, Secret Manager, Cloud Scheduler
 - Terraform: GCS state, 8 files by resource type, CI plan/apply, `for_each` over regions
 - **CI (ci.yml):** single workflow. Jobs: unit, api (demo-based, continue-on-error), smoke (non-blocking), codeql, scan (SBOM+Grype), audit (npm+lockfile-lint), secrets (gitleaks). Required: unit + codeql.
-- **Deploy:** Kaniko v1.23.2 --reproducible → cosign sign → SLSA provenance → deploy by digest → both regions → health check → OWASP ZAP DAST
+- **Deploy:** Kaniko v1.23.2 --reproducible → cosign sign → SBOM attest (Syft SPDX from container) → SLSA provenance attest → deploy by digest → both regions → health check → OWASP ZAP DAST
 - **Custom Wolfi base image:** gcr.io/casecomp-495718/casecomp-node24. Built with apko. 9 smoke tests. 0 CVEs.
-- **Supply chain:** Dependabot, lockfile-lint, Socket.dev, pre-commit hook (blocks .env, secrets, large files)
+- **Supply chain:** SBOM + SLSA attestations on image digest, Dependabot, lockfile-lint, Socket.dev, pre-commit hook (blocks .env, secrets, large files)
 - **Binary Authorization:** ENFORCED on both Cloud Run services
 - **Secret workflow:** Add to secrets.tf → CI creates → `gcloud secrets versions add` for value. Never `gcloud secrets create`.
 - Secrets: EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, TOGETHER_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY, RESEND_API_KEY, CASECOMP_JWT_SECRET, GOOGLE_OAUTH_CLIENT_ID, CASECOMP_ADMIN_SUB

@@ -26,7 +26,7 @@ lib/
     card-database.js  TCGdex card DB (29K EN+JP cards), set browser, rarity
     card-identity.js  Canonical IDs, set resolution, SET_TOTAL_MAP
     demo.js           Sample data (3 multi-source cards)
-    grading-dataset.js  ML slab image collection from eBay sold listings
+    grading-dataset.js  ML slab image collection from sold listings (eBay, magi, search)
     price-history.js  Sold comp tracking + TCGPlayer seeding
   data/
     analytics.js      Request analytics (Firestore, 30d TTL)
@@ -50,8 +50,8 @@ public/admin/         Admin panel (keys, stats, errors)
 extension/            Chrome extension: queue auto-join, drop intel
 terraform/            GCP infra (Cloud Run, Firestore, LB, CDN, Scheduler)
 test/
-  unit-test.js        266 unit tests
-  api-test.js         97 API integration tests
+  unit-test.js        312 unit tests
+  api-test.js         103 API integration tests
   smoke-test.js       71 Playwright UI smoke tests
 ```
 
@@ -82,7 +82,7 @@ Both `casecomp-api` and `casecomp-site` run in asia-south1 (Mumbai) and us-centr
 | Artifact Registry (frontend) | us (multi-region) | `us-docker.pkg.dev`, accessible from both regions |
 | GCR (API) | us (multi-region) | `gcr.io`, accessible globally |
 
-Deploy workflow: build once → cosign sign → deploy to both regions via GitHub Actions matrix (parallel, fail-fast: false).
+Deploy workflow: build once → cosign sign → SBOM attest → SLSA attest → deploy to both regions via GitHub Actions matrix (parallel, fail-fast: false) → health check → ZAP DAST.
 
 ## Caching
 
@@ -153,7 +153,7 @@ Use `--refresh` to delete all cache files before a run.
 | `api-analytics` | userId + ts desc | Per-user analytics |
 | `price-history` | cardKey + recordedAt desc | Card price history |
 
-**ML dataset pipeline**: `track-prices` passively saves graded slab images (PSA/BGS/CGC/TAG) from eBay sold listings into `grading-dataset` Firestore collection. `GET /api/grading-dataset/stats` monitors progress.
+**ML dataset pipeline**: graded slab images (PSA/BGS/CGC/TAG) are passively collected into `grading-dataset` Firestore collection from multiple sources: eBay sold (via `track-prices` and `/api/sold`), magi sold (via `track-prices`), and any search with sold results (`/api/search`). Grade is parsed from listing title or grade label. `GET /api/grading-dataset/stats` monitors collection progress.
 
 ## Security pipeline
 
@@ -163,8 +163,8 @@ Three workflows: `ci.yml` (all checks), `deploy.yml` (build + sign + deploy), `t
 
 | Job | What | Required? |
 |-----|------|-----------|
-| unit | 172 unit tests | Yes |
-| smoke | 74 Playwright smoke tests | No (continue-on-error) |
+| unit | 312 unit tests | Yes |
+| smoke | 71 Playwright smoke tests | No (continue-on-error) |
 | codeql | SAST for JavaScript/TypeScript | Yes |
 | scan | SBOM (Syft) + Grype vulnerability scan | No |
 | audit | npm audit + lockfile-lint | No |
@@ -176,7 +176,8 @@ Three workflows: `ci.yml` (all checks), `deploy.yml` (build + sign + deploy), `t
 |------|------|
 | Kaniko v1.23.2 | Build with `--reproducible`, dual tags |
 | Cosign sign | Keyless signing via GitHub OIDC → Sigstore Rekor |
-| Cosign attest | SLSA provenance attestation |
+| SBOM attest | Syft SPDX JSON from container image, cosign-attested to digest |
+| SLSA attest | Provenance attestation (builder, source, commit, entrypoint) |
 | Deploy | Matrix deploy to asia-south1 + us-central1 |
 
 **Other tools:**
