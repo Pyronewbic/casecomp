@@ -58,7 +58,7 @@ resource "google_binary_authorization_attestor" "deploy" {
       id = "//cloudkms.googleapis.com/v1/projects/casecomp-495718/locations/global/keyRings/binary-auth/cryptoKeys/attestor-key/cryptoKeyVersions/1"
 
       pkix_public_key {
-        public_key_pem = <<-EOT
+        public_key_pem      = <<-EOT
 -----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEz1M4jt+Io7Na86SpMNZkIG+yUEn+
 7N/9tVN7BfbH2jZ76A1zm02/5qC4oPbk/+i0SFcUuKMUCqkv+tv4hORMzA==
