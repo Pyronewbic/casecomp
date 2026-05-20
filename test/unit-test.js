@@ -2155,7 +2155,9 @@ test("detectPathTraversal: safe — normal API path", () => {
 console.log("\n\x1b[1m=== RASP: Prototype pollution ===\x1b[0m");
 
 test("detectPrototypePollution: catches __proto__ key", () => {
-  assert(detectPrototypePollution({ __proto__: { admin: true } }) !== null);
+  const obj = Object.create(null);
+  obj["__proto__"] = { admin: true };
+  assert(detectPrototypePollution(obj) !== null);
 });
 test("detectPrototypePollution: catches nested constructor key", () => {
   assert(detectPrototypePollution({ a: { constructor: {} } }) !== null);
@@ -2203,7 +2205,7 @@ test("fingerprintRequest: flags missing user-agent", () => {
   assert(r.flags.includes("missing-ua"));
 });
 test("fingerprintRequest: flags ZAP but lower score", () => {
-  const r = fingerprintRequest({ headers: { "user-agent": "Mozilla/5.0 (zaproxy)" } });
+  const r = fingerprintRequest({ headers: { "user-agent": "Mozilla/5.0 (zaproxy)", accept: "text/html" } });
   assert(r.flags.includes("zap-ua"));
   eq(r.botScore, 5);
 });
