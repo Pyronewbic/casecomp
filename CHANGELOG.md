@@ -1,12 +1,19 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 (2026-05-20)
 
-- Grade history: cardId/userId stored in grade logs, GET /api/grades/mine, DELETE /api/grades/:id
-- POST /api/grade returns gradeId for share links + grade management
-- Front-only uploads now get v3 results (no longer falls back to v2)
+- SBOM attestation: Syft SPDX generated from built container image, cosign-attested to digest
+- RASP middleware: runtime detection for SQLi, XSS, command injection, path traversal, NoSQL injection, prototype pollution
+- Per-IP anomaly scoring with exponential decay, bot fingerprinting, Firestore event logging
+- ML dataset collection from all sold sources (eBay, magi, search), grade parsed from title
+- Global JSON 404/error handlers (sanitized responses, no HTML leaks)
+- CPU throttling enabled, API dropped to 1 vCPU
+- OWASP ZAP DAST scan in deploy pipeline
+- Grade history: GET /api/grades/mine, DELETE /api/grades/:id, share links via gradeId
+- Front-only uploads get v3 8-subgrade results
 - Card detection resilient to failures (continues without cropping)
-- Firestore composite indexes managed in Terraform (5 indexes, import blocks for existing)
+- Firestore composite indexes managed in Terraform (5 indexes)
+- 486 tests (312 unit, 103 API, 71 smoke)
 
 ## 1.3.0 (2026-05-15)
 
