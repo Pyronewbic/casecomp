@@ -366,7 +366,10 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
       result.counts.activeTotal = Object.values(result.activeByCountry).reduce((n, arr) => n + arr.length, 0);
     }
 
-    if (result.sold?.length) recordSoldPrices(q, result.sold, result.source).catch(() => {});
+    if (result.sold?.length) {
+      recordSoldPrices(q, result.sold, result.source).catch(() => {});
+      saveGradedImages(result.sold, result.source).catch(() => {});
+    }
     getOrCreateCard(q, { source: result.source, lang: config.language }).catch(() => {});
     trackSearchFrequency(q).catch(() => {});
     res.json(result);
@@ -414,6 +417,7 @@ app.get("/api/sold", apiAuthMiddleware, (req, res, next) => { req._errorType = "
       soldSource = soldRes.source;
     }
 
+    if (sold.length) saveGradedImages(sold, soldSource).catch(() => {});
     res.json({ query: q, sold, soldSource, counts: { sold: sold.length } });
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
@@ -2089,6 +2093,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
         magiSold = magiRes.sold || [];
         if (magiSold.length) {
           await recordSoldPrices(card, magiSold, "magi");
+          saveGradedImages(magiSold, "magi").catch(() => {});
         }
       } catch (e) {
         logError("track-prices", `Magi fetch failed for "${card}": ${e.message}`, "/api/track-prices");
