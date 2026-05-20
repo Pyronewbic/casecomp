@@ -188,7 +188,7 @@ Three workflows: `ci.yml` (all checks), `deploy.yml` (build + sign + deploy), `t
 | apko + Wolfi | Base image | Custom Node 24 image, manual `workflow_dispatch` |
 | Dependabot | Weekly | npm + GitHub Actions version updates |
 | RASP | Runtime | SQLi/XSS/cmdi/traversal/NoSQLi/proto-pollution detection, anomaly scoring |
-| Binary Auth | Cloud Run | ENFORCED policy (blocks unsigned images) |
+| Binary Auth | Cloud Run | REQUIRE_ATTESTATION policy (blocks unattested images) |
 
 ## Scheduled tasks
 
