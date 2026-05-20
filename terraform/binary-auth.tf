@@ -1,8 +1,18 @@
+import {
+  to = google_kms_key_ring.binary_auth
+  id = "projects/casecomp-495718/locations/global/keyRings/binary-auth"
+}
+
 resource "google_kms_key_ring" "binary_auth" {
   name     = "binary-auth"
   location = "global"
 
   depends_on = [google_project_service.cloudkms]
+}
+
+import {
+  to = google_kms_crypto_key.attestor_key
+  id = "projects/casecomp-495718/locations/global/keyRings/binary-auth/cryptoKeys/attestor-key"
 }
 
 resource "google_kms_crypto_key" "attestor_key" {
@@ -14,6 +24,11 @@ resource "google_kms_crypto_key" "attestor_key" {
     algorithm        = "EC_SIGN_P256_SHA256"
     protection_level = "SOFTWARE"
   }
+}
+
+import {
+  to = google_container_analysis_note.deploy_attestor
+  id = "projects/casecomp-495718/notes/deploy-attestor"
 }
 
 resource "google_container_analysis_note" "deploy_attestor" {
@@ -28,6 +43,11 @@ resource "google_container_analysis_note" "deploy_attestor" {
   depends_on = [google_project_service.containeranalysis]
 }
 
+import {
+  to = google_binary_authorization_attestor.deploy
+  id = "projects/casecomp-495718/attestors/deploy-attestor"
+}
+
 resource "google_binary_authorization_attestor" "deploy" {
   name = "deploy-attestor"
 
@@ -35,7 +55,17 @@ resource "google_binary_authorization_attestor" "deploy" {
     note_reference = google_container_analysis_note.deploy_attestor.name
 
     public_keys {
-      id = "${google_kms_crypto_key.attestor_key.id}/cryptoKeyVersions/1"
+      id = "//cloudkms.googleapis.com/v1/projects/casecomp-495718/locations/global/keyRings/binary-auth/cryptoKeys/attestor-key/cryptoKeyVersions/1"
+
+      pkix_public_key {
+        public_key_pem = <<-EOT
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEz1M4jt+Io7Na86SpMNZkIG+yUEn+
+7N/9tVN7BfbH2jZ76A1zm02/5qC4oPbk/+i0SFcUuKMUCqkv+tv4hORMzA==
+-----END PUBLIC KEY-----
+EOT
+        signature_algorithm = "ECDSA_P256_SHA256"
+      }
     }
   }
 
