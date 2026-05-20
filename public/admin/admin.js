@@ -218,7 +218,9 @@ async function deleteKey(id) {
 
 async function loadErrors() {
   try {
-    const res = await fetch(`/api/errors?limit=20`, { headers: { Authorization: `Bearer ${ownerKey}` } });
+    const typeFilter = document.getElementById("error-type-filter")?.value || "";
+    const typeParam = typeFilter ? `&type=${encodeURIComponent(typeFilter)}` : "";
+    const res = await fetch(`/api/errors?limit=20${typeParam}`, { headers: { Authorization: `Bearer ${ownerKey}` } });
     const { errors } = await res.json();
     if (!errors || !errors.length) {
       $("#error-list").innerHTML = '<div class="card"><div class="no-errors">No errors</div></div>';
@@ -243,4 +245,107 @@ function esc(s) {
   const d = document.createElement("div");
   d.textContent = String(s);
   return d.innerHTML;
+}
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.add("hidden"));
+    tab.classList.add("active");
+    const target = document.getElementById(`tab-${tab.dataset.tab}`);
+    if (target) target.classList.remove("hidden");
+    if (tab.dataset.tab === "analytics") loadAnalytics();
+    if (tab.dataset.tab === "funnel") loadFunnel();
+  });
+});
+
+function hBar(items, maxVal) {
+  if (!items.length) return '<div class="no-errors">No data</div>';
+  return items.map(([label, count]) => {
+    const pct = maxVal > 0 ? Math.round((count / maxVal) * 100) : 0;
+    return `<div class="hbar-row">
+      <span class="hbar-label">${esc(label)}</span>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${pct}%"></div></div>
+      <span class="hbar-count">${count.toLocaleString()}</span>
+    </div>`;
+  }).join("");
+}
+
+async function loadAnalytics() {
+  const days = parseInt(document.getElementById("analytics-days")?.value) || 7;
+  try {
+    const res = await fetch(`/api/analytics?days=${days}`, { headers: { Authorization: `Bearer ${ownerKey}` } });
+    const data = await res.json();
+
+    const latClass = data.avgLatencyMs < 200 ? "ok" : data.avgLatencyMs < 500 ? "warn" : "bad";
+    $("#analytics-stats").innerHTML = `
+      <div class="stat-card"><div class="stat-label">Total Requests</div><div class="stat-value">${data.total.toLocaleString()}</div></div>
+      <div class="stat-card"><div class="stat-label">Unique Users</div><div class="stat-value">${(data.uniqueUsers || 0).toLocaleString()}</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value ${latClass}">${data.avgLatencyMs}ms</div></div>
+    `;
+
+    const daily = data.daily || [];
+    if (daily.length) {
+      const maxCount = Math.max(...daily.map(d => d.count));
+      $("#analytics-daily").innerHTML = `<div class="bar-chart">${daily.map(d => {
+        const h = maxCount > 0 ? Math.max(2, Math.round((d.count / maxCount) * 120)) : 2;
+        const label = d.date.slice(5);
+        return `<div class="bar-col"><div class="bar" style="height:${h}px" title="${d.date}: ${d.count} req, ${d.avgLatencyMs}ms avg"></div><div class="bar-date">${label}</div></div>`;
+      }).join("")}</div>`;
+    } else {
+      $("#analytics-daily").innerHTML = '<div class="no-errors">No data yet</div>';
+    }
+
+    const tierEntries = Object.entries(data.byTier || {}).sort((a, b) => b[1] - a[1]);
+    const tierMax = tierEntries.length ? tierEntries[0][1] : 0;
+    $("#analytics-tier").innerHTML = hBar(tierEntries, tierMax);
+
+    const statusEntries = Object.entries(data.byStatus || {}).sort((a, b) => b[1] - a[1]);
+    const statusMax = statusEntries.length ? statusEntries[0][1] : 0;
+    $("#analytics-status").innerHTML = hBar(statusEntries, statusMax);
+
+    const pathEntries = Object.entries(data.byPath || {}).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const pathMax = pathEntries.length ? pathEntries[0][1] : 0;
+    $("#analytics-paths").innerHTML = hBar(pathEntries, pathMax);
+
+    const queries = data.topQueries || [];
+    if (queries.length) {
+      $("#analytics-queries").innerHTML = `<table class="query-table">
+        <tr><th>Query</th><th>Count</th></tr>
+        ${queries.map(q => `<tr><td>${esc(q.query)}</td><td>${q.count}</td></tr>`).join("")}
+      </table>`;
+    } else {
+      $("#analytics-queries").innerHTML = '<div class="no-errors">No queries yet</div>';
+    }
+  } catch (e) {
+    $("#analytics-stats").innerHTML = `<div class="card"><div class="no-errors" style="color:var(--red)">${esc(e.message)}</div></div>`;
+  }
+}
+
+async function loadFunnel() {
+  try {
+    const res = await fetch("/api/funnel", { headers: { Authorization: `Bearer ${ownerKey}` } });
+    const data = await res.json();
+    const stages = [
+      { label: "Signups", key: "signup" },
+      { label: "First Search", key: "firstSearch" },
+      { label: "First Grade", key: "firstGrade" },
+      { label: "First Portfolio Add", key: "firstPortfolioAdd" },
+    ];
+    const maxVal = data.signup || 1;
+    $("#funnel-chart").innerHTML = stages.map((s, i) => {
+      const count = data[s.key] || 0;
+      const pct = Math.round((count / maxVal) * 100);
+      const convLabel = i > 0 ? `${pct}%` : "";
+      const opacity = 1 - i * 0.15;
+      return `<div class="funnel-row">
+        <span class="funnel-label">${s.label}</span>
+        <div class="funnel-track"><div class="funnel-fill" style="width:${pct}%;opacity:${opacity}"></div></div>
+        <span class="funnel-count">${count}</span>
+        <span class="funnel-pct">${convLabel}</span>
+      </div>`;
+    }).join("");
+  } catch (e) {
+    $("#funnel-chart").innerHTML = `<div class="card"><div class="no-errors" style="color:var(--red)">${esc(e.message)}</div></div>`;
+  }
 }

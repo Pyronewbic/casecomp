@@ -52,6 +52,13 @@ locals {
         { field_path = "recordedAt", order = "DESCENDING" },
       ]
     }
+    "error-logs_type_createdAt" = {
+      collection = "error-logs"
+      fields = [
+        { field_path = "type", order = "ASCENDING" },
+        { field_path = "createdAt", order = "DESCENDING" },
+      ]
+    }
   }
 }
 
@@ -65,6 +72,15 @@ import {
   }
   to = google_firestore_index.composite[each.key]
   id = each.value
+}
+
+resource "google_firestore_field" "error_logs_ttl" {
+  project    = var.project_id
+  database   = google_firestore_database.default.name
+  collection = "error-logs"
+  field      = "expiresAt"
+
+  ttl_config {}
 }
 
 resource "google_firestore_index" "composite" {

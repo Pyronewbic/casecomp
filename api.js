@@ -15,7 +15,7 @@ import { gradeImage, medianGrade } from "./lib/grading/grading.js";
 import { parseListingLanguagesFromInput, filterByCondition, detectCondition, flagPriceOutliers, filterRelevantResults, isGradedCard } from "./lib/search/filters.js";
 import { buildEbaySearchQuery } from "./lib/search/listingQuery.js";
 import { EBAY_CATEGORY_TCG_SINGLE_CARDS_US } from "./lib/search/ebayCategories.js";
-import { saveGradeLog, getGradeLogs, getGradeLogsByUser, getGradeLog, deleteGradeLog, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds, trackSearchFrequency, getTopSearchedCards } from "./lib/data/firestore.js";
+import { saveGradeLog, getGradeLogs, getGradeLogsByUser, getGradeLog, deleteGradeLog, saveDrop, getDrops, getDrop, saveWebhook, getWebhooks, deleteWebhook, getFirestoreStatus, saveAlert, getActiveAlerts, updateAlert, getAlertsByEmail, saveErrorLog, getErrorLogs, clearErrorLogs, getPortfolio, addToPortfolio, removeFromPortfolio, updatePortfolioCard, savePortfolioSnapshot, getPortfolioSnapshots, listPortfolioUserIds, trackSearchFrequency, getTopSearchedCards, recordMilestone, getFunnelStats } from "./lib/data/firestore.js";
 import { getDemoSearchResult, getDemoResult, listDemoCards, findDemoByNumber } from "./lib/cards/demo.js";
 import { csvEscape, csvRow } from "./lib/data/csv.js";
 import { createApiKey, listApiKeys, listAllKeys, listKeysByOwner, getApiKey, updateApiKey, deleteApiKey, rotateApiKey, validateApiKey } from "./lib/auth/api-keys.js";
@@ -372,6 +372,7 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
     }
     getOrCreateCard(q, { source: result.source, lang: config.language }).catch(() => {});
     trackSearchFrequency(q).catch(() => {});
+    if (req.userId) recordMilestone(req.userId, "firstSearch").catch(() => {});
     res.json(result);
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
@@ -503,6 +504,7 @@ app.post("/api/grade", authMiddleware, (req, res, next) => { req._errorType = "g
       }
     }
 
+    if (req.userId && grade && !grade.error) recordMilestone(req.userId, "firstGrade").catch(() => {});
     res.json({ grade, gradeId, stored: !!(grade && !grade.error) });
   } catch (e) {
     logError(req._errorType || "api", e.message, req.originalUrl, req.requestId);
@@ -613,8 +615,9 @@ app.get("/api/grades", authMiddleware, async (req, res) => {
 // GET /api/errors
 app.get("/api/errors", authMiddleware, async (req, res) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  const type = req.query.type || undefined;
   try {
-    const errors = await getErrorLogs({ limit });
+    const errors = await getErrorLogs({ limit, type });
     res.json({ errors, count: errors.length });
   } catch (e) {
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
@@ -636,6 +639,16 @@ app.get("/api/analytics", ownerOnly, async (req, res) => {
   const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
   try {
     const stats = await getAnalytics({ days });
+    res.json(stats);
+  } catch (e) {
+    res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
+  }
+});
+
+// GET /api/funnel
+app.get("/api/funnel", ownerOnly, async (req, res) => {
+  try {
+    const stats = await getFunnelStats();
     res.json(stats);
   } catch (e) {
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
@@ -708,6 +721,7 @@ app.post("/auth/google", authLimiter, async (req, res) => {
     }
 
     const isAdmin = gUser.sub === process.env.CASECOMP_ADMIN_SUB;
+    recordMilestone(gUser.sub, "signup").catch(() => {});
     res.json({ jwt, apiKey, isAdmin, user: { id: gUser.sub, email: gUser.email, name: gUser.name, picture: gUser.picture } });
   } catch (e) {
     res.status(401).json({ error: "Invalid Google token" });
@@ -1999,6 +2013,7 @@ app.post("/api/portfolio", authMiddleware, async (req, res) => {
       purchaseSource: purchaseSource || "",
       quantity: quantity != null ? Number(quantity) : 1,
     });
+    recordMilestone(userId, "firstPortfolioAdd").catch(() => {});
     res.status(201).json({ ok: true, card });
   } catch (e) {
     logError("portfolio", e.message, req.originalUrl, req.requestId);
@@ -2425,4 +2440,14 @@ app.listen(PORT, async () => {
     }
   }
   initCardDatabase().catch(() => {});
+});
+
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  logError("unhandledRejection", msg, reason instanceof Error ? reason.stack?.split("\n")[1]?.trim() : "");
+});
+
+process.on("uncaughtException", (err) => {
+  logError("uncaughtException", err.message, err.stack?.split("\n")[1]?.trim());
+  setTimeout(() => process.exit(1), 1000);
 });
