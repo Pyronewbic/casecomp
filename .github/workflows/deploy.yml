@@ -18,14 +18,14 @@ jobs:
     outputs:
       digest: ${{ steps.digest.outputs.digest }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: google-github-actions/auth@v3
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: projects/129850122606/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: casecomp-deploy@casecomp-495718.iam.gserviceaccount.com
 
-      - uses: google-github-actions/setup-gcloud@v3
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
 
       - name: Build and push
         run: |
@@ -57,7 +57,7 @@ jobs:
       - name: Configure Docker auth for GCR
         run: gcloud auth configure-docker --quiet
 
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v3
 
       - name: Sign image (keyless)
         run: |
@@ -73,7 +73,7 @@ jobs:
             "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}" || true
 
       - name: Generate container SBOM (Syft)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: "${{ env.IMAGE }}@${{ steps.digest.outputs.digest }}"
           format: spdx-json
@@ -117,12 +117,12 @@ jobs:
         region: [asia-south1, us-central1]
       fail-fast: false
     steps:
-      - uses: google-github-actions/auth@v3
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: projects/129850122606/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: casecomp-deploy@casecomp-495718.iam.gserviceaccount.com
 
-      - uses: google-github-actions/setup-gcloud@v3
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
 
       - name: Deploy to Cloud Run (${{ matrix.region }})
         run: |
@@ -156,9 +156,9 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: ZAP API Scan
-        uses: zaproxy/action-api-scan@v0.9.0
+        uses: zaproxy/action-api-scan@a9a916402665623ce9d37a6998d7b48e6b35dd6c # v0.9.0
         with:
           target: https://api.casecomp.xyz/docs/spec.json
           format: openapi
@@ -167,7 +167,7 @@ jobs:
           cmd_options: '-a'
       - name: Upload DAST report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: zap-report-${{ github.sha }}
           path: report_html.html
