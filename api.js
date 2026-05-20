@@ -2368,6 +2368,15 @@ app.post("/api/keys/rotate", async (req, res) => {
   }
 });
 
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+app.use((err, req, res, _next) => {
+  logError("unhandled", err.message, req.originalUrl, req.requestId);
+  res.status(500).json({ error: safeErrorMessage(err), requestId: req.requestId });
+});
+
 const PORT = process.env.API_PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`Casecomp API listening on http://localhost:${PORT}`);

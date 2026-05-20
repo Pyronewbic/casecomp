@@ -100,9 +100,6 @@ curl "https://api.casecomp.xyz/api/portfolio/set/sv8a?demo=true"
 curl -H "Authorization: Bearer $CASECOMP_KEY" \
   "https://api.casecomp.xyz/api/search?q=Pikachu+ex+SAR&source=magi&format=slab&slab_provider=PSA&slab_grade=10"
 
-curl -H "Authorization: Bearer $CASECOMP_KEY" \
-  "https://api.casecomp.xyz/v1/drops"
-
 curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
   -H "Content-Type: application/json" \
   -d '{"email":"you@email.com","query":"Umbreon ex SAR 217/187","type":"arbitrage","spreadThreshold":10}' \
@@ -128,7 +125,7 @@ curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
 - **SBOM** - Syft SPDX JSON generated per deploy, uploaded as build artifact
 - **Vulnerability scanning** - Grype scans SBOM for CVEs, SARIF uploaded to GitHub Security tab
 - **SAST** - CodeQL static analysis on every PR + weekly schedule
-- **Binary Authorization** - GCP policy on both Cloud Run services (audit mode)
+- **Binary Authorization** - GCP policy enforced on both Cloud Run services
 - **Reproducible builds** - Kaniko `--reproducible` flag, pinned version
 - **Multi-region** - Cloud Run in asia-south1 + us-central1, global LB auto geo-routes to nearest
 - **Custom base image** - Wolfi + apko Node 24 image, manual rebuild, zero CVEs by design
@@ -214,13 +211,13 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-329 tests across three layers. CI required checks: unit + codeql. Smoke is non-blocking.
+434 tests across three layers. CI required checks: unit + codeql. Smoke is non-blocking.
 
 | Suite | Count | Command | Covers |
 |-------|------:|---------|--------|
-| **Unit** | 151 | `yarn test:unit` | Filters, grading, query builder, card identity, condition detection, image preprocessing, email alerts, portfolio ROI, CSV export, autocomplete, JWT auth, price trends |
-| **API** | 104 | `yarn test:api` | Search, sold, PSA, grade, auth, admin keys, arbitrage, price history, alerts, share pages, portfolio CRUD, card view, upload-url, analytics, collection tracking |
-| **Smoke** | 74 | `yarn test:smoke` | API root page, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters |
+| **Unit** | 266 | `yarn test:unit` | Filters, grading, query builder, card identity, condition detection, image preprocessing, email alerts, portfolio ROI, CSV export, autocomplete, JWT auth, price trends |
+| **API** | 97 | `yarn test:api` | Search, sold, PSA, grade, auth, admin keys, arbitrage, price history, alerts, share pages, portfolio CRUD, card view, upload-url, analytics, collection tracking |
+| **Smoke** | 71 | `yarn test:smoke` | API root page, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters |
 
 ## Contributing
 
