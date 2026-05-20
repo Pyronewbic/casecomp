@@ -45,6 +45,13 @@ locals {
         { field_path = "recordedAt", order = "DESCENDING" },
       ]
     }
+    "price-history_cardId_recordedAt" = {
+      collection = "price-history"
+      fields = [
+        { field_path = "cardId", order = "ASCENDING" },
+        { field_path = "recordedAt", order = "DESCENDING" },
+      ]
+    }
   }
 }
 

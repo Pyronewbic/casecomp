@@ -281,8 +281,8 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
         ...item, detectedCondition: item.detectedCondition || detectCondition(item),
       })));
     }
-    if (demoResult.sold?.length) recordSoldPrices(q, demoResult.sold, demoResult.source).catch(() => {});
     const demoIdentity = parseCardIdentity(q);
+    if (demoResult.sold?.length) recordSoldPrices(q, demoResult.sold, demoResult.source, { cardId: demoIdentity.cardId }).catch(() => {});
     if (demoIdentity.cardId) {
       demoResult.cardId = demoIdentity.cardId;
       demoResult.cardIdentity = { name: demoIdentity.name, setCode: demoIdentity.setCode, rarity: demoIdentity.rarity, setName: SET_NAME_MAP[demoIdentity.setCode] || null };
@@ -367,7 +367,7 @@ app.get("/api/search", apiAuthMiddleware, (req, res, next) => { req._errorType =
     }
 
     if (result.sold?.length) {
-      recordSoldPrices(q, result.sold, result.source).catch(() => {});
+      recordSoldPrices(q, result.sold, result.source, { cardId: identity.cardId }).catch(() => {});
       saveGradedImages(result.sold, result.source).catch(() => {});
     }
     getOrCreateCard(q, { source: result.source, lang: config.language }).catch(() => {});
@@ -1412,7 +1412,9 @@ app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
   }
 
   try {
-    let history = await getPriceHistory(q, { days });
+    const identity = parseCardIdentity(q);
+    const cardId = identity.cardId || undefined;
+    let history = await getPriceHistory(q, { days, cardId });
     let tcgData = null;
 
     const tcg = await seedFromTCGPlayer(q);
@@ -1434,8 +1436,8 @@ app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
           priceCurrency: "USD",
           title: tcg.name,
           soldDate: new Date().toISOString().split("T")[0],
-        }], "tcgplayer");
-        history = await getPriceHistory(q, { days });
+        }], "tcgplayer", { cardId });
+        history = await getPriceHistory(q, { days, cardId });
       }
     }
 
@@ -1453,7 +1455,7 @@ app.get("/api/price-history", apiAuthMiddleware, async (req, res) => {
     }
 
     const trend = computePriceTrend(history);
-    res.json({ query: q, days, history, stats, trend, tcgplayer: tcgData });
+    res.json({ query: q, days, history, stats, trend, tcgplayer: tcgData, cardId: cardId || null });
   } catch (e) {
     logError("price-history", e.message, req.originalUrl, req.requestId);
     res.status(500).json({ error: safeErrorMessage(e), requestId: req.requestId });
@@ -1662,7 +1664,7 @@ async function enrichPortfolioCards(cards) {
     let currentPrice = 0;
     let currentSource = "";
     try {
-      const history = await getPriceHistory(card.query, { days: 30 });
+      const history = await getPriceHistory(card.query, { days: 30, cardId: card.cardId });
       if (history.length) {
         currentPrice = history[0].price;
         currentSource = history[0].source || "";
@@ -1704,7 +1706,7 @@ async function calculateGainersLosers(cards, lookbackDays) {
   const cardChanges = await Promise.all(cards.map(async (card) => {
     let priceNDaysAgo = card.purchasePrice;
     try {
-      const history = await getPriceHistory(card.query, { days: lookbackDays });
+      const history = await getPriceHistory(card.query, { days: lookbackDays, cardId: card.cardId });
       if (history.length) {
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - lookbackDays);
@@ -2049,18 +2051,33 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
   } catch {}
 
   let portfolioQueries = [];
+  const queryToCardId = new Map();
   try {
     const userIds = await listPortfolioUserIds();
     for (const uid of userIds.slice(0, 100)) {
       const pCards = await getPortfolio(uid);
-      portfolioQueries.push(...pCards.map(c => c.query).filter(Boolean));
+      for (const c of pCards) {
+        if (c.query) {
+          portfolioQueries.push(c.query);
+          if (c.cardId) queryToCardId.set(c.query, c.cardId);
+        }
+      }
     }
   } catch {}
+
+  for (const q of [...defaultCards, ...alertCards]) {
+    if (!queryToCardId.has(q)) {
+      const id = parseCardIdentity(q);
+      if (id.cardId) queryToCardId.set(q, id.cardId);
+    }
+  }
 
   const cards = req.body?.cards || [...new Set([...defaultCards, ...alertCards, ...portfolioQueries])];
   const hasEbay = !!(clientId && clientSecret);
   const results = [];
   for (const card of cards) {
+    const cardId = queryToCardId.get(card) || parseCardIdentity(card).cardId;
+    const opts = { cardId };
     try {
       let ebaySold = [];
       let magiSold = [];
@@ -2080,7 +2097,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
           ]);
           ebaySold = soldRes.items || [];
           if (ebaySold.length) {
-            await recordSoldPrices(card, ebaySold, "ebay");
+            await recordSoldPrices(card, ebaySold, "ebay", opts);
             saveGradedImages(ebaySold, "ebay").catch(() => {});
           }
         } catch (e) {
@@ -2092,7 +2109,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
         const magiRes = await searchMagi(card, {});
         magiSold = magiRes.sold || [];
         if (magiSold.length) {
-          await recordSoldPrices(card, magiSold, "magi");
+          await recordSoldPrices(card, magiSold, "magi", opts);
           saveGradedImages(magiSold, "magi").catch(() => {});
         }
       } catch (e) {
@@ -2102,7 +2119,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
       if (!ebaySold.length && !magiSold.length) {
         const demoResult = getDemoSearchResult(card);
         if (demoResult.sold?.length) {
-          await recordSoldPrices(card, demoResult.sold, demoResult.source);
+          await recordSoldPrices(card, demoResult.sold, demoResult.source, opts);
           usedDemo = true;
           ebaySold = demoResult.sold;
         }
