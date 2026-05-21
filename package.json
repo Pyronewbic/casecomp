@@ -22,7 +22,7 @@
     "playwright-install": "npx playwright install chromium"
   },
   "dependencies": {
-    "@google-cloud/firestore": "^8.5.0",
+    "@google-cloud/firestore": "^8.6.0",
     "@google-cloud/storage": "^7.19.0",
     "axios": "^1.16.1",
     "axios-cookiejar-support": "^7.0.0",
