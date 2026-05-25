@@ -906,8 +906,7 @@ app.get("/api/sets/:setCode", requireCardDb, (req, res) => {
 });
 
 // POST /api/card-database/sync
-app.post("/api/card-database/sync", apiAuthMiddleware, async (req, res) => {
-  if (req.authTier !== "owner") return res.status(403).json({ error: "Owner only" });
+app.post("/api/card-database/sync", ownerOnly, async (req, res) => {
   try {
     const force = req.query.force === "true";
     const result = await syncCardDatabase({ force });
