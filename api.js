@@ -890,10 +890,12 @@ app.get("/api/autocomplete", requireCardDb, (req, res) => {
 
 // GET /api/sets
 app.get("/api/sets", requireCardDb, (req, res) => {
-  const sets = getAllSets();
-  const era = req.query.era;
-  const filtered = era ? sets.filter(s => s.era === era) : sets;
-  res.json({ sets: filtered, count: filtered.length });
+  let sets = getAllSets();
+  if (req.query.era) sets = sets.filter(s => s.era === req.query.era);
+  const lang = req.query.lang;
+  if (lang === "en") sets = sets.filter(s => s.lang === "en" || s.lang === "both");
+  else if (lang === "jp") sets = sets.filter(s => s.lang === "jp" || s.lang === "both");
+  res.json({ sets, count: sets.length });
 });
 
 // GET /api/sets/:setCode
