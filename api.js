@@ -2465,13 +2465,3 @@ process.on("uncaughtException", (err) => {
   logError("uncaughtException", err.message, err.stack?.split("\n")[1]?.trim());
   setTimeout(() => process.exit(1), 1000);
 });
-
-process.on("unhandledRejection", (reason) => {
-  const msg = reason instanceof Error ? reason.message : String(reason);
-  logError("unhandledRejection", msg, reason instanceof Error ? reason.stack?.split("\n")[1]?.trim() : "");
-});
-
-process.on("uncaughtException", (err) => {
-  logError("uncaughtException", err.message, err.stack?.split("\n")[1]?.trim());
-  setTimeout(() => process.exit(1), 1000);
-});
