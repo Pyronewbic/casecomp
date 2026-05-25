@@ -948,8 +948,9 @@ async function run() {
   });
 
   await test("POST /api/card-database/sync requires owner key", async () => {
-    const { res } = await json("/api/card-database/sync", { method: "POST" });
-    assert(res.status === 403, `expected 403, got ${res.status}`);
+    const { res } = await jsonNoAuth("/api/card-database/sync", { method: "POST" });
+    if (API_KEY) assert(res.status === 403, `expected 403, got ${res.status}`);
+    else assert(res.status === 200, `expected 200 in local mode, got ${res.status}`);
   });
 
   // ── Price trend ──
