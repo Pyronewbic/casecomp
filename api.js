@@ -2433,9 +2433,8 @@ app.use((err, req, res, _next) => {
 });
 
 const PORT = process.env.API_PORT || 3000;
-app.listen(PORT, async () => {
-  console.log(`Casecomp API listening on http://localhost:${PORT}`);
-  console.log(`Swagger docs: http://localhost:${PORT}/docs`);
+
+async function startup() {
   if (clientId && clientSecret) {
     try {
       await getToken();
@@ -2444,8 +2443,18 @@ app.listen(PORT, async () => {
       console.warn(`eBay token warmup failed: ${e.message}`);
     }
   }
-  initCardDatabase().catch(() => {});
-});
+  try {
+    await initCardDatabase();
+  } catch (e) {
+    console.warn(`Card database init failed: ${e.message}`);
+  }
+  app.listen(PORT, () => {
+    console.log(`Casecomp API listening on http://localhost:${PORT}`);
+    console.log(`Swagger docs: http://localhost:${PORT}/docs`);
+  });
+}
+
+startup();
 
 process.on("unhandledRejection", (reason) => {
   const msg = reason instanceof Error ? reason.message : String(reason);
