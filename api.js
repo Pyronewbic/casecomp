@@ -26,7 +26,7 @@ import { saveGradedImages } from "./lib/cards/grading-dataset.js";
 import { verifyGoogleToken, generateJwt, verifyJwt } from "./lib/auth/auth.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/cards/card-identity.js";
-import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId } from "./lib/cards/card-database.js";
+import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId, isCardDatabaseReady } from "./lib/cards/card-database.js";
 import { raspMiddleware, getSecurityEvents } from "./lib/security/rasp.js";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -183,6 +183,11 @@ const clientId = process.env.EBAY_CLIENT_ID;
 const clientSecret = process.env.EBAY_CLIENT_SECRET;
 async function getToken() { return getAccessToken(clientId, clientSecret); }
 async function on401() { invalidateToken(); }
+
+function requireCardDb(req, res, next) {
+  if (!isCardDatabaseReady()) return res.status(503).json({ error: "Card database loading, try again shortly", retryAfter: 5 });
+  next();
+}
 
 function validateQuery(q, res) {
   if (!q) { res.status(400).json({ error: "Missing required parameter: q" }); return false; }
@@ -874,7 +879,7 @@ app.delete("/api/admin/keys/:id", authMiddleware, async (req, res) => {
 });
 
 // GET /api/autocomplete
-app.get("/api/autocomplete", (req, res) => {
+app.get("/api/autocomplete", requireCardDb, (req, res) => {
   const q = (req.query.q || "").trim();
   if (!q || q.length < 2) return res.status(400).json({ error: "Query must be at least 2 characters" });
   if (q.length > 100) return res.status(400).json({ error: "Query too long (max 100 characters)" });
@@ -884,7 +889,7 @@ app.get("/api/autocomplete", (req, res) => {
 });
 
 // GET /api/sets
-app.get("/api/sets", (req, res) => {
+app.get("/api/sets", requireCardDb, (req, res) => {
   const sets = getAllSets();
   const era = req.query.era;
   const filtered = era ? sets.filter(s => s.era === era) : sets;
@@ -892,7 +897,7 @@ app.get("/api/sets", (req, res) => {
 });
 
 // GET /api/sets/:setCode
-app.get("/api/sets/:setCode", (req, res) => {
+app.get("/api/sets/:setCode", requireCardDb, (req, res) => {
   const result = getSetWithCards(req.params.setCode);
   if (!result) return res.status(404).json({ error: "Set not found" });
   res.json(result);
