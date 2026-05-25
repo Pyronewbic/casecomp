@@ -11,6 +11,7 @@ locals {
     "GOOGLE_OAUTH_CLIENT_ID",
     "CASECOMP_ADMIN_SUB",
     "TOGETHER_API_KEY",
+    "POKEWALLET_API_KEY",
   ]
 }
 
