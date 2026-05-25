@@ -890,10 +890,12 @@ app.get("/api/autocomplete", requireCardDb, (req, res) => {
 
 // GET /api/sets
 app.get("/api/sets", requireCardDb, (req, res) => {
-  const sets = getAllSets();
-  const era = req.query.era;
-  const filtered = era ? sets.filter(s => s.era === era) : sets;
-  res.json({ sets: filtered, count: filtered.length });
+  let sets = getAllSets();
+  if (req.query.era) sets = sets.filter(s => s.era === req.query.era);
+  const lang = req.query.lang;
+  if (lang === "en") sets = sets.filter(s => s.lang === "en" || s.lang === "both");
+  else if (lang === "jp") sets = sets.filter(s => s.lang === "jp" || s.lang === "both");
+  res.json({ sets, count: sets.length });
 });
 
 // GET /api/sets/:setCode
@@ -2455,16 +2457,6 @@ async function startup() {
 }
 
 startup();
-
-process.on("unhandledRejection", (reason) => {
-  const msg = reason instanceof Error ? reason.message : String(reason);
-  logError("unhandledRejection", msg, reason instanceof Error ? reason.stack?.split("\n")[1]?.trim() : "");
-});
-
-process.on("uncaughtException", (err) => {
-  logError("uncaughtException", err.message, err.stack?.split("\n")[1]?.trim());
-  setTimeout(() => process.exit(1), 1000);
-});
 
 process.on("unhandledRejection", (reason) => {
   const msg = reason instanceof Error ? reason.message : String(reason);

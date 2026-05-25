@@ -1070,6 +1070,13 @@ test("getAllSets: returns empty array when no cards loaded", () => {
   eq(Array.isArray(sets), true);
 });
 
+test("getAllSets: lang field is en, jp, or both", () => {
+  const sets = getAllSets();
+  for (const s of sets) {
+    eq(["en", "jp", "both", undefined].includes(s.lang), true);
+  }
+});
+
 test("getSetWithCards: returns null for nonexistent set", () => {
   eq(getSetWithCards("zzz999"), null);
 });

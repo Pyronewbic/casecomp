@@ -922,6 +922,31 @@ async function run() {
     assert(res.status === 404, `expected 404, got ${res.status}`);
   });
 
+  await test("GET /api/sets includes lang field on each set", async () => {
+    const { body } = await jsonNoAuth("/api/sets");
+    for (const s of body.sets) {
+      assert(["en", "jp", "both"].includes(s.lang), `unexpected lang ${s.lang} on set ${s.setCode}`);
+    }
+  });
+
+  await test("GET /api/sets?lang=en filters to EN sets", async () => {
+    const { body: all } = await jsonNoAuth("/api/sets");
+    const { body: en } = await jsonNoAuth("/api/sets?lang=en");
+    assert(en.count <= all.count, "en count should be <= total");
+    for (const s of en.sets) {
+      assert(s.lang === "en" || s.lang === "both", `expected en/both, got ${s.lang}`);
+    }
+  });
+
+  await test("GET /api/sets?lang=jp filters to JP sets", async () => {
+    const { body: all } = await jsonNoAuth("/api/sets");
+    const { body: jp } = await jsonNoAuth("/api/sets?lang=jp");
+    assert(jp.count <= all.count, "jp count should be <= total");
+    for (const s of jp.sets) {
+      assert(s.lang === "jp" || s.lang === "both", `expected jp/both, got ${s.lang}`);
+    }
+  });
+
   // ── Price trend ──
 
   console.log("\n\x1b[1m=== price trend ===\x1b[0m");

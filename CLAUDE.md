@@ -10,6 +10,7 @@ Casecomp — Pokemon TCG card research tool. API at api.casecomp.xyz (Cloud Run 
 - **No Co-Authored-By lines** in commits. No "Generated with Claude Code" in PR descriptions or any public text.
 - **Branch flow:** push to dev or main → CI runs → deploy on main push.
 - **Commits:** concise message, no attribution trailers.
+- **Before each commit:** consider whether new unit, API, or smoke tests are needed for the change. Add them in the same commit.
 - **PR template:** .github/PULL_REQUEST_TEMPLATE.md
 
 ## Code style
