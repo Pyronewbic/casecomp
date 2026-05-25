@@ -947,6 +947,11 @@ async function run() {
     }
   });
 
+  await test("POST /api/card-database/sync requires owner key", async () => {
+    const { res } = await json("/api/card-database/sync", { method: "POST" });
+    assert(res.status === 403, `expected 403, got ${res.status}`);
+  });
+
   // ── Price trend ──
 
   console.log("\n\x1b[1m=== price trend ===\x1b[0m");

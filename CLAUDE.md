@@ -46,7 +46,7 @@ Strict palette — no deviations:
 
 ## Architecture decisions
 
-- **Caching:** Firestore only, no Redis. Stale-while-revalidate on active listings. TCGdex card DB cached (24h TTL). PSA negative caching (7 days).
+- **Caching:** Firestore only, no Redis. Stale-while-revalidate on active listings. TCGdex card DB cached (no TTL, synced on-demand via `POST /api/card-database/sync`). PSA negative caching (7 days).
 - **CORS:** Wildcard `*`. API key is the access control layer.
 - **Auth:** Owner `CC_LIVE_` (60/min), sandbox (5/min), developer keys (per-key rate limit enforced), demo `?demo=true` (360/min). Local: no auth.
 - **authMiddleware** checks owner → sandbox → JWT (Google OAuth) → Firestore developer keys (30s cache). `apiAuthMiddleware` adds demo bypass.
@@ -100,6 +100,7 @@ Strict palette — no deviations:
 - `/api/analytics` — request analytics (owner-only)
 - `/api/grading-dataset/stats` — ML dataset collection stats (owner-only)
 - `/api/security/events` — RASP security event log (owner-only)
+- `POST /api/card-database/sync` — sync card DB from TCGdex if new sets detected (owner-only, `?force=true` to force)
 - `/auth/google` — Google OAuth → JWT
 
 ## Free tier strategy

@@ -26,7 +26,7 @@ import { saveGradedImages } from "./lib/cards/grading-dataset.js";
 import { verifyGoogleToken, generateJwt, verifyJwt } from "./lib/auth/auth.js";
 import { seedFromTCGPlayer } from "./lib/sources/tcgplayer.js";
 import { getOrCreateCard, findCardByQuery, parseCardIdentity, resolveCardIdToQuery, SET_NAME_MAP } from "./lib/cards/card-identity.js";
-import { initCardDatabase, searchCards, refreshCardDatabase, getAllSets, getSetWithCards, findCardByCardId, isCardDatabaseReady } from "./lib/cards/card-database.js";
+import { initCardDatabase, searchCards, syncCardDatabase, getAllSets, getSetWithCards, findCardByCardId, isCardDatabaseReady } from "./lib/cards/card-database.js";
 import { raspMiddleware, getSecurityEvents } from "./lib/security/rasp.js";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -903,6 +903,18 @@ app.get("/api/sets/:setCode", requireCardDb, (req, res) => {
   const result = getSetWithCards(req.params.setCode);
   if (!result) return res.status(404).json({ error: "Set not found" });
   res.json(result);
+});
+
+// POST /api/card-database/sync
+app.post("/api/card-database/sync", apiAuthMiddleware, async (req, res) => {
+  if (req.authTier !== "owner") return res.status(403).json({ error: "Owner only" });
+  try {
+    const force = req.query.force === "true";
+    const result = await syncCardDatabase({ force });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: "Sync failed" });
+  }
 });
 
 // ============ V1 API — Drop Intelligence ============
@@ -2227,7 +2239,7 @@ app.post("/api/track-prices", authMiddleware, async (req, res) => {
     } catch {}
   }
 
-  refreshCardDatabase().catch(() => {});
+  syncCardDatabase().catch(() => {});
   res.json({ tracked: results.length, results, portfolioSnapshots, portfolioWarmed, portfolioCardsTracked: portfolioQueries.length, frequencyWarmed });
 });
 
