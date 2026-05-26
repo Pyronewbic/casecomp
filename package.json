@@ -34,7 +34,7 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "minimist": "^1.2.8",
-    "playwright": "^1.59.1",
+    "playwright": "^1.60.0",
     "resend": "^6.12.3",
     "sharp": "^0.34.5",
     "swagger-ui-express": "^5.0.1",
