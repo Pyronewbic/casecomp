@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0 (2026-05-25)
+
+- Admin panel: tabbed layout (Keys / Analytics / Errors / Funnel)
+- Analytics dashboard: daily volume chart, by-tier/by-path bars, top queries, avg latency
+- Error monitoring: type filter dropdown, 30-day TTL on error-logs, process-level handlers (unhandledRejection, uncaughtException)
+- User funnel tracking: signup/firstSearch/firstGrade/firstPortfolioAdd milestones, GET /api/funnel
+- Set browser: language filter (?lang=en|jp), 353 sets (up from 238)
+- Card database: on-demand sync (POST /api/card-database/sync), no more TTL-based refresh on cold start
+- PokeWallet integration: JP card rarity enrichment (SAR/IR/UR/HR/SR/RR/AR/ACE/CR)
+- Card ID normalization: deduplicate EN/JA zero-padded IDs for older sets (neo, base)
+- Cold start fix: card DB + set metadata fully loaded before accepting connections
+- 488 tests (313 unit, 104 API, 71 smoke)
+
 ## 1.4.0 (2026-05-20)
 
 - SBOM attestation: Syft SPDX generated from built container image, cosign-attested to digest
