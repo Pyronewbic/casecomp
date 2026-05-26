@@ -1,6 +1,6 @@
 # <img src="logos/casecomp-logo.svg" width="32" height="32" alt="Casecomp logo" /> Casecomp
 
-[![Version](https://img.shields.io/badge/version-1.4.0-d9b676)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.5.0-d9b676)](CHANGELOG.md)
 [![CI](https://github.com/Pyronewbic/casecomp/actions/workflows/ci.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/ci.yml)
 [![Deploy](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml/badge.svg)](https://github.com/Pyronewbic/casecomp/actions/workflows/deploy.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -26,8 +26,8 @@ Search any Pokemon card across four marketplaces in one query. Get live prices, 
 - **PSA grading signals** - population data, difficulty, gem 10%, recommended submission tier
 - **Slab comparison** - compare PSA 10 / BGS 9.5 / TAG 10 prices across sources
 - **Portfolio** - track cards, ROI, value over time, grading opportunities
-- **Admin** - API key management, stats KPIs, error log at `/admin`
-- **Set browser** - browse 238 sets with logos, rarity filters, collection tracking (owned/missing)
+- **Admin** - API key management, analytics dashboard, error monitoring with type filters, user funnel tracking at `/admin`
+- **Set browser** - browse 353 sets with logos, rarity filters, language filter (EN/JP), collection tracking (owned/missing)
 - **REST API** - authenticated endpoints with rate limiting, per-key caching, OpenAPI spec
 - **Claude Code skill** - `/casecomp` for plain-English card search
 - **Chrome extension** - queue auto-join for Pokemon Center, Walmart, Costco, Target drops
@@ -84,7 +84,8 @@ Full reference: [api.casecomp.xyz/docs](https://api.casecomp.xyz/docs)
 
 ```bash
 # ── Public (no key) ──────────────────────────────────────────
-curl "https://api.casecomp.xyz/api/sets"                        # browse 238 sets
+curl "https://api.casecomp.xyz/api/sets"                        # browse 353 sets
+curl "https://api.casecomp.xyz/api/sets?lang=en"                 # EN sets only
 curl "https://api.casecomp.xyz/api/sets/sv06"                   # cards in a set
 curl "https://api.casecomp.xyz/api/autocomplete?q=umbreon"      # card search (29K cards)
 curl "https://api.casecomp.xyz/api/health"                      # service status
@@ -117,7 +118,7 @@ curl -X POST -H "Authorization: Bearer $CASECOMP_KEY" \
 
 ### Public endpoints (no key)
 
-`GET /api/health` | `GET /api/demo` | `GET /api/sitemap` | `GET /api/autocomplete` | `GET /api/sets` | `GET /api/sets/:setCode` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold/arbitrage/price-history
+`GET /api/health` | `GET /api/demo` | `GET /api/sitemap` | `GET /api/autocomplete` | `GET /api/sets` | `GET /api/sets/:setCode` | `GET /api/funnel` | `GET /docs` | `GET /docs/spec.json` | `?demo=true` (sample data) on search/sold/arbitrage/price-history
 
 ## Security
 
@@ -199,7 +200,9 @@ All caches use Firestore (shared across Cloud Run instances, persists across dep
 | `cache-ebay-sold` | 24 hours | eBay sold comp results |
 | `price-history` | permanent | Sold comp prices over time |
 | `api-keys` | permanent | Developer API keys (hashed) |
-| `error-logs` | permanent | API errors with request IDs |
+| `error-logs` | 30 days (TTL) | API errors with request IDs |
+| `card-database-cache` | permanent (on-demand sync) | TCGdex card index (~29K cards) |
+| `user-milestones` | permanent | User funnel milestones (signup, first search, etc.) |
 
 ## Infrastructure
 
@@ -213,12 +216,12 @@ Load unpacked from `extension/` in `chrome://extensions`.
 
 ## Tests
 
-486 tests across three layers. CI required checks: unit + codeql. Smoke is non-blocking.
+488 tests across three layers. CI required checks: unit + codeql. Smoke is non-blocking.
 
 | Suite | Count | Command | Covers |
 |-------|------:|---------|--------|
-| **Unit** | 312 | `yarn test:unit` | Filters, grading, query builder, card identity, condition detection, image preprocessing, email alerts, portfolio ROI, CSV export, autocomplete, JWT auth, price trends, RASP detection |
-| **API** | 103 | `yarn test:api` | Search, sold, PSA, grade, auth, admin keys, arbitrage, price history, alerts, share pages, portfolio CRUD, card view, upload-url, analytics, collection tracking |
+| **Unit** | 313 | `yarn test:unit` | Filters, grading, query builder, card identity, condition detection, image preprocessing, email alerts, portfolio ROI, CSV export, autocomplete, JWT auth, price trends, RASP detection |
+| **API** | 104 | `yarn test:api` | Search, sold, PSA, grade, auth, admin keys, arbitrage, price history, alerts, share pages, portfolio CRUD, card view, upload-url, analytics, collection tracking, lang filter, card-database sync |
 | **Smoke** | 71 | `yarn test:smoke` | API root page, detail panel, tabs, PSA stats, arbitrage, mobile viewport, portfolio, autocomplete, search filters |
 
 ## Contributing

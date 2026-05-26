@@ -12,11 +12,11 @@ Both Cloud Run services deploy to asia-south1 and us-central1. The global HTTPS 
 |----------|---------|
 | Cloud Run `casecomp-api` | API server, 2 regions, scales to 20 per region |
 | Cloud Run `casecomp-site` | Frontend SSR (TanStack Start), 2 regions, scales to 10 |
-| Firestore | Grade logs, drops, webhooks, alerts, caches, api-keys, price-history, error-logs (asia-south1 only) |
+| Firestore | Grade logs, drops, webhooks, alerts, caches, api-keys, price-history, error-logs (30d TTL), card-database-cache, user-milestones, api-analytics (asia-south1 only) |
 | HTTPS Load Balancer | Global IP, URL map routes by host, serverless NEGs in both regions |
 | Cloud CDN | Caches static assets from frontend Cloud Run |
 | SSL Certificates | GCP managed certs for `api.casecomp.xyz` and `casecomp.xyz` |
-| Secret Manager | EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY, RESEND_API_KEY (auto-replicated) |
+| Secret Manager | EBAY_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, TOGETHER_API_KEY, PSA_AUTH_TOKEN, CASECOMP_API_KEY, CASECOMP_SANDBOX_KEY, RESEND_API_KEY, CASECOMP_JWT_SECRET, GOOGLE_OAUTH_CLIENT_ID, CASECOMP_ADMIN_SUB, POKEWALLET_API_KEY (auto-replicated) |
 | Binary Authorization | ENFORCED policy on both Cloud Run services |
 | Cloud Monitoring | Log-based error metric, error + uptime alerts |
 | Cloud Scheduler | track-prices + check-alerts every 6h |

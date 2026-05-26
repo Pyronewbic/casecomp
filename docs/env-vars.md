@@ -56,6 +56,7 @@ Copy **`.env.example`** to **`.env`** and fill in the required values.
 | `GOOGLE_OAUTH_CLIENT_ID` | *(none)* | Google OAuth client ID for sign-in (popup flow) |
 | `TOGETHER_API_KEY` | *(none)* | Together AI key for card detection (GLM-4.6V, falls back to Claude Sonnet) |
 | `RASP_MODE` | `monitor` | RASP enforcement mode: `monitor` (log only) or `block` (reject malicious requests) |
+| `POKEWALLET_API_KEY` | *(none)* | PokeWallet API key for JP card rarity data (free tier: 100 req/hr, 1K/day) |
 
 ## Email notifications
 

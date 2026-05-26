@@ -23,7 +23,7 @@ lib/
     auth.js           Google OAuth token verification, JWT (HS256)
     api-keys.js       Developer key management
   cards/
-    card-database.js  TCGdex card DB (29K EN+JP cards), set browser, rarity
+    card-database.js  TCGdex card DB (29K EN+JP cards), set browser, rarity, PokeWallet JP enrichment
     card-identity.js  Canonical IDs, set resolution, SET_TOTAL_MAP
     demo.js           Sample data (3 multi-source cards)
     grading-dataset.js  ML slab image collection from sold listings (eBay, magi, search)
@@ -50,8 +50,8 @@ public/admin/         Admin panel (keys, stats, errors)
 extension/            Chrome extension: queue auto-join, drop intel
 terraform/            GCP infra (Cloud Run, Firestore, LB, CDN, Scheduler)
 test/
-  unit-test.js        312 unit tests
-  api-test.js         103 API integration tests
+  unit-test.js        313 unit tests
+  api-test.js         104 API integration tests
   smoke-test.js       71 Playwright UI smoke tests
 ```
 
@@ -66,7 +66,7 @@ test/
 - **Dashboard**: static files from `public/` served at `/` and `/admin`.
 - **Docs**: Swagger UI at `/docs`, spec at `/docs/spec.json`.
 
-On startup: eBay OAuth token pre-fetched, TCGdex card database loaded from Firestore cache (24h TTL), set names + logos loaded in parallel.
+On startup: eBay OAuth token pre-fetched, TCGdex card database loaded from Firestore cache (no TTL, on-demand sync via `POST /api/card-database/sync`), set metadata (names + logos) loaded in parallel. Server waits for card DB and set metadata before accepting connections.
 
 ## Multi-region deployment
 
@@ -98,8 +98,10 @@ All caches use Firestore (shared across Cloud Run instances, single region). No 
 | `cache-ebay-sold` | 24 hours | eBay sold comp results |
 | `price-history` | permanent | Sold comp prices over time |
 | `api-keys` | permanent | Developer API keys (hashed) |
-| `error-logs` | permanent | API errors with request IDs |
-| `api-analytics` | 30 days | Request analytics (tier, path, latency) |
+| `error-logs` | 30 days (TTL) | API errors with request IDs, type filter |
+| `api-analytics` | 30 days | Request analytics (tier, path, latency, daily/byStatus) |
+| `card-database-cache` | permanent | TCGdex card index (~29K cards), synced on-demand |
+| `user-milestones` | permanent | User funnel milestones (signup → search → grade → portfolio) |
 | `grading-dataset` | permanent | ML training data: slab images + parsed grades |
 
 Stale-while-revalidate on active listings for owner key. File-based cache (`.json` files) still used by the CLI.
@@ -152,6 +154,8 @@ Use `--refresh` to delete all cache files before a run.
 | `grade-logs` | source + createdAt desc | Filter grades by source |
 | `api-analytics` | userId + ts desc | Per-user analytics |
 | `price-history` | cardKey + recordedAt desc | Card price history |
+| `price-history` | cardId + recordedAt desc | Card price history (by canonical ID) |
+| `error-logs` | type + createdAt desc | Error filtering by type |
 
 **ML dataset pipeline**: graded slab images (PSA/BGS/CGC/TAG) are passively collected into `grading-dataset` Firestore collection from multiple sources: eBay sold (via `track-prices` and `/api/sold`), magi sold (via `track-prices`), and any search with sold results (`/api/search`). Grade is parsed from listing title or grade label. `GET /api/grading-dataset/stats` monitors collection progress.
 
@@ -163,7 +167,7 @@ Three workflows: `ci.yml` (all checks), `deploy.yml` (build + sign + deploy), `t
 
 | Job | What | Required? |
 |-----|------|-----------|
-| unit | 312 unit tests | Yes |
+| unit | 313 unit tests | Yes |
 | smoke | 71 Playwright smoke tests | No (continue-on-error) |
 | codeql | SAST for JavaScript/TypeScript | Yes |
 | scan | SBOM (Syft) + Grype vulnerability scan | No |
