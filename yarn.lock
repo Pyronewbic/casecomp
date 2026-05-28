@@ -2077,13 +2077,13 @@ require-directory@^2.1.1:
   resolved "https://registry.npmjs.org/require-directory/-/require-directory-2.1.1.tgz"
   integrity sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==
 
-resend@^6.12.3:
-  version "6.12.3"
-  resolved "https://registry.npmjs.org/resend/-/resend-6.12.3.tgz"
-  integrity sha512-FkEi6YPnVL96/LvH8+QP7NaeaBy5brYXwlRqUCqZZeNL0/iyKij18IPmyPXYauT/2ODn1JG04qKz+qlJfzqzTw==
+resend@^6.12.4:
+  version "6.12.4"
+  resolved "https://registry.yarnpkg.com/resend/-/resend-6.12.4.tgz#37585aff359704f6434d529e6b84924f0786d86d"
+  integrity sha512-lRpJ2Hxd+ht+JPDm97juRcUp9HOMuZyxaRFRFmc9Tx8iNWiei94Dx9v6SWufgKk2667C/uCeKKspMotOHSpCSg==
   dependencies:
     postal-mime "2.7.4"
-    svix "1.92.2"
+    standardwebhooks "1.0.0"
 
 resolve-from@^4.0.0:
   version "4.0.0"
@@ -2386,13 +2386,6 @@ supports-color@^7.1.0:
   integrity sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==
   dependencies:
     has-flag "^4.0.0"
-
-svix@1.92.2:
-  version "1.92.2"
-  resolved "https://registry.npmjs.org/svix/-/svix-1.92.2.tgz"
-  integrity sha512-ZmuA3UVvlnF9EgxlzmPtF7CKjQb64Z6OFlyfdDfU0sdcC7dJa+3aOYX5B9mA+RS6ch1AxBa4UP/l6KmqfGtWBQ==
-  dependencies:
-    standardwebhooks "1.0.0"
 
 swagger-ui-dist@>=5.0.0:
   version "5.32.5"
